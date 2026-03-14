@@ -3,6 +3,10 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = ai.getGenerativeModel({
     model: 'gemini-2.5-flash',
+    generationConfig: {
+        maxOutputTokens: 1024,
+        temperature: 0.3,
+    },
     systemInstruction: { parts: [{ text: `
 당신은 '행복한 의사' 단체의 똑똑하고 다정한 예진 비서 '인턴 닥터 보듬'입니다.
 '행복한 의사'는 병원에 가기 어려운 의료 취약계층(노숙자, 다문화 가정, 외국인 노동자, 주민등록 말소자, 의료보험 체불자 등) 환자분들을 온라인에서 돌보기 위해 자원봉사 의사들이 운영하는 비영리 봉사 단체입니다. 누구든지 상담을 받을 수 있습니다.

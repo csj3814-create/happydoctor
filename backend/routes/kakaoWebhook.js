@@ -45,19 +45,23 @@ router.post('/triage-complete', async (req, res) => {
             pmhx: merged.past_medical_history || '특이사항 없음'
         };
 
-        // 즉시 대기 메시지 반환 (5초 타임아웃 방지)
-        res.status(200).json({
-            version: "2.0",
-            useCallback: true,
-            template: {
-                outputs: [{
-                    simpleText: { text: "🩺 입력해주신 증상을 분석하고 있습니다. 잠시만 기다려주세요..." }
-                }]
-            }
-        });
-
-        // 비동기로 Gemini 분석 + 콜백 응답
-        processTriageAsync(callbackUrl, userId, patientData);
+        if (callbackUrl) {
+            // 콜백 모드: 대기 메시지 먼저 반환 후 비동기 처리
+            res.status(200).json({
+                version: "2.0",
+                useCallback: true,
+                template: {
+                    outputs: [{
+                        simpleText: { text: "🩺 입력해주신 증상을 분석하고 있습니다. 잠시만 기다려주세요..." }
+                    }]
+                }
+            });
+            processTriageAsync(callbackUrl, userId, patientData);
+        } else {
+            // 동기 모드: 5초 내 직접 응답
+            const result = await processTriageSync(userId, patientData);
+            return res.status(200).json(result);
+        }
 
     } catch (error) {
         console.error('[Kakao Webhook Error]', error);
@@ -71,6 +75,29 @@ router.post('/triage-complete', async (req, res) => {
         });
     }
 });
+
+async function processTriageSync(userId, patientData) {
+    try {
+        const analysisResult = await analyzeAndRouteTriage(patientData);
+        let finalResponseText = '';
+        if (analysisResult.action === 'AUTONOMOUS_REPLY') {
+            finalResponseText = analysisResult.replyToPatient;
+            const fallbackChart = `[최초 자동 해결된 경증 환자]\n증상: ${patientData.cc}\nNRS: ${patientData.nrs}`;
+            followUpService.scheduleFollowUp(userId, fallbackChart, 15);
+        } else {
+            enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId);
+            followUpService.scheduleFollowUp(userId, analysisResult.soapChartForDoctor, 15);
+            finalResponseText = analysisResult.replyToPatient +
+                "\n\n🩺 작성해주신 차트를 담당 전문의 선생님들께 보고드렸습니다. 잠시만 대기해 주세요. (급박한 응급상황 시 119를 부르세요!)" +
+                "\n\n🏥 '행복한 의사'는 의료 취약계층을 위한 비영리 단체입니다. 💛";
+        }
+        dbService.logConsultation(userId, patientData, analysisResult).catch(err => console.error("DB Log Error:", err));
+        return { version: "2.0", template: { outputs: [{ simpleText: { text: finalResponseText } }] } };
+    } catch (error) {
+        console.error('[Sync Triage Error]', error);
+        return { version: "2.0", template: { outputs: [{ simpleText: { text: "죄송합니다. 분석 중 오류가 발생했습니다. 다시 시도해주세요." } }] } };
+    }
+}
 
 async function processTriageAsync(callbackUrl, userId, patientData) {
     try {
