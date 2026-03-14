@@ -34,16 +34,22 @@ router.post('/triage-complete', async (req, res) => {
         const merged = { ...contextParams, ...params };
         console.log('[Merged Params]', JSON.stringify(merged));
 
+        // sys.* 엔티티 이름이 그대로 들어온 경우 기본값 처리
+        const sanitize = (val, fallback) => {
+            if (!val || val.startsWith('sys.')) return fallback;
+            return val;
+        };
+
         const patientData = {
-            age: merged.age || '미상',
-            gender: merged.gender || '미상',
-            cc: merged.chief_complaint || '증상 미확인',
-            onset: merged.onset || '알 수 없음',
-            symptom: merged.symptom_detail || '상세 내용 없음',
-            nrs: merged.nrs || '0',
-            associated: merged.associated_symptom || '없음',
-            pmhx: merged.past_medical_history || '특이사항 없음',
-            location: merged.location || '미확인',
+            age: sanitize(merged.age, '미상'),
+            gender: sanitize(merged.gender, '미상'),
+            cc: sanitize(merged.chief_complaint, '증상 미확인'),
+            onset: sanitize(merged.onset, '알 수 없음'),
+            symptom: sanitize(merged.symptom_detail, '상세 내용 없음'),
+            nrs: sanitize(merged.nrs, '0'),
+            associated: sanitize(merged.associated_symptom, '없음'),
+            pmhx: sanitize(merged.past_medical_history, '특이사항 없음'),
+            location: sanitize(merged.location, '미확인'),
             symptomImage: merged.symptom_image || null
         };
 
