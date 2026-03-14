@@ -16,11 +16,11 @@ router.post('/triage-complete', async (req, res) => {
     try {
         console.log('[Kakao Webhook] Received Triage Data');
         
-        // 오픈빌더 payload에서 params + contexts 모두 수집
         const params = req.body.action?.params || {};
         const userId = req.body.userRequest?.user?.id || 'kakao_user_unknown';
+        const callbackUrl = req.body.userRequest?.callbackUrl;
 
-        // 컨텍스트에서 파라미터 추출 (이전 블록들에서 출력 컨텍스트로 전달된 값)
+        // 컨텍스트에서 파라미터 추출
         const contextParams = {};
         const contexts = req.body.contexts || [];
         for (const ctx of contexts) {
@@ -31,11 +31,9 @@ router.post('/triage-complete', async (req, res) => {
             }
         }
 
-        // params(현재 블록) + contextParams(이전 블록) 병합 (params 우선)
         const merged = { ...contextParams, ...params };
         console.log('[Merged Params]', JSON.stringify(merged));
 
-        // 1. 환자 데이터 수집 (오픈빌더 엔터티명에 따라 매핑)
         const patientData = {
             age: merged.age || '미상',
             gender: merged.gender || '미상',
@@ -47,50 +45,19 @@ router.post('/triage-complete', async (req, res) => {
             pmhx: merged.past_medical_history || '특이사항 없음'
         };
 
-        // 2. Gemini를 이용해 예진 데이터 분석 및 분기 (자율해결 vs 전문의협진)
-        const analysisResult = await analyzeAndRouteTriage(patientData);
-        console.log('[Gemini Analysis Result]', analysisResult.action);
-
-        let finalResponseText = '';
-
-        // 3. 분기 처리 로직 (AI 자율해결 vs 전문의협진)
-        if (analysisResult.action === 'AUTONOMOUS_REPLY') {
-            // [경증] AI가 단독 처리
-            finalResponseText = analysisResult.replyToPatient;
-
-            // [추가] 15분 뒤 자동 상태 점검 스케줄링 (경증이라 차트는 없으나 초기 증상 텍스트를 임시 저장)
-            const fallbackChart = `[최초 자동 해결된 경증 환자]\n증상: ${patientData.cc}\nNRS: ${patientData.nrs}`;
-            followUpService.scheduleFollowUp(userId, fallbackChart, 15);
-
-        } else {
-            // [협진 필요] 전문의 큐에 차트 적재 후 대기 안내
-            enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId);
-            
-            // [추가] 고위험 환자도 15분 뒤(또는 의사 답변 지연 시) 상태가 악화되는지 F/U 스케줄링
-            followUpService.scheduleFollowUp(userId, analysisResult.soapChartForDoctor, 15);
-
-            // AI가 제안한 1차 안심 멘트에 챗봇 공식 대기 안내 병합
-            finalResponseText = analysisResult.replyToPatient + 
-                "\n\n🩺 작성해주신 차트를 담당 전문의 선생님들께 보고드렸습니다. 진료 틈틈이 확인하시고 이곳으로 직접 답변을 드릴 예정이니 잠시만 대기해 주세요. (급박한 응급상황 시 지체 없이 119를 부르세요!)" +
-                "\n\n🏥 '행복한 의사'는 의료 취약계층 환자분들을 위해 의사들이 자원봉사로 운영하는 비영리 단체입니다. 오늘 상담이 도움이 되셨다면, 이 활동이 계속될 수 있도록 작은 응원을 보내주세요. 💛 [후원 링크 추가 필요]";
-        }
-
-        // [추가] 4. Firebase DB에 상담 내역 영구 기록 (비동기 병렬 처리)
-        dbService.logConsultation(userId, patientData, analysisResult).catch(err => console.error("DB Log Error:", err));
-
-        // 5. 환자에게 응답 (카카오 i 응답 템플릿 반환)
-        return res.status(200).json({
+        // 즉시 대기 메시지 반환 (5초 타임아웃 방지)
+        res.status(200).json({
             version: "2.0",
+            useCallback: true,
             template: {
-                outputs: [
-                    {
-                        simpleText: {
-                            text: finalResponseText
-                        }
-                    }
-                ]
+                outputs: [{
+                    simpleText: { text: "🩺 입력해주신 증상을 분석하고 있습니다. 잠시만 기다려주세요..." }
+                }]
             }
         });
+
+        // 비동기로 Gemini 분석 + 콜백 응답
+        processTriageAsync(callbackUrl, userId, patientData);
 
     } catch (error) {
         console.error('[Kakao Webhook Error]', error);
@@ -98,12 +65,72 @@ router.post('/triage-complete', async (req, res) => {
             version: "2.0",
             template: {
                 outputs: [{
-                    simpleText: { text: "죄송합니다. 시스템 오류가 발생하여 예진표를 전송하지 못했습니다. 잠시 후 다시 시도해주세요." }
+                    simpleText: { text: "죄송합니다. 시스템 오류가 발생했습니다. 잠시 후 다시 시도해주세요." }
                 }]
             }
         });
     }
 });
+
+async function processTriageAsync(callbackUrl, userId, patientData) {
+    try {
+        const analysisResult = await analyzeAndRouteTriage(patientData);
+        console.log('[Gemini Analysis Result]', analysisResult.action);
+
+        let finalResponseText = '';
+
+        if (analysisResult.action === 'AUTONOMOUS_REPLY') {
+            finalResponseText = analysisResult.replyToPatient;
+            const fallbackChart = `[최초 자동 해결된 경증 환자]\n증상: ${patientData.cc}\nNRS: ${patientData.nrs}`;
+            followUpService.scheduleFollowUp(userId, fallbackChart, 15);
+        } else {
+            enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId);
+            followUpService.scheduleFollowUp(userId, analysisResult.soapChartForDoctor, 15);
+            finalResponseText = analysisResult.replyToPatient + 
+                "\n\n🩺 작성해주신 차트를 담당 전문의 선생님들께 보고드렸습니다. 진료 틈틈이 확인하시고 이곳으로 직접 답변을 드릴 예정이니 잠시만 대기해 주세요. (급박한 응급상황 시 지체 없이 119를 부르세요!)" +
+                "\n\n🏥 '행복한 의사'는 의료 취약계층 환자분들을 위해 의사들이 자원봉사로 운영하는 비영리 단체입니다. 오늘 상담이 도움이 되셨다면, 이 활동이 계속될 수 있도록 작은 응원을 보내주세요. 💛 [후원 링크 추가 필요]";
+        }
+
+        dbService.logConsultation(userId, patientData, analysisResult).catch(err => console.error("DB Log Error:", err));
+
+        // 콜백 URL로 실제 분석 결과 전송
+        if (callbackUrl) {
+            const callbackBody = {
+                version: "2.0",
+                template: {
+                    outputs: [{
+                        simpleText: { text: finalResponseText }
+                    }]
+                }
+            };
+            const response = await fetch(callbackUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(callbackBody)
+            });
+            console.log('[Callback Response]', response.status);
+        } else {
+            console.error('[Callback] No callbackUrl provided');
+        }
+
+    } catch (error) {
+        console.error('[Async Triage Error]', error);
+        if (callbackUrl) {
+            await fetch(callbackUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    version: "2.0",
+                    template: {
+                        outputs: [{
+                            simpleText: { text: "죄송합니다. 분석 중 오류가 발생했습니다. 다시 시도해주세요." }
+                        }]
+                    }
+                })
+            }).catch(e => console.error('[Callback Error]', e));
+        }
+    }
+}
 
 /**
  * 카카오 i 오픈빌더 F/U(추적 관찰) 환자 응답 웹훅
