@@ -41,8 +41,10 @@ async function analyzeAndRouteTriage(patientData) {
             `- 양상/부위: ${patientData.symptom}\n` +
             `- NRS(통증점수): ${patientData.nrs}\n` +
             `- 동반증상: ${patientData.associated}\n` +
-            `- 기저질환/약물: ${patientData.pmhx}\n\n` +
-            `위 정보를 분석하여 지침에 맞는 JSON 형태로 답변해주세요. JSON 구조체(마크다운 백틱 제외)만 정확히 반환하세요.`;
+            `- 기저질환/약물: ${patientData.pmhx}\n` +
+            `- 현재 위치: ${patientData.location}\n` +
+            (patientData.symptomImage ? `- 증상 사진: ${patientData.symptomImage}\n` : '') +
+            `\n위 정보를 분석하여 지침에 맞는 JSON 형태로 답변해주세요. JSON 구조체(마크다운 백틱 제외)만 정확히 반환하세요.`;
 
         const result = await model.generateContent(prompt);
         let textResult = result.response.text().trim();

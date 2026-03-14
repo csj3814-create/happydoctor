@@ -42,7 +42,9 @@ router.post('/triage-complete', async (req, res) => {
             symptom: merged.symptom_detail || '상세 내용 없음',
             nrs: merged.nrs || '0',
             associated: merged.associated_symptom || '없음',
-            pmhx: merged.past_medical_history || '특이사항 없음'
+            pmhx: merged.past_medical_history || '특이사항 없음',
+            location: merged.location || '미확인',
+            symptomImage: merged.symptom_image || null
         };
 
         if (callbackUrl) {
