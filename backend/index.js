@@ -37,8 +37,8 @@ app.get('/', (req, res) => {
 const PING_INTERVAL = 14 * 60 * 1000; // 14분
 setInterval(async () => {
     try {
-        // 실제 배포 시에는 Render에서 제공하는 외부 URL(환경변수)을 우선 세팅하여 호출
-        const pingUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${port}`;
+        // Render에서 제공하는 외부 URL을 환경변수 또는 기본값으로 사용
+        const pingUrl = process.env.RENDER_EXTERNAL_URL || 'https://happydoctor.onrender.com';
         await axios.get(pingUrl);
         console.log(`[Keep-Alive] Pinged ${pingUrl} successfully to prevent sleeping.`);
     } catch (error) {
