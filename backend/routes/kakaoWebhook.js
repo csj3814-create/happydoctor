@@ -16,20 +16,35 @@ router.post('/triage-complete', async (req, res) => {
     try {
         console.log('[Kakao Webhook] Received Triage Data');
         
-        // 오픈빌더 payload 구조 안전망 처리 (실제 환경에 맞게 키 이름 수정 필요)
+        // 오픈빌더 payload에서 params + contexts 모두 수집
         const params = req.body.action?.params || {};
         const userId = req.body.userRequest?.user?.id || 'kakao_user_unknown';
 
+        // 컨텍스트에서 파라미터 추출 (이전 블록들에서 출력 컨텍스트로 전달된 값)
+        const contextParams = {};
+        const contexts = req.body.contexts || [];
+        for (const ctx of contexts) {
+            if (ctx.params) {
+                for (const [key, val] of Object.entries(ctx.params)) {
+                    if (val && val.value) contextParams[key] = val.value;
+                }
+            }
+        }
+
+        // params(현재 블록) + contextParams(이전 블록) 병합 (params 우선)
+        const merged = { ...contextParams, ...params };
+        console.log('[Merged Params]', JSON.stringify(merged));
+
         // 1. 환자 데이터 수집 (오픈빌더 엔터티명에 따라 매핑)
         const patientData = {
-            age: params.age || '미상',
-            gender: params.gender || '미상',
-            cc: params.chief_complaint || '증상 미확인',
-            onset: params.onset || '알 수 없음',
-            symptom: params.symptom_detail || '상세 내용 없음',
-            nrs: params.nrs || '0',
-            associated: params.associated_symptom || '없음',
-            pmhx: params.past_medical_history || '특이사항 없음'
+            age: merged.age || '미상',
+            gender: merged.gender || '미상',
+            cc: merged.chief_complaint || '증상 미확인',
+            onset: merged.onset || '알 수 없음',
+            symptom: merged.symptom_detail || '상세 내용 없음',
+            nrs: merged.nrs || '0',
+            associated: merged.associated_symptom || '없음',
+            pmhx: merged.past_medical_history || '특이사항 없음'
         };
 
         // 2. Gemini를 이용해 예진 데이터 분석 및 분기 (자율해결 vs 전문의협진)

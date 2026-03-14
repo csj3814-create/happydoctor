@@ -23,10 +23,10 @@
 - [ ] Test F/U Scenario changes with test cases
 
 ## Phase 4: Deployment & Testing
-- [ ] Initialize Git repository & Push to GitHub
-- [ ] Connect repository to Render (Web Service)
-- [ ] Set up Environment Variables on Render (.env keys)
-- [ ] Acquire Render external URL and link to Kakao OpenBuilder
+- [x] Initialize Git repository & Push to GitHub
+- [x] Connect repository to Render (Web Service)
+- [x] Set up Environment Variables on Render (.env keys)
+- [x] Acquire Render external URL and link to Kakao OpenBuilder
 - [ ] End-to-end scenario testing in KakaoTalk
 - [ ] Finalize disclaimer and user consent flowop
 
