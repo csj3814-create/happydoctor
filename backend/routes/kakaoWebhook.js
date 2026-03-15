@@ -109,10 +109,19 @@ async function processTriageSync(userId, patientData) {
             followUpService.scheduleFollowUp(userId, analysisResult.soapChartForDoctor, 15);
             finalResponseText = analysisResult.replyToPatient +
                 "\n\n🩺 작성해주신 차트를 담당 전문의 선생님들께 보고드렸습니다. 잠시만 대기해 주세요. (급박한 응급상황 시 119를 부르세요!)" +
-                "\n\n🏥 '행복한 의사'는 의료 취약계층을 위한 비영리 단체입니다. 💛";
+                "\n\n🏥 '해피닥터 행복한 의사'는 의료 취약계층을 위한 비영리 단체입니다. 💛";
         }
         dbService.logConsultation(userId, patientData, analysisResult).catch(err => console.error("DB Log Error:", err));
-        return { version: "2.0", template: { outputs: [{ simpleText: { text: finalResponseText } }] } };
+        return {
+            version: "2.0",
+            template: {
+                outputs: [{ simpleText: { text: finalResponseText } }],
+                quickReplies: [
+                    { label: "예진상담", action: "message", messageText: "예진상담" },
+                    { label: "상담종료", action: "message", messageText: "상담종료" }
+                ]
+            }
+        };
     } catch (error) {
         console.error('[Sync Triage Error]', error);
         return { version: "2.0", template: { outputs: [{ simpleText: { text: "죄송합니다. 분석 중 오류가 발생했습니다. 다시 시도해주세요." } }] } };
@@ -135,7 +144,7 @@ async function processTriageAsync(callbackUrl, userId, patientData) {
             followUpService.scheduleFollowUp(userId, analysisResult.soapChartForDoctor, 15);
             finalResponseText = analysisResult.replyToPatient + 
                 "\n\n🩺 작성해주신 차트를 담당 전문의 선생님들께 보고드렸습니다. 진료 틈틈이 확인하시고 이곳으로 직접 답변을 드릴 예정이니 잠시만 대기해 주세요. (급박한 응급상황 시 지체 없이 119를 부르세요!)" +
-                "\n\n🏥 '행복한 의사'는 의료 취약계층 환자분들을 위해 의사들이 자원봉사로 운영하는 비영리 단체입니다. 오늘 상담이 도움이 되셨다면, 이 활동이 계속될 수 있도록 작은 응원을 보내주세요. 💛";
+                "\n\n🏥 '해피닥터 행복한 의사'는 의료 취약계층 환자분들을 위해 의사들이 자원봉사로 운영하는 비영리 단체입니다. 오늘 상담이 도움이 되셨다면, 이 활동이 계속될 수 있도록 작은 응원을 보내주세요. 💛";
         }
 
         dbService.logConsultation(userId, patientData, analysisResult).catch(err => console.error("DB Log Error:", err));
@@ -147,7 +156,11 @@ async function processTriageAsync(callbackUrl, userId, patientData) {
                 template: {
                     outputs: [{
                         simpleText: { text: finalResponseText }
-                    }]
+                    }],
+                    quickReplies: [
+                        { label: "예진상담", action: "message", messageText: "예진상담" },
+                        { label: "상담종료", action: "message", messageText: "상담종료" }
+                    ]
                 }
             };
             const response = await fetch(callbackUrl, {
@@ -218,7 +231,11 @@ router.post('/fu-reply', async (req, res) => {
         return res.status(200).json({
             version: "2.0",
             template: {
-                outputs: [{ simpleText: { text: finalResponseText } }]
+                outputs: [{ simpleText: { text: finalResponseText } }],
+                quickReplies: [
+                    { label: "예진상담", action: "message", messageText: "예진상담" },
+                    { label: "상담종료", action: "message", messageText: "상담종료" }
+                ]
             }
         });
 
@@ -269,12 +286,15 @@ router.post('/close-consultation', async (req, res) => {
         };
         const personalMsg = closeMessages[reason] || '상담이 종결되었습니다. 문의사항이 있으면 언제든 다시 찾아주세요.';
 
-        const finalText = `🙏 보듬입니다. ${personalMsg}\n\n환자분의 건강을 응원합니다! 😊\n\n🏥 '행복한 의사'는 의료 취약계층 환자분들을 위해 의사들이 자원봉사로 운영하는 비영리 단체입니다. 오늘 상담이 도움이 되셨다면, 이 활동이 계속될 수 있도록 작은 응원을 보내주세요. 💛`;
+        const finalText = `🙏 보듬입니다. ${personalMsg}\n\n환자분의 건강을 응원합니다! 😊\n\n🏥 '해피닥터 행복한 의사'는 의료 취약계층 환자분들을 위해 의사들이 자원봉사로 운영하는 비영리 단체입니다. 오늘 상담이 도움이 되셨다면, 이 활동이 계속될 수 있도록 작은 응원을 보내주세요. 💛`;
 
         return res.status(200).json({
             version: "2.0",
             template: {
-                outputs: [{ simpleText: { text: finalText } }]
+                outputs: [{ simpleText: { text: finalText } }],
+                quickReplies: [
+                    { label: "예진상담", action: "message", messageText: "예진상담" }
+                ]
             }
         });
     } catch (error) {

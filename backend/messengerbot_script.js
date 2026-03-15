@@ -1,5 +1,5 @@
 /**
- * MessengerBot R 스크립트 — '행복한 의사' 채널용
+ * MessengerBot R 스크립트 — '해피닥터 행복한 의사' 채널용
  * 
  * 이 스크립트를 공기계의 MessengerBot R 앱에 등록합니다.
  * 
@@ -17,7 +17,7 @@
 
 // ===== 설정 =====
 const SERVER_URL = "https://happydoctor.onrender.com"; // Render 배포 URL
-const API_KEY = "YOUR_MESSENGER_API_KEY_HERE"; // .env의 MESSENGER_API_KEY와 동일하게
+const API_KEY = "happydoctor_bot_2026_secret"; // .env의 MESSENGER_API_KEY와 동일하게
 const CHANNEL_LINK = "http://pf.kakao.com/_PxaTxhX/chat"; // 카카오 채널 1:1 채팅 링크
 
 // 의료진 단톡방 이름 (정확히 일치해야 함)

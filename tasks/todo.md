@@ -31,30 +31,41 @@
 - [x] Remove [DONATION_LINK] placeholder (until website ready)
 - [x] E2E test success: slot-filling → callback → Gemini analysis → patient response ✅
 
-## Phase 5: Notification & Follow-Up System
+## Phase 5: Notification & Follow-Up System ✅
 - [x] Set up Kakao MessengerBotR for medical team group chat
 - [x] Implement AI conditional routing logic (Autonomous vs Escalate)
-- [ ] Test F/U scenario (15-min follow-up trigger → patient response → re-analysis)
-- [ ] Verify ESCALATE flow: doctor notification delivery via MessengerBotR
+- [x] Test F/U scenario (15-min follow-up trigger → patient response → re-analysis)
+- [x] Verify ESCALATE flow: doctor notification delivery via MessengerBotR
+- [x] Implement close-consultation feature (호전/응급실/외래 사유)
+- [x] F/U push via MessengerBotR polling (fuPushQueue)
 
-## Phase 6: Deployment & Polish
+## Phase 6: Deployment & Polish ✅
 - [x] Initialize Git repository & Push to GitHub (csj3814-create/happydoctor)
 - [x] Connect repository to Render (auto-deploy from main branch)
 - [x] Set up Environment Variables on Render (GEMINI_API_KEY, MESSENGER_API_KEY)
-- [ ] Gemini API: upgrade from free tier (20 req/day) to paid plan for production
-- [ ] Firebase Firestore: set up FIREBASE_SERVICE_ACCOUNT for persistent logging
-- [ ] E2E testing of ESCALATE scenario (doctor receives SOAP chart)
+- [x] Gemini API: paid plan confirmed (via 해빛스쿨)
+- [x] Firebase Firestore: set up FIREBASE_SERVICE_ACCOUNT for persistent logging
+- [x] E2E testing of ESCALATE scenario (doctor receives SOAP chart)
+- [x] maxOutputTokens 2048→4096 for Korean SOAP charts
+- [x] Chatbot launch announcement message updated
 
-## Phase 7: Donation & Website (Future)
+## Phase 7: Live Testing & Polish
+- [ ] Live E2E test via actual Kakao channel (환자 시뮬레이션)
+- [ ] 상담종료 블록 되묻기 질문 바로연결 버튼 설정 확인
+- [ ] MessengerBotR 공기계 배포 및 실제 동작 확인
+- [ ] Render cold start 대응 테스트 (keep-alive 14분 ping)
+
+## Phase 8: Donation & Website (Future)
 - [ ] Build Happy Doctor website with donation page
 - [ ] Add donation link back to Gemini system prompt & bot responses
 - [ ] Add donation button to Kakao OpenBuilder post-consultation block
 - [ ] Verify donation message tone (warm invitation, not pressure)
 
 ## Current Status
-- **Last updated**: 2026.03.14
-- **MVP Status**: Core triage flow working end-to-end ✅
+- **Last updated**: 2026.03.15
+- **MVP Status**: Full triage + F/U + close + ESCALATE flow working ✅
 - **Deployed at**: https://happydoctor.onrender.com (Render free tier)
 - **GitHub**: https://github.com/csj3814-create/happydoctor
-- **Model**: gemini-2.5-flash (free tier, 20 req/day limit)
-- **Kakao Channel**: 해피닥터 행복한 의사
+- **Model**: gemini-2.5-flash (paid plan via 해빛스쿨)
+- **Kakao Channel**: http://pf.kakao.com/_PxaTxhX/chat
+- **Firebase**: happydoctor0 (Firestore logging active)
