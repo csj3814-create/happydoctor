@@ -84,7 +84,36 @@ async function logFollowUp(userId, fuAnalysis) {
      }
 }
 
+/**
+ * 상담을 종결 처리합니다. (status 업데이트 + 종결 사유 기록)
+ */
+async function closeConsultation(userId, reason) {
+    if (!db) return;
+
+    try {
+        const snapshot = await db.collection('consultations')
+            .where('userId', '==', userId)
+            .orderBy('createdAt', 'desc')
+            .limit(1)
+            .get();
+
+        if (snapshot.empty) return;
+
+        const docRef = snapshot.docs[0].ref;
+        await docRef.update({
+            status: 'COMPLETED',
+            closedAt: admin.firestore.FieldValue.serverTimestamp(),
+            closeReason: reason || '환자 종결'
+        });
+
+        console.log(`[DB] Consultation closed for ${userId}, reason: ${reason}`);
+    } catch (error) {
+        console.error('[DB Close Error]', error);
+    }
+}
+
 module.exports = {
     logConsultation,
-    logFollowUp
+    logFollowUp,
+    closeConsultation
 };

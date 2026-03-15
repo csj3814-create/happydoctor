@@ -80,6 +80,19 @@ class FollowUpService {
         }
         return null;
     }
+
+    /**
+     * 상담 종결 시 F/U 타이머 및 모든 대기 데이터를 삭제합니다.
+     */
+    cancelFollowUp(userId) {
+        if (this.timers.has(userId)) {
+            clearTimeout(this.timers.get(userId));
+            this.timers.delete(userId);
+        }
+        this.pendingFollowUps.delete(userId);
+        this.patientDataStore.delete(userId);
+        console.log(`[F/U Cancelled] ${userId} — 상담종결로 추적관찰 취소`);
+    }
 }
 
 const followUpService = new FollowUpService();

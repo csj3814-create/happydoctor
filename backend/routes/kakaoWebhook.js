@@ -240,4 +240,50 @@ router.post('/test-trigger-fu', (req, res) => {
     res.status(200).json({ ok: true, message: `F/U push triggered for ${userId}` });
 });
 
+/**
+ * 상담 종결 엔드포인트
+ * 환자가 "상담종료" 버튼을 눌러 종결 사유를 선택하면 호출됩니다.
+ * - F/U 타이머 취소
+ * - DB 상태 업데이트 (COMPLETED)
+ * - 따뜻한 종결 메시지 반환
+ */
+router.post('/close-consultation', async (req, res) => {
+    try {
+        const params = req.body.action?.params || {};
+        const userId = req.body.userRequest?.user?.id || 'kakao_user_unknown';
+        const reason = params.close_reason || '환자 종결';
+
+        console.log(`[Close Consultation] ${userId}, reason: ${reason}`);
+
+        // 1) F/U 타이머 및 대기 데이터 삭제
+        followUpService.cancelFollowUp(userId);
+
+        // 2) DB 상태 업데이트
+        dbService.closeConsultation(userId, reason).catch(err => console.error('DB Close Error:', err));
+
+        // 3) 종결 메시지
+        const closeMessages = {
+            '호전': '다행이 나아지셨군요! 증상이 다시 나타나면 언제든 다시 찾아주세요.',
+            '응급실 방문': '응급실에서 잘 치료 받으셨길 바랍니다. 퇴원 후에도 문의사항이 있으면 언제든 상담해 주세요.',
+            '외래 진료': '병원에서 진료 잘 받으셨군요! 추가 문의사항이 있으면 언제든 다시 찾아주세요.',
+        };
+        const personalMsg = closeMessages[reason] || '상담이 종결되었습니다. 문의사항이 있으면 언제든 다시 찾아주세요.';
+
+        const finalText = `🙏 보듬입니다. ${personalMsg}\n\n환자분의 건강을 응원합니다! 😊\n\n🏥 '행복한 의사'는 의료 취약계층 환자분들을 위해 의사들이 자원봉사로 운영하는 비영리 단체입니다. 오늘 상담이 도움이 되셨다면, 이 활동이 계속될 수 있도록 작은 응원을 보내주세요. 💛`;
+
+        return res.status(200).json({
+            version: "2.0",
+            template: {
+                outputs: [{ simpleText: { text: finalText } }]
+            }
+        });
+    } catch (error) {
+        console.error('[Close Consultation Error]', error);
+        return res.status(500).json({
+            version: "2.0",
+            template: { outputs: [{ simpleText: { text: "일시적인 오류가 발생했습니다." } }] }
+        });
+    }
+});
+
 module.exports = router;
