@@ -53,6 +53,20 @@ router.post('/triage-complete', async (req, res) => {
             symptomImage: merged.symptom_image || null
         };
 
+        // 동의 확인
+        const consent = merged.consent || '';
+        if (consent && !consent.includes('동의')) {
+            return res.status(200).json({
+                version: "2.0",
+                template: {
+                    outputs: [{ simpleText: { text: "상담 동의가 필요합니다. 다음에 도움이 필요하시면 언제든 다시 찾아주세요! 😊" } }],
+                    quickReplies: [
+                        { label: "예진상담", action: "message", messageText: "예진상담" }
+                    ]
+                }
+            });
+        }
+
         // 대기 중인 F/U 질문이 있으면 새 상담 대신 F/U 질문을 먼저 표시
         const pendingFU = followUpService.consumePendingFollowUp(userId);
         if (pendingFU) {
