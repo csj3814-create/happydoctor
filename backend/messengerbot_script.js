@@ -28,18 +28,27 @@ const PATIENT_ROOM = "행복한 의사의 응급상담방";
 // ===== 메시지 수신 핸들러 =====
 function response(room, msg, sender, isGroupChat, replier, imageDB, packageName) {
     
-    // [1] 환자 오픈채팅방: 상담 키워드 → 1:1 채널 안내
-    var guideKeywords = ["!상담", "!진료", "아파요", "아픈데", "상담"];
-    for (var i = 0; i < guideKeywords.length; i++) {
-        if (msg.indexOf(guideKeywords[i]) !== -1) {
-            replier.reply(
-                "안녕하세요, " + sender + "님! 🩺\n" +
-                "'행복한 의사'는 의료 취약계층 환자분들을 위한 비영리 봉사 단체입니다.\n\n" +
-                "의료 상담은 개인정보 보호를 위해 1:1 채팅으로 진행됩니다.\n" +
-                "아래 링크를 눌러 상담을 시작해주세요!\n" +
-                "👉 " + CHANNEL_LINK
-            );
-            return;
+    // [1] 환자 오픈채팅방에서만: 의료 키워드 → 1:1 채널 안내
+    if (room === PATIENT_ROOM) {
+        var guideKeywords = [
+            "!상담", "!진료", "아파요", "아픈데", "아프다", "아픕니다",
+            "통증", "두통", "복통", "열이", "기침", "설사", "구토",
+            "다쳤", "다쳐", "피가", "출혈", "어지러", "숨이",
+            "상담", "진료", "병원", "응급", "도와주세요", "도와줘"
+        ];
+        for (var i = 0; i < guideKeywords.length; i++) {
+            if (msg.indexOf(guideKeywords[i]) !== -1) {
+                replier.reply(
+                    "🩺 " + sender + "님, 안녕하세요!\n\n" +
+                    "증상 상담은 개인정보 보호를 위해\n" +
+                    "아래 1:1 채팅에서 진행됩니다.\n\n" +
+                    "👉 " + CHANNEL_LINK + "\n\n" +
+                    "링크를 누르시면 AI 상담사 '보듬'이가\n" +
+                    "증상을 여쭤보고, 필요하면 전문의\n" +
+                    "선생님께 바로 연결해 드립니다. 😊"
+                );
+                return;
+            }
         }
     }
 
