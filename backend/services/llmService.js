@@ -4,7 +4,7 @@ const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = ai.getGenerativeModel({
     model: 'gemini-2.5-flash',
     generationConfig: {
-        maxOutputTokens: 2048,
+        maxOutputTokens: 4096,
         temperature: 0.3,
         responseMimeType: 'application/json',
     },
@@ -64,7 +64,7 @@ async function analyzeAndRouteTriage(patientData) {
             // 잘린 JSON 복구 시도: 응답이 잘려서 파싱 실패한 경우 기본 응답 반환
             return {
                 action: 'AUTONOMOUS_REPLY',
-                replyToPatient: '증상을 확인했습니다. 현재 입력해주신 내용으로는 심각한 응급 상황은 아닌 것으로 보이지만, 증상이 지속되거나 악화된다면 가까운 병원이나 응급실을 방문해 주세요. 편히 쉬시고 수분을 충분히 섭취하세요. 💛\n\n🏥 \'행복한 의사\'는 의료 취약계층 환자분들을 위해 의사들이 자원봉사로 운영하는 비영리 단체입니다. [DONATION_LINK]',
+                replyToPatient: '증상을 확인했습니다. 현재 입력해주신 내용으로는 심각한 응급 상황은 아닌 것으로 보이지만, 증상이 지속되거나 악화된다면 가까운 병원이나 응급실을 방문해 주세요. 편히 쉬시고 수분을 충분히 섭취하세요. 💛\n\n🏥 \'행복한 의사\'는 의료 취약계층 환자분들을 위해 의사들이 자원봉사로 운영하는 비영리 단체입니다. 오늘 상담이 도움이 되셨다면, 이 활동이 계속될 수 있도록 작은 응원을 보내주세요. 💛',
                 soapChartForDoctor: null
             };
         }

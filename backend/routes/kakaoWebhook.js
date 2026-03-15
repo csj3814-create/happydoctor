@@ -53,6 +53,18 @@ router.post('/triage-complete', async (req, res) => {
             symptomImage: merged.symptom_image || null
         };
 
+        // 대기 중인 F/U 질문이 있으면 새 상담 대신 F/U 질문을 먼저 표시
+        const pendingFU = followUpService.consumePendingFollowUp(userId);
+        if (pendingFU) {
+            console.log(`[F/U Pending] ${userId} — 대기 중인 F/U 질문 전달`);
+            return res.status(200).json({
+                version: "2.0",
+                template: {
+                    outputs: [{ simpleText: { text: `⏰ ${pendingFU}` } }]
+                }
+            });
+        }
+
         if (callbackUrl) {
             // 콜백 모드: 대기 메시지 먼저 반환 후 비동기 처리
             res.status(200).json({
@@ -217,6 +229,15 @@ router.post('/fu-reply', async (req, res) => {
             template: { outputs: [{ simpleText: { text: "일시적인 오류가 발생했습니다." } }] }
         });
     }
+});
+
+// 테스트용: F/U 타이머를 수동으로 즉시 실행 (프로덕션 배포 시 제거 또는 환경변수로 제한)
+router.post('/test-trigger-fu', (req, res) => {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId required' });
+    
+    followUpService.executeFollowUpPush(userId);
+    res.status(200).json({ ok: true, message: `F/U push triggered for ${userId}` });
 });
 
 module.exports = router;
