@@ -54,8 +54,9 @@ router.post('/triage-complete', async (req, res) => {
         };
 
         // 동의 확인
-        const consent = merged.consent || '';
-        if (consent && !consent.includes('동의')) {
+        const consent = (merged.consent || '').toString().trim();
+        // consent가 비어있거나 '동의' 문구가 없으면 상담을 진행하지 않음
+        if (!consent || !consent.includes('동의')) {
             return res.status(200).json({
                 version: "2.0",
                 template: {
