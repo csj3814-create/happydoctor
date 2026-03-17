@@ -54,6 +54,20 @@ router.post('/triage-complete', async (req, res) => {
         const merged = { ...contextParams, ...params };
         console.log('[Merged Params]', JSON.stringify(merged));
 
+        // 예진 상담 시작 버튼 클릭 시에는 실제 문진 데이터가 없을 수 있으므로
+        // 의미 있는 문진 데이터가 없으면 바로 응답하여 딜레이를 줄입니다.
+        const meaningfulKeys = Object.keys(merged).filter(k => k !== 'consent' && k !== 'callbackUrl');
+        const hasMeaningfulData = meaningfulKeys.length > 0 && meaningfulKeys.some(k => merged[k]);
+        if (!hasMeaningfulData) {
+            return res.status(200).json({
+                version: "2.0",
+                template: {
+                    outputs: [{ simpleText: { text: "예진 상담을 시작합니다. 먼저 증상과 상황을 입력해주시면 도와드릴게요!" } }],
+                    quickReplies: [{ label: "증상 입력하기", action: "message", messageText: "증상 입력" }]
+                }
+            });
+        }
+
         // sys.* 엔티티 이름이 그대로 들어온 경우 기본값 처리
         const sanitize = (val, fallback) => {
             if (!val || val.startsWith('sys.')) return fallback;
