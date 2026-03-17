@@ -200,36 +200,11 @@ async function processTriageAsync(callbackUrl, userId, patientData) {
 
         dbService.logConsultation(userId, patientData, analysisResult).catch(err => console.error("DB Log Error:", err));
 
-        // 콜백 URL로 실제 분석 결과 전송 (카카오가 callbackUrl을 제공하면 사용)
-        if (callbackUrl) {
-            const callbackBody = {
-                version: "2.0",
-                template: {
-                    outputs: [{
-                        simpleText: { text: finalResponseText }
-                    }],
-                    quickReplies: [
-                        { label: "예진상담", action: "message", messageText: "예진상담" },
-                        { label: "상담종료", action: "message", messageText: "상담종료" }
-                    ]
-                }
-            };
-            const response = await fetch(callbackUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(callbackBody)
-            });
-            const respText = await response.text();
-            console.log('[Callback Response]', response.status, respText);
-            if (!response.ok) {
-                console.warn('[Callback] non-200 response from callback URL', response.status, respText);
-            }
-        } else {
-            // callbackUrl이 없는 환경에서는 메신저봇 푸시 큐로 대신 전송
-            const pushed = enqueueFUPush(userId, finalResponseText);
-            if (!pushed) {
-                console.warn('[F/U Push] room mapping missing - cannot deliver analysis result to user', userId);
-            }
+        // 카카오 콜백 URL은 스킬 서버 설정이 정확히 맞지 않으면 400을 반환하므로
+        // 예진 결과는 쿼리 가능한 메신저봇 푸시 큐를 통해 전달합니다.
+        const pushed = enqueueFUPush(userId, finalResponseText);
+        if (!pushed) {
+            console.warn('[F/U Push] room mapping missing - cannot deliver analysis result to user', userId);
         }
 
     } catch (error) {
