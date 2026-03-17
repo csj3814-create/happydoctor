@@ -73,38 +73,7 @@ router.post('/triage-complete', async (req, res) => {
             symptomImage: merged.symptom_image || null
         };
 
-        // 동의 확인
-        let consent = (merged.consent || '').toString().trim().toLowerCase();
-
-        // 명시적 부정 의사 표시인 경우 팅김
-        const negativeConsent = ['거부', '비동의', '안함', '아니요', '싫어요', 'no', 'false'];
-        if (negativeConsent.some(word => consent.includes(word))) {
-            consent = '';
-        }
-
-        // 만약 파라미터가 비어있거나 'true' 같은 값인 경우, 요청 utterance를 추가로 참고
-        if (!consent) {
-            const utterance = (req.body.userRequest?.utterance || '').toString().toLowerCase();
-
-            // 긍정 의도 키워드
-            const positiveConsent = ['동의', '예진', '시작', '상담'];
-            if (positiveConsent.some(word => utterance.includes(word))) {
-                consent = '동의';
-            }
-        }
-
-        // consent가 비어있거나 부정 의사가 포함된 경우 상담을 진행하지 않음
-        if (!consent) {
-            return res.status(200).json({
-                version: "2.0",
-                template: {
-                    outputs: [{ simpleText: { text: "상담 동의가 필요합니다. 다음에 도움이 필요하시면 언제든 다시 찾아주세요! 😊" } }],
-                    quickReplies: [
-                        { label: "예진상담", action: "message", messageText: "예진상담" }
-                    ]
-                }
-            });
-        }
+        // (카카오 오픈빌더 상에서 상담 시작 블록을 통해 호출되므로 별도의 동의 확인은 생략)
 
         // 대기 중인 F/U 질문이 있으면 새 상담 대신 F/U 질문을 먼저 표시
         const pendingFU = followUpService.consumePendingFollowUp(userId);
