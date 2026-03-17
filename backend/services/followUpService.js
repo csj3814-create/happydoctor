@@ -6,8 +6,12 @@ const { enqueueDoctorNotification, enqueueFUPush } = require('./notifyService');
 class FollowUpService {
     constructor() {
         this.timers = new Map();
+        // userId -> { chart: string, lastActiveAt: Date, createdAt: Date }
         this.patientDataStore = new Map(); // F/U 비교를 위해 환자의 1차 차트를 임시 보관
         this.pendingFollowUps = new Map(); // 환자가 재접속 시 F/U 질문을 전달하기 위한 대기 플래그
+
+        // 세션 만료 (예: 30분) 이후에는 이전 상담을 자동으로 초기화
+        this.SESSION_EXPIRY_MS = 30 * 60 * 1000; // 30분
     }
 
     /**
@@ -18,8 +22,12 @@ class FollowUpService {
             clearTimeout(this.timers.get(userId));
         }
 
-        // 1차 차트 보관
-        this.patientDataStore.set(userId, originalSoapChart);
+        // 1차 차트 보관 (세션 만료 타임스탬프 포함)
+        this.patientDataStore.set(userId, {
+            chart: originalSoapChart,
+            createdAt: new Date(),
+            lastActiveAt: new Date()
+        });
 
         const delayMs = delayMinutes * 60 * 1000;
         console.log(`[Follow-Up Scheduled] ${userId} 회원님, ${delayMinutes}분 뒤 상태 체크 예약 완료.`);
@@ -66,7 +74,21 @@ class FollowUpService {
     }
 
     getOriginalChart(userId) {
-        return this.patientDataStore.get(userId) || "이전 차트 기록 없음";
+        const session = this.patientDataStore.get(userId);
+        if (!session) return "이전 차트 기록 없음";
+
+        const ageMs = Date.now() - new Date(session.lastActiveAt).getTime();
+        if (ageMs > this.SESSION_EXPIRY_MS) {
+            // 만료된 세션 제거
+            this.cancelFollowUp(userId);
+            return "이전 차트 기록 없음";
+        }
+
+        // 접근 시마다 활동 시간 갱신
+        session.lastActiveAt = new Date();
+        this.patientDataStore.set(userId, session);
+
+        return session.chart;
     }
 
     /**
@@ -74,11 +96,25 @@ class FollowUpService {
      */
     consumePendingFollowUp(userId) {
         const pending = this.pendingFollowUps.get(userId);
-        if (pending) {
+        if (!pending) return null;
+
+        const ageMs = Date.now() - new Date(pending.createdAt).getTime();
+        if (ageMs > this.SESSION_EXPIRY_MS) {
+            // 오래된 F/U 질문은 무시
             this.pendingFollowUps.delete(userId);
-            return pending.message;
+            return null;
         }
-        return null;
+
+        this.pendingFollowUps.delete(userId);
+        return pending.message;
+    }
+
+    /**
+     * 새로운 상담이 시작될 때 이전 상담 상태가 남아있으면 초기화합니다.
+     */
+    resetSession(userId) {
+        this.cancelFollowUp(userId);
+        console.log(`[Session Reset] ${userId} — 이전 상담 상태 초기화`);
     }
 
     /**

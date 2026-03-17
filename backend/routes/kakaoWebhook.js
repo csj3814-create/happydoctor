@@ -19,6 +19,26 @@ router.post('/triage-complete', async (req, res) => {
         const params = req.body.action?.params || {};
         const userId = req.body.userRequest?.user?.id || 'kakao_user_unknown';
         const callbackUrl = req.body.userRequest?.callbackUrl;
+        const utterance = (req.body.userRequest?.utterance || '').toString().trim();
+
+        // 새로운 상담을 시작하는 경우 기존 상담 상태(대기 F/U, 타이머 등)를 초기화하여
+        // 이전 대화가 이어지지 않도록 합니다.
+        followUpService.resetSession(userId);
+
+        // 사용자가 "다음에 할게요" 등으로 중단하고 싶어할 때, 예진을 시작하지 않고 종료 메시지 반환
+        const cancelPhrases = ['다음에', '나중에', '그만', '중단', '끝낼게', '종료'];
+        const normalized = utterance.replace(/\s+/g, '');
+        if (cancelPhrases.some(kw => normalized.includes(kw))) {
+            return res.status(200).json({
+                version: "2.0",
+                template: {
+                    outputs: [{ simpleText: { text: "알겠습니다. 필요하실 때 언제든 다시 찾아주세요. 건강 잘 챙기세요! 😊" } }],
+                    quickReplies: [
+                        { label: "예진상담", action: "message", messageText: "예진상담" }
+                    ]
+                }
+            });
+        }
 
         // 컨텍스트에서 파라미터 추출
         const contextParams = {};
@@ -54,7 +74,15 @@ router.post('/triage-complete', async (req, res) => {
         };
 
         // 동의 확인
-        const consent = (merged.consent || '').toString().trim();
+        let consent = (merged.consent || '').toString().trim();
+        // 만약 파라미터가 비어있다면 (버튼만으로 이동시) 요청 utterance에 "동의" 또는 "예진" 키워드가 있는지 확인
+        if (!consent) {
+            const utterance = (req.body.userRequest?.utterance || '').toString();
+            if (utterance.includes('동의') || utterance.includes('예진')) {
+                consent = '동의';
+            }
+        }
+
         // consent가 비어있거나 '동의' 문구가 없으면 상담을 진행하지 않음
         if (!consent || !consent.includes('동의')) {
             return res.status(200).json({
