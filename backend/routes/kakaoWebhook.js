@@ -87,10 +87,20 @@ router.post('/triage-complete', async (req, res) => {
             });
         }
 
-        // 동기 모드: 항상 즉시 최종 응답을 반환하도록 변경
-        // (카카오 콜백 모드가 제대로 동작하지 않는 환경에서 응답 누락을 방지하기 위함)
+        // 동기 모드: 항상 즉시 최종 응답을 반환하고, F/U 예약은 응답 후 비동기 처리합니다.
         const result = await processTriageSync(userId, patientData);
-        return res.status(200).json(result);
+        res.status(200).json(result.response);
+
+        if (result.followUp && result.followUp.chart) {
+            setImmediate(() => {
+                followUpService.scheduleFollowUp(
+                    result.followUp.userId,
+                    result.followUp.chart,
+                    result.followUp.delayMinutes
+                );
+            });
+        }
+        return;
 
     } catch (error) {
         console.error('[Kakao Webhook Error]', error);
@@ -113,31 +123,41 @@ async function processTriageSync(userId, patientData) {
         console.log(`[Timing] analyzeAndRouteTriage took ${durationMs}ms`);
 
         let finalResponseText = '';
+        let followUpChart = null;
+
         if (analysisResult.action === 'AUTONOMOUS_REPLY') {
             finalResponseText = analysisResult.replyToPatient;
             const fallbackChart = `[최초 자동 해결된 경증 환자]\n증상: ${patientData.cc}\nNRS: ${patientData.nrs}`;
-            followUpService.scheduleFollowUp(userId, fallbackChart, 15);
+            followUpChart = fallbackChart;
         } else {
             enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId);
-            followUpService.scheduleFollowUp(userId, analysisResult.soapChartForDoctor, 15);
+            followUpChart = analysisResult.soapChartForDoctor;
             finalResponseText = analysisResult.replyToPatient +
                 "\n\n🩺 작성해주신 차트를 담당 전문의 선생님들께 보고드렸습니다. 잠시만 대기해 주세요. (급박한 응급상황 시 119를 부르세요!)" +
                 "\n\n🏥 '해피닥터 행복한 의사'는 의료 취약계층을 위한 비영리 단체입니다. 💛";
         }
         dbService.logConsultation(userId, patientData, analysisResult).catch(err => console.error("DB Log Error:", err));
+
         return {
-            version: "2.0",
-            template: {
-                outputs: [{ simpleText: { text: finalResponseText } }],
-                quickReplies: [
-                    { label: "예진상담", action: "message", messageText: "예진상담" },
-                    { label: "상담종료", action: "message", messageText: "상담종료" }
-                ]
+            response: {
+                version: "2.0",
+                template: {
+                    outputs: [{ simpleText: { text: finalResponseText } }],
+                    quickReplies: [
+                        { label: "예진상담", action: "message", messageText: "예진상담" },
+                        { label: "상담종료", action: "message", messageText: "상담종료" }
+                    ]
+                }
+            },
+            followUp: {
+                userId,
+                chart: followUpChart,
+                delayMinutes: 15
             }
         };
     } catch (error) {
         console.error('[Sync Triage Error]', error);
-        return { version: "2.0", template: { outputs: [{ simpleText: { text: "죄송합니다. 분석 중 오류가 발생했습니다. 다시 시도해주세요." } }] } };
+        return { response: { version: "2.0", template: { outputs: [{ simpleText: { text: "죄송합니다. 분석 중 오류가 발생했습니다. 다시 시도해주세요." } }] } } };
     }
 }
 
