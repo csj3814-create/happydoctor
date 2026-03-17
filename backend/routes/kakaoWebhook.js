@@ -120,7 +120,11 @@ router.post('/triage-complete', async (req, res) => {
 
 async function processTriageSync(userId, patientData) {
     try {
+        const startTime = Date.now();
         const analysisResult = await analyzeAndRouteTriage(patientData);
+        const durationMs = Date.now() - startTime;
+        console.log(`[Timing] analyzeAndRouteTriage took ${durationMs}ms`);
+
         let finalResponseText = '';
         if (analysisResult.action === 'AUTONOMOUS_REPLY') {
             finalResponseText = analysisResult.replyToPatient;
@@ -152,7 +156,10 @@ async function processTriageSync(userId, patientData) {
 
 async function processTriageAsync(callbackUrl, userId, patientData) {
     try {
+        const startTime = Date.now();
         const analysisResult = await analyzeAndRouteTriage(patientData);
+        const durationMs = Date.now() - startTime;
+        console.log(`[Timing] analyzeAndRouteTriage (async) took ${durationMs}ms`);
         console.log('[Gemini Analysis Result]', analysisResult.action);
 
         let finalResponseText = '';

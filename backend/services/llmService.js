@@ -47,7 +47,11 @@ async function analyzeAndRouteTriage(patientData) {
             (patientData.symptomImage ? `- 증상 사진: ${patientData.symptomImage}\n` : '') +
             `\n위 정보를 분석하여 지침에 맞는 JSON 형태로 답변해주세요. JSON 구조체(마크다운 백틱 제외)만 정확히 반환하세요.`;
 
+        const startTime = Date.now();
         const result = await model.generateContent(prompt);
+        const durationMs = Date.now() - startTime;
+        console.log(`[Timing] Gemini generateContent took ${durationMs}ms`);
+
         let textResult = result.response.text().trim();
         
         // JSON 파싱을 위해 혹시 모를 마크다운 블록 제거
