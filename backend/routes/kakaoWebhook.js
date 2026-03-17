@@ -143,6 +143,12 @@ async function processTriageSync(userId, patientData) {
         }
         dbService.logConsultation(userId, patientData, analysisResult).catch(err => console.error("DB Log Error:", err));
 
+        // 카카오톡 메시지 길이 제한(약 2,000자 내외) 대비
+        const MAX_MSG_LEN = 1600;
+        if (finalResponseText.length > MAX_MSG_LEN) {
+            finalResponseText = finalResponseText.slice(0, MAX_MSG_LEN - 20) + "... (메시지가 길어 일부만 표시됩니다)";
+        }
+
         return {
             response: {
                 version: "2.0",
