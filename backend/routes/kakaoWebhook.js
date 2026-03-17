@@ -101,19 +101,20 @@ router.post('/triage-complete', async (req, res) => {
             });
         }
 
-        // 동기 모드: 항상 즉시 최종 응답을 반환하고, F/U 예약은 응답 후 비동기 처리합니다.
-        const result = await processTriageSync(userId, patientData);
-        res.status(200).json(result.response);
+        // 증상 데이터가 들어온 이후부터는 분석 시간이 소요되므로
+        // 사용자에게는 즉시 '분석 중' 메시지를 보내고, 백그라운드에서 Gemini 호출 및 결과 전송을 수행합니다.
+        res.status(200).json({
+            version: "2.0",
+            template: {
+                outputs: [{ simpleText: { text: "증상 정보를 분석 중입니다. 잠시만 기다려주세요..." } }]
+            }
+        });
 
-        if (result.followUp && result.followUp.chart) {
-            setImmediate(() => {
-                followUpService.scheduleFollowUp(
-                    result.followUp.userId,
-                    result.followUp.chart,
-                    result.followUp.delayMinutes
-                );
+        setImmediate(() => {
+            processTriageAsync(callbackUrl, userId, patientData).catch(err => {
+                console.error('[Background Triage Error]', err);
             });
-        }
+        });
         return;
 
     } catch (error) {
@@ -199,7 +200,7 @@ async function processTriageAsync(callbackUrl, userId, patientData) {
 
         dbService.logConsultation(userId, patientData, analysisResult).catch(err => console.error("DB Log Error:", err));
 
-        // 콜백 URL로 실제 분석 결과 전송
+        // 콜백 URL로 실제 분석 결과 전송 (카카오가 callbackUrl을 제공하면 사용)
         if (callbackUrl) {
             const callbackBody = {
                 version: "2.0",
@@ -220,7 +221,11 @@ async function processTriageAsync(callbackUrl, userId, patientData) {
             });
             console.log('[Callback Response]', response.status);
         } else {
-            console.error('[Callback] No callbackUrl provided');
+            // callbackUrl이 없는 환경에서는 메신저봇 푸시 큐로 대신 전송
+            const pushed = enqueueFUPush(userId, finalResponseText);
+            if (!pushed) {
+                console.warn('[F/U Push] room mapping missing - cannot deliver analysis result to user', userId);
+            }
         }
 
     } catch (error) {
