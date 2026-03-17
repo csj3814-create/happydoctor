@@ -102,20 +102,10 @@ router.post('/triage-complete', async (req, res) => {
         }
 
         // 증상 데이터가 들어온 이후부터는 분석 시간이 소요되므로
-        // 사용자에게는 즉시 '분석 중' 메시지를 보내고, 백그라운드에서 Gemini 호출 및 결과 전송을 수행합니다.
-        res.status(200).json({
-            version: "2.0",
-            template: {
-                outputs: [{ simpleText: { text: "증상 정보를 분석 중입니다. 잠시만 기다려주세요..." } }]
-            }
-        });
-
-        setImmediate(() => {
-            processTriageAsync(callbackUrl, userId, patientData).catch(err => {
-                console.error('[Background Triage Error]', err);
-            });
-        });
-        return;
+        // 직접 분석 결과를 반환하여 카카오톡으로 바로 보여줍니다.
+        // (개인 채팅에서는 callbackUrl을 사용하지 않으므로, 지연이 있더라도 동기 응답을 보냅니다.)
+        const result = await processTriageSync(userId, patientData);
+        return res.status(200).json(result.response);
 
     } catch (error) {
         console.error('[Kakao Webhook Error]', error);
