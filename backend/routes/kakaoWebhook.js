@@ -87,23 +87,10 @@ router.post('/triage-complete', async (req, res) => {
             });
         }
 
-        if (callbackUrl) {
-            // 콜백 모드: 대기 메시지 먼저 반환 후 비동기 처리
-            res.status(200).json({
-                version: "2.0",
-                useCallback: true,
-                template: {
-                    outputs: [{
-                        simpleText: { text: "🩺 입력해주신 증상을 분석하고 있습니다. 잠시만 기다려주세요..." }
-                    }]
-                }
-            });
-            processTriageAsync(callbackUrl, userId, patientData);
-        } else {
-            // 동기 모드: 5초 내 직접 응답
-            const result = await processTriageSync(userId, patientData);
-            return res.status(200).json(result);
-        }
+        // 동기 모드: 항상 즉시 최종 응답을 반환하도록 변경
+        // (카카오 콜백 모드가 제대로 동작하지 않는 환경에서 응답 누락을 방지하기 위함)
+        const result = await processTriageSync(userId, patientData);
+        return res.status(200).json(result);
 
     } catch (error) {
         console.error('[Kakao Webhook Error]', error);
