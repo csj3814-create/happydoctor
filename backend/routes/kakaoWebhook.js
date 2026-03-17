@@ -219,7 +219,11 @@ async function processTriageAsync(callbackUrl, userId, patientData) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(callbackBody)
             });
-            console.log('[Callback Response]', response.status);
+            const respText = await response.text();
+            console.log('[Callback Response]', response.status, respText);
+            if (!response.ok) {
+                console.warn('[Callback] non-200 response from callback URL', response.status, respText);
+            }
         } else {
             // callbackUrl이 없는 환경에서는 메신저봇 푸시 큐로 대신 전송
             const pushed = enqueueFUPush(userId, finalResponseText);
