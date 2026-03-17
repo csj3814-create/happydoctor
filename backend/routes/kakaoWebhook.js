@@ -54,20 +54,6 @@ router.post('/triage-complete', async (req, res) => {
         const merged = { ...contextParams, ...params };
         console.log('[Merged Params]', JSON.stringify(merged));
 
-        // 예진 상담 시작 버튼 클릭 시에는 실제 문진 데이터가 없을 수 있으므로
-        // 의미 있는 문진 데이터가 없으면 바로 응답하여 딜레이를 줄입니다.
-        const meaningfulKeys = Object.keys(merged).filter(k => k !== 'consent' && k !== 'callbackUrl');
-        const hasMeaningfulData = meaningfulKeys.length > 0 && meaningfulKeys.some(k => merged[k]);
-        if (!hasMeaningfulData) {
-            return res.status(200).json({
-                version: "2.0",
-                template: {
-                    outputs: [{ simpleText: { text: "예진 상담을 시작합니다. 먼저 증상과 상황을 입력해주시면 도와드릴게요!" } }],
-                    quickReplies: [{ label: "증상 입력하기", action: "message", messageText: "증상 입력" }]
-                }
-            });
-        }
-
         // sys.* 엔티티 이름이 그대로 들어온 경우 기본값 처리
         const sanitize = (val, fallback) => {
             if (!val || val.startsWith('sys.')) return fallback;
@@ -101,11 +87,23 @@ router.post('/triage-complete', async (req, res) => {
             });
         }
 
-        // 증상 데이터가 들어온 이후부터는 분석 시간이 소요되므로
-        // 직접 분석 결과를 반환하여 카카오톡으로 바로 보여줍니다.
-        // (개인 채팅에서는 callbackUrl을 사용하지 않으므로, 지연이 있더라도 동기 응답을 보냅니다.)
-        const result = await processTriageSync(userId, patientData);
-        return res.status(200).json(result.response);
+        if (callbackUrl) {
+            // 콜백 모드: 대기 메시지 먼저 반환 후 비동기 처리
+            res.status(200).json({
+                version: "2.0",
+                useCallback: true,
+                template: {
+                    outputs: [{
+                        simpleText: { text: "🩺 입력해주신 증상을 분석하고 있습니다. 잠시만 기다려주세요..." }
+                    }]
+                }
+            });
+            processTriageAsync(callbackUrl, userId, patientData);
+        } else {
+            // 동기 모드: 5초 내 직접 응답
+            const result = await processTriageSync(userId, patientData);
+            return res.status(200).json(result);
+        }
 
     } catch (error) {
         console.error('[Kakao Webhook Error]', error);
@@ -128,47 +126,31 @@ async function processTriageSync(userId, patientData) {
         console.log(`[Timing] analyzeAndRouteTriage took ${durationMs}ms`);
 
         let finalResponseText = '';
-        let followUpChart = null;
-
         if (analysisResult.action === 'AUTONOMOUS_REPLY') {
             finalResponseText = analysisResult.replyToPatient;
             const fallbackChart = `[최초 자동 해결된 경증 환자]\n증상: ${patientData.cc}\nNRS: ${patientData.nrs}`;
-            followUpChart = fallbackChart;
+            followUpService.scheduleFollowUp(userId, fallbackChart, 15);
         } else {
             enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId);
-            followUpChart = analysisResult.soapChartForDoctor;
+            followUpService.scheduleFollowUp(userId, analysisResult.soapChartForDoctor, 15);
             finalResponseText = analysisResult.replyToPatient +
                 "\n\n🩺 작성해주신 차트를 담당 전문의 선생님들께 보고드렸습니다. 잠시만 대기해 주세요. (급박한 응급상황 시 119를 부르세요!)" +
                 "\n\n🏥 '해피닥터 행복한 의사'는 의료 취약계층을 위한 비영리 단체입니다. 💛";
         }
         dbService.logConsultation(userId, patientData, analysisResult).catch(err => console.error("DB Log Error:", err));
-
-        // 카카오톡 메시지 길이 제한(약 2,000자 내외) 대비
-        const MAX_MSG_LEN = 1600;
-        if (finalResponseText.length > MAX_MSG_LEN) {
-            finalResponseText = finalResponseText.slice(0, MAX_MSG_LEN - 20) + "... (메시지가 길어 일부만 표시됩니다)";
-        }
-
         return {
-            response: {
-                version: "2.0",
-                template: {
-                    outputs: [{ simpleText: { text: finalResponseText } }],
-                    quickReplies: [
-                        { label: "예진상담", action: "message", messageText: "예진상담" },
-                        { label: "상담종료", action: "message", messageText: "상담종료" }
-                    ]
-                }
-            },
-            followUp: {
-                userId,
-                chart: followUpChart,
-                delayMinutes: 15
+            version: "2.0",
+            template: {
+                outputs: [{ simpleText: { text: finalResponseText } }],
+                quickReplies: [
+                    { label: "예진상담", action: "message", messageText: "예진상담" },
+                    { label: "상담종료", action: "message", messageText: "상담종료" }
+                ]
             }
         };
     } catch (error) {
         console.error('[Sync Triage Error]', error);
-        return { response: { version: "2.0", template: { outputs: [{ simpleText: { text: "죄송합니다. 분석 중 오류가 발생했습니다. 다시 시도해주세요." } }] } } };
+        return { version: "2.0", template: { outputs: [{ simpleText: { text: "죄송합니다. 분석 중 오류가 발생했습니다. 다시 시도해주세요." } }] } };
     }
 }
 
@@ -196,11 +178,28 @@ async function processTriageAsync(callbackUrl, userId, patientData) {
 
         dbService.logConsultation(userId, patientData, analysisResult).catch(err => console.error("DB Log Error:", err));
 
-        // 카카오 콜백 URL은 스킬 서버 설정이 정확히 맞지 않으면 400을 반환하므로
-        // 예진 결과는 쿼리 가능한 메신저봇 푸시 큐를 통해 전달합니다.
-        const pushed = enqueueFUPush(userId, finalResponseText);
-        if (!pushed) {
-            console.warn('[F/U Push] room mapping missing - cannot deliver analysis result to user', userId);
+        // 콜백 URL로 실제 분석 결과 전송
+        if (callbackUrl) {
+            const callbackBody = {
+                version: "2.0",
+                template: {
+                    outputs: [{
+                        simpleText: { text: finalResponseText }
+                    }],
+                    quickReplies: [
+                        { label: "예진상담", action: "message", messageText: "예진상담" },
+                        { label: "상담종료", action: "message", messageText: "상담종료" }
+                    ]
+                }
+            };
+            const response = await fetch(callbackUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(callbackBody)
+            });
+            console.log('[Callback Response]', response.status);
+        } else {
+            console.error('[Callback] No callbackUrl provided');
         }
 
     } catch (error) {
