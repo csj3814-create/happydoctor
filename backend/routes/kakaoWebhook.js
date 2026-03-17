@@ -74,17 +74,27 @@ router.post('/triage-complete', async (req, res) => {
         };
 
         // 동의 확인
-        let consent = (merged.consent || '').toString().trim();
-        // 만약 파라미터가 비어있다면 (버튼만으로 이동시) 요청 utterance에 "동의" 또는 "예진" 키워드가 있는지 확인
+        let consent = (merged.consent || '').toString().trim().toLowerCase();
+
+        // 명시적 부정 의사 표시인 경우 팅김
+        const negativeConsent = ['거부', '비동의', '안함', '아니요', '싫어요', 'no', 'false'];
+        if (negativeConsent.some(word => consent.includes(word))) {
+            consent = '';
+        }
+
+        // 만약 파라미터가 비어있거나 'true' 같은 값인 경우, 요청 utterance를 추가로 참고
         if (!consent) {
-            const utterance = (req.body.userRequest?.utterance || '').toString();
-            if (utterance.includes('동의') || utterance.includes('예진')) {
+            const utterance = (req.body.userRequest?.utterance || '').toString().toLowerCase();
+
+            // 긍정 의도 키워드
+            const positiveConsent = ['동의', '예진', '시작', '상담'];
+            if (positiveConsent.some(word => utterance.includes(word))) {
                 consent = '동의';
             }
         }
 
-        // consent가 비어있거나 '동의' 문구가 없으면 상담을 진행하지 않음
-        if (!consent || !consent.includes('동의')) {
+        // consent가 비어있거나 부정 의사가 포함된 경우 상담을 진행하지 않음
+        if (!consent) {
             return res.status(200).json({
                 version: "2.0",
                 template: {
