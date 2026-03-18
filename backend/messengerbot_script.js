@@ -42,7 +42,6 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
                 "🤖 해피닥터 봇 도움말 (의료진)\n" +
                 "━━━━━━━━━━━━━━━\n" +
                 "~차트확인  대기 중인 신규 예진 차트 조회\n" +
-                "~당직확인  위와 동일\n" +
                 "~도움말    이 도움말 표시\n" +
                 "━━━━━━━━━━━━━━━\n" +
                 "※ 신규 차트는 10초마다 자동으로도 전송됩니다.";
@@ -64,7 +63,7 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
                 "~상담 / ~진료     1:1 채널 안내\n" +
                 "아파요·통증 등    증상 키워드 자동 감지\n\n" +
                 "[의료진]\n" +
-                "~차트확인 / ~당직확인   대기 차트 조회\n\n" +
+                "~차트확인   대기 차트 조회\n\n" +
                 "[공통]\n" +
                 "~도움말    이 도움말 표시\n" +
                 "━━━━━━━━━━━━━━━\n" +
@@ -101,7 +100,7 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
     }
 
     // [2] 의료진 단톡방 또는 실험방: 차트 확인
-    if ((room === DOCTOR_ROOM || room === EXPERIMENT_ROOM) && (msg.trim() === "~차트확인" || msg.trim() === "~당직확인")) {
+    if ((room === DOCTOR_ROOM || room === EXPERIMENT_ROOM) && msg.trim() === "~차트확인") {
         try {
             var chartRes = org.jsoup.Jsoup.connect(SERVER_URL + "/api/messengerbot")
                 .header("Content-Type", "application/json")

@@ -42,7 +42,7 @@ router.post('/', checkApiKey, (req, res) => {
     // ===== 의료진 카톡 단체방 알림 푸시 (Polling 응답) =====
     // 메신저봇이 "!확인" 과 같은 메세지를 보내거나 정기적으로 ping을 시도하면
     // 쌓여있는 차트를 응답으로 내려보냄.
-    if (msg.trim() === '~차트확인' || msg.trim() === '~당직확인') {
+    if (msg.trim() === '~차트확인') {
         const latestChart = dequeueDoctorNotification();
         if (latestChart) {
             return res.status(200).json({ reply: latestChart.message });
