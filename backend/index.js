@@ -11,7 +11,9 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
+// /api/* 는 카카오 오픈빌더·메신저봇R 서버간 호출이므로 브라우저 CORS 불필요.
+// 헬스체크(/) 등 공개 경로만 CORS 허용하고 API 경로는 차단.
+app.use('/api/', cors({ origin: false }));
 app.use(express.json());
 
 // Rate Limiting (분당 30회)
