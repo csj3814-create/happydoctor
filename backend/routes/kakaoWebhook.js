@@ -50,6 +50,29 @@ router.post('/triage-complete', async (req, res) => {
         const merged = { ...contextParams, ...params };
         console.log('[Merged Params]', JSON.stringify(merged));
 
+        // confirm 파라미터 처리: "다시" → 세션 초기화 후 재시작 안내, "종료" → 상담 종료
+        const confirm = (merged.confirm || '').toString().trim();
+        if (confirm === '다시') {
+            followUpService.resetSession(userId);
+            return res.status(200).json({
+                version: "2.0",
+                template: {
+                    outputs: [{ simpleText: { text: "알겠습니다. 처음부터 다시 입력해주세요." } }],
+                    quickReplies: [{ label: "예진상담", action: "message", messageText: "예진상담" }]
+                }
+            });
+        }
+        if (confirm === '종료') {
+            followUpService.resetSession(userId);
+            return res.status(200).json({
+                version: "2.0",
+                template: {
+                    outputs: [{ simpleText: { text: "알겠습니다.\n필요하실 때 언제든 다시 찾아주세요.\n건강 잘 챙기세요! 😊" } }],
+                    quickReplies: [{ label: "예진상담", action: "message", messageText: "예진상담" }]
+                }
+            });
+        }
+
         // sys.* 엔티티 이름이 그대로 들어온 경우 기본값 처리
         const sanitize = (val, fallback) => {
             if (!val || val.startsWith('sys.')) return fallback;
