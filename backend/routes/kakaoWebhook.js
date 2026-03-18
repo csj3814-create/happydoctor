@@ -335,6 +335,29 @@ router.post('/fu-reply', async (req, res) => {
     }
 });
 
+/**
+ * 예진 중단 엔드포인트
+ * 슬롯 필링 도중 "그만", "중단" 등 취소 의도 발화 시 오픈빌더에서 호출합니다.
+ * - F/U 타이머 및 세션 초기화
+ * - 따뜻한 중단 안내 메시지 반환
+ */
+router.post('/cancel-triage', (req, res) => {
+    const userId = req.body.userRequest?.user?.id || 'kakao_user_unknown';
+    console.log(`[Cancel Triage] ${userId} — 예진 도중 중단 요청`);
+
+    followUpService.resetSession(userId);
+
+    return res.status(200).json({
+        version: "2.0",
+        template: {
+            outputs: [{ simpleText: { text: "알겠습니다. 언제든 다시 찾아주시면 도와드릴게요. 건강 잘 챙기세요! 😊" } }],
+            quickReplies: [
+                { label: "예진상담", action: "message", messageText: "예진상담" }
+            ]
+        }
+    });
+});
+
 // 테스트용: F/U 타이머를 수동으로 즉시 실행 (개발/테스트 환경에서만 사용)
 router.post('/test-trigger-fu', (req, res) => {
     // MESSENGER_API_KEY로 인증 — 설정되지 않으면 항상 거부
