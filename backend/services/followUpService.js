@@ -10,8 +10,10 @@ class FollowUpService {
         this.patientDataStore = new Map(); // F/U 비교를 위해 환자의 1차 차트를 임시 보관
         this.pendingFollowUps = new Map(); // 환자가 재접속 시 F/U 질문을 전달하기 위한 대기 플래그
 
-        // 세션 만료 (예: 30분) 이후에는 이전 상담을 자동으로 초기화
+        // 슬라이딩 만료: 마지막 접근 후 30분 비활성 시 만료
         this.SESSION_EXPIRY_MS = 30 * 60 * 1000; // 30분
+        // 절대 만료: 상담 생성 후 최대 2시간이 지나면 무조건 만료 (무한 연장 방지)
+        this.SESSION_ABSOLUTE_EXPIRY_MS = 2 * 60 * 60 * 1000; // 2시간
     }
 
     /**
@@ -77,14 +79,23 @@ class FollowUpService {
         const session = this.patientDataStore.get(userId);
         if (!session) return "이전 차트 기록 없음";
 
-        const ageMs = Date.now() - new Date(session.lastActiveAt).getTime();
-        if (ageMs > this.SESSION_EXPIRY_MS) {
-            // 만료된 세션 제거
+        const now = Date.now();
+
+        // 절대 만료 체크: 생성 후 2시간 초과 시 무조건 만료
+        const absoluteAgeMs = now - new Date(session.createdAt).getTime();
+        if (absoluteAgeMs > this.SESSION_ABSOLUTE_EXPIRY_MS) {
             this.cancelFollowUp(userId);
             return "이전 차트 기록 없음";
         }
 
-        // 접근 시마다 활동 시간 갱신
+        // 슬라이딩 만료 체크: 마지막 접근 후 30분 비활성 시 만료
+        const inactiveMs = now - new Date(session.lastActiveAt).getTime();
+        if (inactiveMs > this.SESSION_EXPIRY_MS) {
+            this.cancelFollowUp(userId);
+            return "이전 차트 기록 없음";
+        }
+
+        // 접근 시마다 슬라이딩 활동 시간 갱신
         session.lastActiveAt = new Date();
         this.patientDataStore.set(userId, session);
 
