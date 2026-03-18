@@ -200,8 +200,7 @@ async function processTriageSync(userId, patientData) {
             enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId);
             followUpService.scheduleFollowUp(userId, analysisResult.soapChartForDoctor, 15);
             finalResponseText = analysisResult.replyToPatient +
-                "\n\n🩺 차트를 담당 전문의 선생님께\n보고드렸습니다.\n진료 틈틈이 확인 후 이곳으로\n직접 답변드릴 예정입니다.\n잠시만 대기해 주세요.\n(힘드시면 지체 없이 119!)" +
-                "\n\n🏥 해피닥터 행복한 의사는\n의료 취약계층을 위해 의사들이\n자원봉사로 운영하는 비영리단체입니다.\n도움이 되셨다면 응원 부탁드려요! 💛";
+                "\n\n🩺 차트를 담당 전문의 선생님께\n보고드렸습니다.\n진료 틈틈이 확인 후 이곳으로\n직접 답변드릴 예정입니다.\n잠시만 대기해 주세요.\n(힘드시면 지체 없이 119!)";
         }
         dbService.logConsultation(userId, patientData, analysisResult).catch(err => console.error("DB Log Error:", err));
         return {
@@ -238,8 +237,7 @@ async function processTriageAsync(callbackUrl, userId, patientData) {
             enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId);
             followUpService.scheduleFollowUp(userId, analysisResult.soapChartForDoctor, 15);
             finalResponseText = analysisResult.replyToPatient +
-                "\n\n🩺 차트를 담당 전문의 선생님께\n보고드렸습니다.\n진료 틈틈이 확인 후 이곳으로\n직접 답변드릴 예정입니다.\n잠시만 대기해 주세요.\n(힘드시면 지체 없이 119!)" +
-                "\n\n🏥 해피닥터 행복한 의사는\n의료 취약계층을 위해 의사들이\n자원봉사로 운영하는 비영리단체입니다.\n도움이 되셨다면 응원 부탁드려요! 💛";
+                "\n\n🩺 차트를 담당 전문의 선생님께\n보고드렸습니다.\n진료 틈틈이 확인 후 이곳으로\n직접 답변드릴 예정입니다.\n잠시만 대기해 주세요.\n(힘드시면 지체 없이 119!)";
         }
 
         dbService.logConsultation(userId, patientData, analysisResult).catch(err => console.error("DB Log Error:", err));
