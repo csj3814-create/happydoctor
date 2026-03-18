@@ -26,12 +26,14 @@ const CHANNEL_LINK = "http://pf.kakao.com/_PxaTxhX/chat"; // 카카오 채널 1:
 const DOCTOR_ROOM = "2기 행복한 의사 의료봉사방";
 // 환자 오픈채팅방 이름
 const PATIENT_ROOM = "행복한 의사의 응급상담방";
+// 실험방 이름
+const EXPERIMENT_ROOM = "해피닥터 AI 인턴 보듬 실험방";
 
 // ===== 메시지 수신 핸들러 =====
 function response(room, msg, sender, isGroupChat, replier, imageDB, packageName) {
 
-    // [1] 환자 오픈채팅방에서만: 의료 키워드 → 1:1 채널 안내
-    if (room === PATIENT_ROOM) {
+    // [1] 환자 오픈채팅방 또는 실험방: 의료 키워드 → 1:1 채널 안내
+    if (room === PATIENT_ROOM || room === EXPERIMENT_ROOM) {
         var guideKeywords = [
             "~상담", "~진료", "아파요", "아픈데", "아프다", "아픕니다",
             "통증", "두통", "복통", "열이", "기침", "설사", "구토",
@@ -54,8 +56,8 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
         }
     }
 
-    // [2] 의료진 단톡방에서만: 차트 확인 (다른 방에서는 동작하지 않음)
-    if (room === DOCTOR_ROOM && (msg.trim() === "~차트확인" || msg.trim() === "~당직확인")) {
+    // [2] 의료진 단톡방 또는 실험방: 차트 확인
+    if ((room === DOCTOR_ROOM || room === EXPERIMENT_ROOM) && (msg.trim() === "~차트확인" || msg.trim() === "~당직확인")) {
         try {
             var chartRes = org.jsoup.Jsoup.connect(SERVER_URL + "/api/messengerbot")
                 .header("Content-Type", "application/json")
