@@ -1,3 +1,5 @@
+const { randomUUID } = require('crypto');
+
 // 임시 메모리 기반 큐 (실제 프로덕션에서는 Redis나 DB를 권장)
 const messageQueue = [];
 
@@ -14,7 +16,7 @@ const roomMapping = new Map();
  */
 function enqueueDoctorNotification(message, patientId) {
     messageQueue.push({
-        id: Date.now().toString(),
+        id: randomUUID(),
         message: message,
         patientId: patientId,
         timestamp: new Date()
@@ -44,7 +46,7 @@ function enqueueFUPush(userId, message) {
         return false;
     }
     fuPushQueue.push({
-        id: Date.now().toString(),
+        id: randomUUID(),
         userId,
         roomName,
         message,

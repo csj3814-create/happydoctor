@@ -21,10 +21,6 @@ router.post('/triage-complete', async (req, res) => {
         const callbackUrl = req.body.userRequest?.callbackUrl;
         const utterance = (req.body.userRequest?.utterance || '').toString().trim();
 
-        // 새로운 상담을 시작하는 경우 기존 상담 상태(대기 F/U, 타이머 등)를 초기화하여
-        // 이전 대화가 이어지지 않도록 합니다.
-        followUpService.resetSession(userId);
-
         // 사용자가 "다음에 할게요" 등으로 중단하고 싶어할 때, 예진을 시작하지 않고 종료 메시지 반환
         const cancelPhrases = ['다음에', '나중에', '그만', '중단', '끝낼게', '종료'];
         const normalized = utterance.replace(/\s+/g, '');
@@ -76,6 +72,7 @@ router.post('/triage-complete', async (req, res) => {
         // (카카오 오픈빌더 상에서 상담 시작 블록을 통해 호출되므로 별도의 동의 확인은 생략)
 
         // 대기 중인 F/U 질문이 있으면 새 상담 대신 F/U 질문을 먼저 표시
+        // ※ resetSession() 호출 전에 체크해야 pending 플래그가 살아있음
         const pendingFU = followUpService.consumePendingFollowUp(userId);
         if (pendingFU) {
             console.log(`[F/U Pending] ${userId} — 대기 중인 F/U 질문 전달`);
@@ -86,6 +83,10 @@ router.post('/triage-complete', async (req, res) => {
                 }
             });
         }
+
+        // 새로운 상담 시작: 이전 상담 상태(타이머 등) 초기화
+        // ※ consumePendingFollowUp() 이후에 호출해야 pending 플래그가 유지됨
+        followUpService.resetSession(userId);
 
         if (callbackUrl) {
             // 콜백 모드: 대기 메시지 먼저 반환 후 비동기 처리
@@ -134,8 +135,8 @@ async function processTriageSync(userId, patientData) {
             enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId);
             followUpService.scheduleFollowUp(userId, analysisResult.soapChartForDoctor, 15);
             finalResponseText = analysisResult.replyToPatient +
-                "\n\n🩺 작성해주신 차트를 담당 전문의 선생님들께 보고드렸습니다. 잠시만 대기해 주세요. (급박한 응급상황 시 119를 부르세요!)" +
-                "\n\n🏥 '해피닥터 행복한 의사'는 의료 취약계층을 위한 비영리 단체입니다. 💛";
+                "\n\n🩺 작성해주신 차트를 담당 전문의 선생님들께 보고드렸습니다. 진료 틈틈이 확인하시고 이곳으로 직접 답변을 드릴 예정이니 잠시만 대기해 주세요. (견디기 힘드시면 지체 없이 119를 부르세요!)" +
+                "\n\n🏥 '해피닥터 행복한 의사'는 의료 취약계층 환자분들을 위해 의사들이 자원봉사로 운영하는 비영리 단체입니다. 오늘 상담이 도움이 되셨다면, 이 활동이 계속될 수 있도록 작은 응원을 보내주세요. 💛";
         }
         dbService.logConsultation(userId, patientData, analysisResult).catch(err => console.error("DB Log Error:", err));
         return {
@@ -171,8 +172,8 @@ async function processTriageAsync(callbackUrl, userId, patientData) {
         } else {
             enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId);
             followUpService.scheduleFollowUp(userId, analysisResult.soapChartForDoctor, 15);
-            finalResponseText = analysisResult.replyToPatient + 
-                "\n\n🩺 작성해주신 차트를 담당 전문의 선생님들께 보고드렸습니다. 진료 틈틈이 확인하시고 이곳으로 직접 답변을 드릴 예정이니 잠시만 대기해 주세요. (급박한 응급상황 시 지체 없이 119를 부르세요!)" +
+            finalResponseText = analysisResult.replyToPatient +
+                "\n\n🩺 작성해주신 차트를 담당 전문의 선생님들께 보고드렸습니다. 진료 틈틈이 확인하시고 이곳으로 직접 답변을 드릴 예정이니 잠시만 대기해 주세요. (견디기 힘드시면 지체 없이 119를 부르세요!)" +
                 "\n\n🏥 '해피닥터 행복한 의사'는 의료 취약계층 환자분들을 위해 의사들이 자원봉사로 운영하는 비영리 단체입니다. 오늘 상담이 도움이 되셨다면, 이 활동이 계속될 수 있도록 작은 응원을 보내주세요. 💛";
         }
 
@@ -239,6 +240,20 @@ router.post('/fu-reply', async (req, res) => {
         // 1. 기존 차트 가져오기
         const originalChart = followUpService.getOriginalChart(userId);
 
+        // 세션 만료 또는 기록 없는 경우 — Gemini 호출 없이 안내 메시지 반환
+        if (!originalChart || originalChart === '이전 차트 기록 없음') {
+            console.warn(`[F/U Reply] ${userId} — 이전 차트 없음 또는 세션 만료. F/U 분석 생략.`);
+            return res.status(200).json({
+                version: "2.0",
+                template: {
+                    outputs: [{ simpleText: { text: "이전 상담 기록이 만료되었습니다. 증상이 지속된다면 새로 예진 상담을 시작해 주세요." } }],
+                    quickReplies: [
+                        { label: "예진상담", action: "message", messageText: "예진상담" }
+                    ]
+                }
+            });
+        }
+
         // 2. 증상 변화 AI 분석 (호전/유지 vs 악화)
         const fuAnalysis = await analyzeFollowUp(originalChart, nrsChange, additionalSymptom);
         console.log('[Gemini F/U Analysis Result]', fuAnalysis.action);
@@ -277,11 +292,18 @@ router.post('/fu-reply', async (req, res) => {
     }
 });
 
-// 테스트용: F/U 타이머를 수동으로 즉시 실행 (프로덕션 배포 시 제거 또는 환경변수로 제한)
+// 테스트용: F/U 타이머를 수동으로 즉시 실행 (개발/테스트 환경에서만 사용)
 router.post('/test-trigger-fu', (req, res) => {
+    // MESSENGER_API_KEY로 인증 — 설정되지 않으면 항상 거부
+    const apiKey = req.headers['x-api-key'];
+    const validKey = process.env.MESSENGER_API_KEY;
+    if (!validKey || apiKey !== validKey) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
     const { userId } = req.body;
     if (!userId) return res.status(400).json({ error: 'userId required' });
-    
+
     followUpService.executeFollowUpPush(userId);
     res.status(200).json({ ok: true, message: `F/U push triggered for ${userId}` });
 });
@@ -309,7 +331,7 @@ router.post('/close-consultation', async (req, res) => {
 
         // 3) 종결 메시지
         const closeMessages = {
-            '호전': '다행이 나아지셨군요! 증상이 다시 나타나면 언제든 다시 찾아주세요.',
+            '호전': '다행히 나아지셨군요! 증상이 다시 나타나면 언제든 다시 찾아주세요.',
             '응급실 방문': '응급실에서 잘 치료 받으셨길 바랍니다. 퇴원 후에도 문의사항이 있으면 언제든 상담해 주세요.',
             '외래 진료': '병원에서 진료 잘 받으셨군요! 추가 문의사항이 있으면 언제든 다시 찾아주세요.',
         };

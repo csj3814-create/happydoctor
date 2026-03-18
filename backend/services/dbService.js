@@ -39,7 +39,7 @@ async function logConsultation(userId, patientData, analysisResult) {
             chatbotReply: analysisResult.replyToPatient, // 환자에게 나간 따뜻한 말
             doctorChart: analysisResult.soapChartForDoctor || "None", // 의사에게 넘어간 요약본 (경증이면 None)
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            status: "CLOSED", // 기본 종결 상태
+            status: "ACTIVE", // 진행 중 상태 (closeConsultation 시 COMPLETED로 변경됨)
             followUpLogs: [] // 추후 추적 관찰 결과를 배열로 누적
         });
 
@@ -73,7 +73,7 @@ async function logFollowUp(userId, fuAnalysis) {
          await docRef.update({
              followUpLogs: admin.firestore.FieldValue.arrayUnion({
                  action: fuAnalysis.action,
-                 timestamp: new Date(),
+                 timestamp: admin.firestore.Timestamp.now(),
                  alertMessage: fuAnalysis.fuChartForDoctor || "None"
              })
          });

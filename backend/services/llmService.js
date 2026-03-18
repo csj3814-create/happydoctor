@@ -20,8 +20,7 @@ const model = ai.getGenerativeModel({
    - 답변 마지막에 다음 문구를 반드시 포함하세요: "\n\n🏥 '해피닥터 행복한 의사'는 의료 취약계층 환자분들을 위해 의사들이 자원봉사로 운영하는 비영리 단체입니다. 오늘 상담이 도움이 되셨다면, 이 활동이 계속될 수 있도록 작은 응원을 보내주세요. 💛"
 2. 전문의 협진 (ESCALATE): 응급실에 가야 하거나 전문의의 확인이 필요한 애매한 경우
    - 전문의 보고용 SOAP 폼의 요약 차트를 생성하되, **검사 내용(Lab, X-ray)이나 구체적 투약 지시(Plan)는 절대 쓰지 마세요**. 오직 환자의 현재 증상 요약과 대략적인 위험도/응급도(Triage: 응급실행, 내일 의원 방문 등) 평가만 씁니다.
-   - 환자에게 건넬 1차 안심 및 대기/응급실 권유 멘트를 작성하세요.
-   - 답변 마지막에 다음 문구를 반드시 포함하세요: "\n\n🏥 '해피닥터 행복한 의사'는 의료 취약계층 환자분들을 위해 의사들이 자원봉사로 운영하는 비영리 단체입니다. 오늘 상담이 도움이 되셨다면, 이 활동이 계속될 수 있도록 작은 응원을 보내주세요. 💛"
+   - 환자에게 건넬 1차 안심 및 대기/응급실 권유 멘트를 작성하세요. (기부/단체 안내 문구는 포함하지 마세요 — 서버에서 별도로 추가됩니다.)
 
 [출력 양식: 반드시 JSON 포맷으로 렌더링할 것]
 {
@@ -54,11 +53,11 @@ async function analyzeAndRouteTriage(patientData) {
 
         let textResult = result.response.text().trim();
         
-        // JSON 파싱을 위해 혹시 모를 마크다운 블록 제거
+        // JSON 파싱을 위해 혹시 모를 마크다운 코드블록 제거
         if (textResult.startsWith('```json')) {
-            textResult = textResult.substring(7, textResult.length - 3).trim();
+            textResult = textResult.slice(7, textResult.lastIndexOf('```')).trim();
         } else if (textResult.startsWith('```')) {
-            textResult = textResult.substring(3, textResult.length - 3).trim();
+            textResult = textResult.slice(3, textResult.lastIndexOf('```')).trim();
         }
 
         try {
@@ -102,13 +101,22 @@ async function analyzeFollowUp(originalChart, nrsChange, additionalSymptom) {
         const result = await model.generateContent(prompt);
         let textResult = result.response.text().trim();
         
-        if (textResult.startsWith('\`\`\`json')) {
-            textResult = textResult.substring(7, textResult.length - 3);
-        } else if (textResult.startsWith('\`\`\`')) {
-            textResult = textResult.substring(3, textResult.length - 3);
+        if (textResult.startsWith('```json')) {
+            textResult = textResult.slice(7, textResult.lastIndexOf('```')).trim();
+        } else if (textResult.startsWith('```')) {
+            textResult = textResult.slice(3, textResult.lastIndexOf('```')).trim();
         }
 
-        return JSON.parse(textResult);
+        try {
+            return JSON.parse(textResult);
+        } catch (parseError) {
+            console.error('JSON Parse failed (F/U), raw response:', textResult.substring(0, 200));
+            return {
+                action: 'AUTONOMOUS_FU',
+                replyToPatient: '확인해주셔서 감사합니다. 증상이 지속되거나 악화되면 언제든 다시 알려주세요. 불편하시면 가까운 의원이나 응급실을 방문해 주세요. 💛',
+                fuChartForDoctor: null
+            };
+        }
 
     } catch (error) {
         console.error('Gemini FollowUp Error:', error);
