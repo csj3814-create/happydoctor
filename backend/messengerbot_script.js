@@ -32,6 +32,48 @@ const EXPERIMENT_ROOM = "해피닥터 AI 인턴 보듬 실험방";
 // ===== 메시지 수신 핸들러 =====
 function response(room, msg, sender, isGroupChat, replier, imageDB, packageName) {
 
+    // [0] 모든 방: ~도움말 명령어
+    if (msg.trim() === "~도움말") {
+        var helpMsg;
+        if (room === DOCTOR_ROOM) {
+            helpMsg =
+                "🤖 해피닥터 봇 도움말 (의료진)\n" +
+                "━━━━━━━━━━━━━━━\n" +
+                "~차트확인  대기 중인 신규 예진 차트 조회\n" +
+                "~당직확인  위와 동일\n" +
+                "~도움말    이 도움말 표시\n" +
+                "━━━━━━━━━━━━━━━\n" +
+                "※ 신규 차트는 10초마다 자동으로도 전송됩니다.";
+        } else if (room === PATIENT_ROOM) {
+            helpMsg =
+                "🤖 해피닥터 봇 도움말 (환자 안내)\n" +
+                "━━━━━━━━━━━━━━━\n" +
+                "아파요 / 통증 / 두통 등 증상 관련 단어를\n" +
+                "입력하시면 1:1 상담 채널로 안내해 드려요.\n\n" +
+                "~상담  ~진료  직접 채널 안내 받기\n" +
+                "~도움말  이 도움말 표시\n" +
+                "━━━━━━━━━━━━━━━\n" +
+                "👉 1:1 상담: " + CHANNEL_LINK;
+        } else if (room === EXPERIMENT_ROOM) {
+            helpMsg =
+                "🤖 해피닥터 봇 도움말 (실험방 — 전체 기능)\n" +
+                "━━━━━━━━━━━━━━━\n" +
+                "[환자 안내]\n" +
+                "~상담 / ~진료     1:1 채널 안내\n" +
+                "아파요·통증 등    증상 키워드 자동 감지\n\n" +
+                "[의료진]\n" +
+                "~차트확인 / ~당직확인   대기 차트 조회\n\n" +
+                "[공통]\n" +
+                "~도움말    이 도움말 표시\n" +
+                "━━━━━━━━━━━━━━━\n" +
+                "👉 1:1 상담: " + CHANNEL_LINK;
+        } else {
+            helpMsg = "🤖 이 방은 해피닥터 봇 지원 대상이 아닙니다.";
+        }
+        replier.reply(helpMsg);
+        return;
+    }
+
     // [1] 환자 오픈채팅방 또는 실험방: 의료 키워드 → 1:1 채널 안내
     if (room === PATIENT_ROOM || room === EXPERIMENT_ROOM) {
         var guideKeywords = [
