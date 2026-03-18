@@ -26,8 +26,10 @@ const CHANNEL_LINK = "http://pf.kakao.com/_PxaTxhX/chat"; // 카카오 채널 1:
 const DOCTOR_ROOM = "2기 행복한 의사 의료봉사방";
 // 환자 오픈채팅방 이름
 const PATIENT_ROOM = "행복한 의사의 응급상담방";
-// 실험방 이름
-const EXPERIMENT_ROOM = "해피닥터 AI 인턴 보듬 실험방";
+// 실험방 식별자
+// ※ MessengerBotR은 오픈채팅방 이름("해피닥터 AI 인턴 보듬 실험방") 대신
+//    "최석재"를 room 식별자로 사용합니다. (오픈채팅 특성상 고정값)
+const EXPERIMENT_ROOM = "최석재";
 
 // ===== 메시지 수신 핸들러 =====
 function response(room, msg, sender, isGroupChat, replier, imageDB, packageName) {
@@ -40,7 +42,6 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
                 "🤖 해피닥터 봇 도움말 (의료진)\n" +
                 "━━━━━━━━━━━━━━━\n" +
                 "~차트확인  대기 중인 신규 예진 차트 조회\n" +
-                "~당직확인  위와 동일\n" +
                 "~도움말    이 도움말 표시\n" +
                 "━━━━━━━━━━━━━━━\n" +
                 "※ 신규 차트는 10초마다 자동으로도 전송됩니다.";
@@ -62,7 +63,7 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
                 "~상담 / ~진료     1:1 채널 안내\n" +
                 "아파요·통증 등    증상 키워드 자동 감지\n\n" +
                 "[의료진]\n" +
-                "~차트확인 / ~당직확인   대기 차트 조회\n\n" +
+                "~차트확인   대기 차트 조회\n\n" +
                 "[공통]\n" +
                 "~도움말    이 도움말 표시\n" +
                 "━━━━━━━━━━━━━━━\n" +
@@ -99,7 +100,7 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
     }
 
     // [2] 의료진 단톡방 또는 실험방: 차트 확인
-    if ((room === DOCTOR_ROOM || room === EXPERIMENT_ROOM) && (msg.trim() === "~차트확인" || msg.trim() === "~당직확인")) {
+    if ((room === DOCTOR_ROOM || room === EXPERIMENT_ROOM) && msg.trim() === "~차트확인") {
         try {
             var chartRes = org.jsoup.Jsoup.connect(SERVER_URL + "/api/messengerbot")
                 .header("Content-Type", "application/json")

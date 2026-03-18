@@ -65,7 +65,6 @@ router.post('/triage-complete', async (req, res) => {
             nrs: sanitize(merged.nrs, '0'),
             associated: sanitize(merged.associated_symptom, '없음'),
             pmhx: sanitize(merged.past_medical_history, '특이사항 없음'),
-            location: sanitize(merged.location, '미확인'),
             symptomImage: merged.symptom_image || null
         };
 
@@ -156,7 +155,7 @@ async function processTriageSync(userId, patientData) {
                 return {
                     version: "2.0",
                     template: {
-                        outputs: [{ simpleText: { text: "🩺 분석에 시간이 걸리고 있습니다. '예진상담' 버튼을 다시 눌러 재시도해 주세요.\n\n지속적으로 이 메시지가 보이면 잠시 후 다시 시도해 주세요." } }],
+                        outputs: [{ simpleText: { text: "🩺 분석에 시간이 걸리고 있습니다.\n'예진상담' 버튼을 다시 눌러\n재시도해 주세요.\n\n계속 보이면 잠시 후 다시\n시도해 주세요." } }],
                         quickReplies: [
                             { label: "예진상담", action: "message", messageText: "예진상담" }
                         ]
@@ -172,14 +171,14 @@ async function processTriageSync(userId, patientData) {
         let finalResponseText = '';
         if (analysisResult.action === 'AUTONOMOUS_REPLY') {
             finalResponseText = analysisResult.replyToPatient;
-            const fallbackChart = `[최초 자동 해결된 경증 환자]\n증상: ${patientData.cc}\nNRS: ${patientData.nrs}`;
+            const fallbackChart = `[최초 자동 해결된 경증 환자]\n증상: ${patientData.cc}\n증상점수: ${patientData.nrs}`;
             followUpService.scheduleFollowUp(userId, fallbackChart, 15);
         } else {
             enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId);
             followUpService.scheduleFollowUp(userId, analysisResult.soapChartForDoctor, 15);
             finalResponseText = analysisResult.replyToPatient +
-                "\n\n🩺 작성해주신 차트를 담당 전문의 선생님들께 보고드렸습니다. 진료 틈틈이 확인하시고 이곳으로 직접 답변을 드릴 예정이니 잠시만 대기해 주세요. (견디기 힘드시면 지체 없이 119를 부르세요!)" +
-                "\n\n🏥 '해피닥터 행복한 의사'는 의료 취약계층 환자분들을 위해 의사들이 자원봉사로 운영하는 비영리 단체입니다. 오늘 상담이 도움이 되셨다면, 이 활동이 계속될 수 있도록 작은 응원을 보내주세요. 💛";
+                "\n\n🩺 차트를 담당 전문의 선생님께\n보고드렸습니다.\n진료 틈틈이 확인 후 이곳으로\n직접 답변드릴 예정입니다.\n잠시만 대기해 주세요.\n(힘드시면 지체 없이 119!)" +
+                "\n\n🏥 해피닥터 행복한 의사는\n의료 취약계층을 위해 의사들이\n자원봉사로 운영하는 비영리단체입니다.\n도움이 되셨다면 응원 부탁드려요! 💛";
         }
         dbService.logConsultation(userId, patientData, analysisResult).catch(err => console.error("DB Log Error:", err));
         return {
@@ -210,14 +209,14 @@ async function processTriageAsync(callbackUrl, userId, patientData) {
 
         if (analysisResult.action === 'AUTONOMOUS_REPLY') {
             finalResponseText = analysisResult.replyToPatient;
-            const fallbackChart = `[최초 자동 해결된 경증 환자]\n증상: ${patientData.cc}\nNRS: ${patientData.nrs}`;
+            const fallbackChart = `[최초 자동 해결된 경증 환자]\n증상: ${patientData.cc}\n증상점수: ${patientData.nrs}`;
             followUpService.scheduleFollowUp(userId, fallbackChart, 15);
         } else {
             enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId);
             followUpService.scheduleFollowUp(userId, analysisResult.soapChartForDoctor, 15);
             finalResponseText = analysisResult.replyToPatient +
-                "\n\n🩺 작성해주신 차트를 담당 전문의 선생님들께 보고드렸습니다. 진료 틈틈이 확인하시고 이곳으로 직접 답변을 드릴 예정이니 잠시만 대기해 주세요. (견디기 힘드시면 지체 없이 119를 부르세요!)" +
-                "\n\n🏥 '해피닥터 행복한 의사'는 의료 취약계층 환자분들을 위해 의사들이 자원봉사로 운영하는 비영리 단체입니다. 오늘 상담이 도움이 되셨다면, 이 활동이 계속될 수 있도록 작은 응원을 보내주세요. 💛";
+                "\n\n🩺 차트를 담당 전문의 선생님께\n보고드렸습니다.\n진료 틈틈이 확인 후 이곳으로\n직접 답변드릴 예정입니다.\n잠시만 대기해 주세요.\n(힘드시면 지체 없이 119!)" +
+                "\n\n🏥 해피닥터 행복한 의사는\n의료 취약계층을 위해 의사들이\n자원봉사로 운영하는 비영리단체입니다.\n도움이 되셨다면 응원 부탁드려요! 💛";
         }
 
         dbService.logConsultation(userId, patientData, analysisResult).catch(err => console.error("DB Log Error:", err));
@@ -306,7 +305,7 @@ router.post('/fu-reply', async (req, res) => {
         // 3. 악화 시 전문의 큐 재할당
         if (fuAnalysis.action === 'ESCALATE_FU') {
             enqueueDoctorNotification(`🚨 **[F/U 경고: 증상 악화 감지]**\n${fuAnalysis.fuChartForDoctor}`, userId);
-            finalResponseText += "\n\n⚠️ 담당 전문의 선생님께 긴급으로 재보고 드렸습니다. 잠시만 대기해 주시고, 견디기 힘드시면 119를 부르셔야 합니다!";
+            finalResponseText += "\n\n⚠️ 담당 전문의 선생님께\n긴급으로 재보고 드렸습니다.\n잠시 대기해 주세요.\n힘드시면 지체 없이 119!";
         } else {
              // 상황 유지/호전 시 F/U 타이머를 1시간 뒤로 연장 (선택사항)
              followUpService.scheduleFollowUp(userId, originalChart, 60); 
@@ -333,6 +332,29 @@ router.post('/fu-reply', async (req, res) => {
             template: { outputs: [{ simpleText: { text: "일시적인 오류가 발생했습니다." } }] }
         });
     }
+});
+
+/**
+ * 예진 중단 엔드포인트
+ * 슬롯 필링 도중 "그만", "중단" 등 취소 의도 발화 시 오픈빌더에서 호출합니다.
+ * - F/U 타이머 및 세션 초기화
+ * - 따뜻한 중단 안내 메시지 반환
+ */
+router.post('/cancel-triage', (req, res) => {
+    const userId = req.body.userRequest?.user?.id || 'kakao_user_unknown';
+    console.log(`[Cancel Triage] ${userId} — 예진 도중 중단 요청`);
+
+    followUpService.resetSession(userId);
+
+    return res.status(200).json({
+        version: "2.0",
+        template: {
+            outputs: [{ simpleText: { text: "알겠습니다. 언제든 다시 찾아주시면 도와드릴게요. 건강 잘 챙기세요! 😊" } }],
+            quickReplies: [
+                { label: "예진상담", action: "message", messageText: "예진상담" }
+            ]
+        }
+    });
 });
 
 // 테스트용: F/U 타이머를 수동으로 즉시 실행 (개발/테스트 환경에서만 사용)
@@ -374,13 +396,13 @@ router.post('/close-consultation', async (req, res) => {
 
         // 3) 종결 메시지
         const closeMessages = {
-            '호전': '다행히 나아지셨군요! 증상이 다시 나타나면 언제든 다시 찾아주세요.',
-            '응급실 방문': '응급실에서 잘 치료 받으셨길 바랍니다. 퇴원 후에도 문의사항이 있으면 언제든 상담해 주세요.',
-            '외래 진료': '병원에서 진료 잘 받으셨군요! 추가 문의사항이 있으면 언제든 다시 찾아주세요.',
+            '호전': '다행히 나아지셨군요! 😊\n증상이 다시 나타나면 언제든\n찾아주세요.',
+            '응급실 방문': '응급실에서 잘 치료 받으셨길\n바랍니다.\n퇴원 후에도 궁금하신 점은\n언제든 상담해 주세요.',
+            '외래 진료': '병원에서 진료 잘 받으셨군요! 😊\n추가 문의사항이 있으면\n언제든 찾아주세요.',
         };
         const personalMsg = closeMessages[reason] || '상담이 종결되었습니다. 문의사항이 있으면 언제든 다시 찾아주세요.';
 
-        const finalText = `🙏 보듬입니다. ${personalMsg}\n\n환자분의 건강을 응원합니다! 😊\n\n🏥 '해피닥터 행복한 의사'는 의료 취약계층 환자분들을 위해 의사들이 자원봉사로 운영하는 비영리 단체입니다. 오늘 상담이 도움이 되셨다면, 이 활동이 계속될 수 있도록 작은 응원을 보내주세요. 💛`;
+        const finalText = `🙏 보듬입니다.\n${personalMsg}\n\n환자분의 건강을 응원합니다! 😊\n\n🏥 해피닥터 행복한 의사는\n의료 취약계층을 위해 의사들이\n자원봉사로 운영하는 비영리단체입니다.\n도움이 되셨다면 응원 부탁드려요! 💛`;
 
         return res.status(200).json({
             version: "2.0",
