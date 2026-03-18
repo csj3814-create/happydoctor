@@ -69,7 +69,21 @@ router.post('/triage-complete', async (req, res) => {
             symptomImage: merged.symptom_image || null
         };
 
-        // (카카오 오픈빌더 상에서 상담 시작 블록을 통해 호출되므로 별도의 동의 확인은 생략)
+        // 슬롯필링이 완료되지 않은 premature 호출 감지
+        // (예: "예진시작" 블록이 실수로 스킬을 호출한 경우, chief_complaint 파라미터가 없음)
+        const rawCc = merged.chief_complaint;
+        if (!rawCc || rawCc.startsWith('sys.')) {
+            console.warn(`[Premature Call] ${userId} — chief_complaint 없음. 슬롯필링 미완료로 판단, Gemini 호출 없이 즉시 반환.`);
+            return res.status(200).json({
+                version: "2.0",
+                template: {
+                    outputs: [{ simpleText: { text: "문진 정보가 아직 완성되지 않았습니다. 예진을 다시 시작해 주세요." } }],
+                    quickReplies: [
+                        { label: "예진상담", action: "message", messageText: "예진상담" }
+                    ]
+                }
+            });
+        }
 
         // 대기 중인 F/U 질문이 있으면 새 상담 대신 F/U 질문을 먼저 표시
         // ※ resetSession() 호출 전에 체크해야 pending 플래그가 살아있음
@@ -119,10 +133,39 @@ router.post('/triage-complete', async (req, res) => {
     }
 });
 
+// 콜백 모드(useCallback)가 꺼진 경우의 안전망: 4.5초 내 응답 못하면 재시도 안내 반환
+const SYNC_TIMEOUT_MS = 4500;
+
 async function processTriageSync(userId, patientData) {
     try {
         const startTime = Date.now();
-        const analysisResult = await analyzeAndRouteTriage(patientData);
+
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('SYNC_TIMEOUT')), SYNC_TIMEOUT_MS)
+        );
+
+        let analysisResult;
+        try {
+            analysisResult = await Promise.race([
+                analyzeAndRouteTriage(patientData),
+                timeoutPromise
+            ]);
+        } catch (raceErr) {
+            if (raceErr.message === 'SYNC_TIMEOUT') {
+                console.warn(`[Sync Timeout] ${userId} — Gemini가 ${SYNC_TIMEOUT_MS}ms 내 응답 못함. 재시도 안내 반환. (콜백 모드 ON 권장)`);
+                return {
+                    version: "2.0",
+                    template: {
+                        outputs: [{ simpleText: { text: "🩺 분석에 시간이 걸리고 있습니다. '예진상담' 버튼을 다시 눌러 재시도해 주세요.\n\n지속적으로 이 메시지가 보이면 잠시 후 다시 시도해 주세요." } }],
+                        quickReplies: [
+                            { label: "예진상담", action: "message", messageText: "예진상담" }
+                        ]
+                    }
+                };
+            }
+            throw raceErr;
+        }
+
         const durationMs = Date.now() - startTime;
         console.log(`[Timing] analyzeAndRouteTriage took ${durationMs}ms`);
 

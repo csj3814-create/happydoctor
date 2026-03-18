@@ -1,13 +1,15 @@
 /**
  * MessengerBot R 스크립트 — '해피닥터 행복한 의사' 채널용
- * 
+ *
  * 이 스크립트를 공기계의 MessengerBot R 앱에 등록합니다.
- * 
- * 기능 3가지:
- * 1) 오픈채팅방 안내: "!상담", "아파요" 등 키워드 → 1:1 채널 안내
- * 2) 의료진 단톡방 차트: "!차트확인" → 서버에서 SOAP 차트 가져와서 방에 전송
- * 3) F/U 환자 푸시: 30초마다 F/U 큐 폴링 → 해당 환자 카톡방에 직접 전송
- * 
+ *
+ * 기능 2가지:
+ * 1) 오픈채팅방 안내: "~상담", "아파요" 등 키워드 → 1:1 채널 안내
+ * 2) 의료진 단톡방 차트: "~차트확인" → 서버에서 SOAP 차트 가져와서 방에 전송
+ *
+ * ※ 명령어 접두사를 "!"가 아닌 "~"로 사용합니다.
+ *    같은 기기에서 구동 중인 해빛스쿨 봇과 충돌 방지용입니다.
+ *
  * [설정 방법]
  * 1. MessengerBot R 앱에서 새 봇 생성
  * 2. 아래 스크립트를 복붙
@@ -24,17 +26,61 @@ const CHANNEL_LINK = "http://pf.kakao.com/_PxaTxhX/chat"; // 카카오 채널 1:
 const DOCTOR_ROOM = "2기 행복한 의사 의료봉사방";
 // 환자 오픈채팅방 이름
 const PATIENT_ROOM = "행복한 의사의 응급상담방";
+// 실험방 이름
+const EXPERIMENT_ROOM = "해피닥터 AI 인턴 보듬 실험방";
 
 // ===== 메시지 수신 핸들러 =====
 function response(room, msg, sender, isGroupChat, replier, imageDB, packageName) {
-    
-    // [1] 환자 오픈채팅방에서만: 의료 키워드 → 1:1 채널 안내
-    if (room === PATIENT_ROOM) {
+
+    // [0] 모든 방: ~도움말 명령어
+    if (msg.trim() === "~도움말") {
+        var helpMsg;
+        if (room === DOCTOR_ROOM) {
+            helpMsg =
+                "🤖 해피닥터 봇 도움말 (의료진)\n" +
+                "━━━━━━━━━━━━━━━\n" +
+                "~차트확인  대기 중인 신규 예진 차트 조회\n" +
+                "~당직확인  위와 동일\n" +
+                "~도움말    이 도움말 표시\n" +
+                "━━━━━━━━━━━━━━━\n" +
+                "※ 신규 차트는 10초마다 자동으로도 전송됩니다.";
+        } else if (room === PATIENT_ROOM) {
+            helpMsg =
+                "🤖 해피닥터 봇 도움말 (환자 안내)\n" +
+                "━━━━━━━━━━━━━━━\n" +
+                "아파요 / 통증 / 두통 등 증상 관련 단어를\n" +
+                "입력하시면 1:1 상담 채널로 안내해 드려요.\n\n" +
+                "~상담  ~진료  직접 채널 안내 받기\n" +
+                "~도움말  이 도움말 표시\n" +
+                "━━━━━━━━━━━━━━━\n" +
+                "👉 1:1 상담: " + CHANNEL_LINK;
+        } else if (room === EXPERIMENT_ROOM) {
+            helpMsg =
+                "🤖 해피닥터 봇 도움말 (실험방 — 전체 기능)\n" +
+                "━━━━━━━━━━━━━━━\n" +
+                "[환자 안내]\n" +
+                "~상담 / ~진료     1:1 채널 안내\n" +
+                "아파요·통증 등    증상 키워드 자동 감지\n\n" +
+                "[의료진]\n" +
+                "~차트확인 / ~당직확인   대기 차트 조회\n\n" +
+                "[공통]\n" +
+                "~도움말    이 도움말 표시\n" +
+                "━━━━━━━━━━━━━━━\n" +
+                "👉 1:1 상담: " + CHANNEL_LINK;
+        } else {
+            helpMsg = "🤖 이 방은 해피닥터 봇 지원 대상이 아닙니다.";
+        }
+        replier.reply(helpMsg);
+        return;
+    }
+
+    // [1] 환자 오픈채팅방 또는 실험방: 의료 키워드 → 1:1 채널 안내
+    if (room === PATIENT_ROOM || room === EXPERIMENT_ROOM) {
         var guideKeywords = [
-            "!상담", "!진료", "아파요", "아픈데", "아프다", "아픕니다",
+            "~상담", "~진료", "아파요", "아픈데", "아프다", "아픕니다",
             "통증", "두통", "복통", "열이", "기침", "설사", "구토",
             "다쳤", "다쳐", "피가", "출혈", "어지러", "숨이",
-            "상담", "진료", "병원", "응급", "도와주세요", "도와줘"
+            "도와주세요", "도와줘"
         ];
         for (var i = 0; i < guideKeywords.length; i++) {
             if (msg.indexOf(guideKeywords[i]) !== -1) {
@@ -52,8 +98,8 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
         }
     }
 
-    // [2] 의료진 단톡방: 차트 확인
-    if (msg.trim() === "!차트확인" || msg.trim() === "!당직확인") {
+    // [2] 의료진 단톡방 또는 실험방: 차트 확인
+    if ((room === DOCTOR_ROOM || room === EXPERIMENT_ROOM) && (msg.trim() === "~차트확인" || msg.trim() === "~당직확인")) {
         try {
             var chartRes = org.jsoup.Jsoup.connect(SERVER_URL + "/api/messengerbot")
                 .header("Content-Type", "application/json")
@@ -68,7 +114,7 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
                 .method(org.jsoup.Connection.Method.POST)
                 .execute()
                 .body();
-            
+
             var data = JSON.parse(chartRes);
             if (data.reply) {
                 replier.reply(data.reply);
@@ -78,62 +124,6 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
         }
         return;
     }
-
-    // [3] 1:1 채널 채팅방에서 메시지 수신 시 → 서버에 방 이름 등록 (F/U 푸시용)
-    //     카카오 채널 1:1 채팅은 isGroupChat = false
-    if (!isGroupChat && room !== DOCTOR_ROOM) {
-        try {
-            // sender 이름을 userId처럼 사용 (카카오 오픈빌더 userId와는 다름)
-            // 실제로는 카카오 채널 관리자 화면의 방 이름(room)으로 매핑
-            org.jsoup.Jsoup.connect(SERVER_URL + "/api/messengerbot/register-room")
-                .header("Content-Type", "application/json")
-                .header("x-api-key", API_KEY)
-                .requestBody(JSON.stringify({
-                    userId: sender, // 참고: 오픈빌더 userId와 다를 수 있음
-                    roomName: room
-                }))
-                .ignoreContentType(true)
-                .method(org.jsoup.Connection.Method.POST)
-                .execute();
-        } catch (e) {
-            // 등록 실패해도 메시지 흐름에 영향 없도록 무시
-        }
-    }
-}
-
-// ===== F/U 환자 푸시 폴링 (30초마다) =====
-// MessengerBot R의 타이머 기능 사용
-var fuPollTimer = null;
-
-function startFUPolling() {
-    if (fuPollTimer) return;
-    
-    fuPollTimer = java.lang.Thread(new java.lang.Runnable({
-        run: function() {
-            while (true) {
-                try {
-                    var fuRes = org.jsoup.Jsoup.connect(SERVER_URL + "/api/messengerbot/fu-push-poll")
-                        .header("x-api-key", API_KEY)
-                        .ignoreContentType(true)
-                        .method(org.jsoup.Connection.Method.GET)
-                        .execute()
-                        .body();
-                    
-                    var data = JSON.parse(fuRes);
-                    if (data.hasNew && data.roomName && data.message) {
-                        // 환자 카톡방에 F/U 메시지 직접 전송
-                        Api.replyRoom(data.roomName, data.message);
-                    }
-                } catch (e) {
-                    // 폴링 실패는 무시 (네트워크 오류 등)
-                }
-                
-                java.lang.Thread.sleep(30000); // 30초 대기
-            }
-        }
-    }));
-    fuPollTimer.setDaemon(true);
-    fuPollTimer.start();
 }
 
 // ===== 의료진 차트 폴링 (10초마다) =====
@@ -141,7 +131,7 @@ var doctorPollTimer = null;
 
 function startDoctorPolling() {
     if (doctorPollTimer) return;
-    
+
     doctorPollTimer = java.lang.Thread(new java.lang.Runnable({
         run: function() {
             while (true) {
@@ -152,7 +142,7 @@ function startDoctorPolling() {
                         .method(org.jsoup.Connection.Method.GET)
                         .execute()
                         .body();
-                    
+
                     var data = JSON.parse(pollRes);
                     if (data.hasNew && data.reply) {
                         // 의료진 단톡방에 차트 전송
@@ -161,7 +151,7 @@ function startDoctorPolling() {
                 } catch (e) {
                     // 폴링 실패는 무시
                 }
-                
+
                 java.lang.Thread.sleep(10000); // 10초 대기
             }
         }
@@ -171,5 +161,4 @@ function startDoctorPolling() {
 }
 
 // 봇 시작 시 폴링 시작
-startFUPolling();
 startDoctorPolling();
