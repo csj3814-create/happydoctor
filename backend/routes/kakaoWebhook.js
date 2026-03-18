@@ -65,7 +65,6 @@ router.post('/triage-complete', async (req, res) => {
             nrs: sanitize(merged.nrs, '0'),
             associated: sanitize(merged.associated_symptom, '없음'),
             pmhx: sanitize(merged.past_medical_history, '특이사항 없음'),
-            location: sanitize(merged.location, '미확인'),
             symptomImage: merged.symptom_image || null
         };
 
@@ -172,7 +171,7 @@ async function processTriageSync(userId, patientData) {
         let finalResponseText = '';
         if (analysisResult.action === 'AUTONOMOUS_REPLY') {
             finalResponseText = analysisResult.replyToPatient;
-            const fallbackChart = `[최초 자동 해결된 경증 환자]\n증상: ${patientData.cc}\nNRS: ${patientData.nrs}`;
+            const fallbackChart = `[최초 자동 해결된 경증 환자]\n증상: ${patientData.cc}\n증상점수: ${patientData.nrs}`;
             followUpService.scheduleFollowUp(userId, fallbackChart, 15);
         } else {
             enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId);
@@ -210,7 +209,7 @@ async function processTriageAsync(callbackUrl, userId, patientData) {
 
         if (analysisResult.action === 'AUTONOMOUS_REPLY') {
             finalResponseText = analysisResult.replyToPatient;
-            const fallbackChart = `[최초 자동 해결된 경증 환자]\n증상: ${patientData.cc}\nNRS: ${patientData.nrs}`;
+            const fallbackChart = `[최초 자동 해결된 경증 환자]\n증상: ${patientData.cc}\n증상점수: ${patientData.nrs}`;
             followUpService.scheduleFollowUp(userId, fallbackChart, 15);
         } else {
             enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId);
