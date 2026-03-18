@@ -26,8 +26,10 @@ const CHANNEL_LINK = "http://pf.kakao.com/_PxaTxhX/chat"; // 카카오 채널 1:
 const DOCTOR_ROOM = "2기 행복한 의사 의료봉사방";
 // 환자 오픈채팅방 이름
 const PATIENT_ROOM = "행복한 의사의 응급상담방";
-// 실험방 이름
-const EXPERIMENT_ROOM = "해피닥터 AI 인턴 보듬 실험방";
+// 실험방 식별자
+// ※ MessengerBotR은 오픈채팅방 이름("해피닥터 AI 인턴 보듬 실험방") 대신
+//    "최석재"를 room 식별자로 사용합니다. (오픈채팅 특성상 고정값)
+const EXPERIMENT_ROOM = "최석재";
 
 // ===== 메시지 수신 핸들러 =====
 function response(room, msg, sender, isGroupChat, replier, imageDB, packageName) {
