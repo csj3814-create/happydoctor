@@ -53,7 +53,7 @@ class FollowUpService {
         console.log(`[F/U Timer Fired] ${userId} — 추적 관찰 시간 도래`);
 
         const originalChart = this.getOriginalChart(userId);
-        const fuMessage = '보듬입니다! 상담하신 지 시간이 좀 지났네요. 현재 통증 점수(NRS 1~10)는 아까보다 어떠신지 알려주시겠어요? 다른 새로운 증상이 있다면 함께 적어주세요.';
+        const fuMessage = '보듬입니다! 😊\n상담하신 지 시간이 지났네요.\n\n현재 증상 점수는 어떠신가요?\n(0=없음, 10=극심)\n\n새로운 증상이 있다면 함께\n알려주세요.';
 
         // 1) 의료진 큐에 F/U 점검 알림 발송 (의료진 인지용 — 항상 동작)
         // ※ 카카오 알림톡 API 없이는 환자에게 직접 푸시할 수 없음.

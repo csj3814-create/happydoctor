@@ -66,7 +66,7 @@ async function analyzeAndRouteTriage(patientData) {
             // 잘린 JSON 복구 시도: 응답이 잘려서 파싱 실패한 경우 기본 응답 반환
             return {
                 action: 'AUTONOMOUS_REPLY',
-                replyToPatient: '증상을 확인했습니다. 현재 입력해주신 내용으로는 심각한 응급 상황은 아닌 것으로 보이지만, 증상이 지속되거나 악화된다면 가까운 병원이나 응급실을 방문해 주세요. 편히 쉬시고 수분을 충분히 섭취하세요. 💛\n\n🏥 \'해피닥터 행복한 의사\'는 의료 취약계층 환자분들을 위해 의사들이 자원봉사로 운영하는 비영리 단체입니다. 오늘 상담이 도움이 되셨다면, 이 활동이 계속될 수 있도록 작은 응원을 보내주세요. 💛',
+                replyToPatient: '증상을 확인했습니다.\n현재 심각한 응급 상황은 아닌 것으로\n보이지만, 증상이 지속되거나\n악화되면 가까운 병원이나\n응급실을 방문해 주세요.\n편히 쉬시고 수분 섭취하세요. 💛\n\n🏥 해피닥터 행복한 의사는\n의료 취약계층을 위해 의사들이\n자원봉사로 운영하는 비영리단체입니다.\n도움이 되셨다면 응원 부탁드려요! 💛',
                 soapChartForDoctor: null
             };
         }
@@ -84,12 +84,12 @@ async function analyzeFollowUp(originalChart, nrsChange, additionalSymptom) {
     try {
         const prompt = `[이전 환자 예진 차트 기록]\n${originalChart}\n\n` +
             `[일정 시간 경과 후 환자 상태 변화]\n` +
-            `- 현재 통증 점수(NRS): ${nrsChange}\n` +
+            `- 현재 증상 점수(0~10): ${nrsChange}\n` +
             `- 추가된 증상(환자 입력): ${additionalSymptom}\n\n` +
             `위 정보를 비교 분석하여 환자의 상태가 호전되었는지, 악화되었는지 판단하고 지침에 맞는 JSON 형태로 답변해주세요.\n` +
             `[판단 기준 및 주의사항: 절대 투약 지시나 검사 오더를 내리지 마세요. 오직 증상에 따른 다음 액션(응급실 가기, 병원 가기, 안심하기)만 제시하세요.]\n` +
-            `1. 악화 (ESCALATE_FU): 통증 점수가 올랐거나 새로운 위험 증상 추가 시. 즉시 전문의 보고용 F/U 노트를 작성(증상 요약과 위급도 판단만)하고 환자에게 응급실 방문 권유 또는 대기 멘트.\n` +
-            `2. 호전/유지 (AUTONOMOUS_FU): 통증이 줄거나 경미한 상태 유지 시. 환자에게 다정하게 안심시키는 멘트만 (의사 보고 안 함).\n` +
+            `1. 악화 (ESCALATE_FU): 증상 점수가 올랐거나 새로운 위험 증상 추가 시. 즉시 전문의 보고용 F/U 노트를 작성(증상 요약과 위급도 판단만)하고 환자에게 응급실 방문 권유 또는 대기 멘트.\n` +
+            `2. 호전/유지 (AUTONOMOUS_FU): 증상이 줄거나 경미한 상태 유지 시. 환자에게 다정하게 안심시키는 멘트만 (의사 보고 안 함).\n` +
             `[출력 양식: 아래 JSON 구조(마크다운 백틱 제외)로만 반환]\n` +
             `{\n` +
             `  "action": "AUTONOMOUS_FU" | "ESCALATE_FU",\n` +
@@ -112,7 +112,7 @@ async function analyzeFollowUp(originalChart, nrsChange, additionalSymptom) {
             console.error('JSON Parse failed (F/U), raw response:', textResult.substring(0, 200));
             return {
                 action: 'AUTONOMOUS_FU',
-                replyToPatient: '확인해주셔서 감사합니다. 증상이 지속되거나 악화되면 언제든 다시 알려주세요. 불편하시면 가까운 의원이나 응급실을 방문해 주세요. 💛',
+                replyToPatient: '확인해주셔서 감사합니다. 😊\n증상이 지속되거나 악화되면\n언제든 다시 알려주세요.\n불편하시면 가까운 병원이나\n응급실을 방문해 주세요. 💛',
                 fuChartForDoctor: null
             };
         }

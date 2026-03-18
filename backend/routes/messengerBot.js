@@ -35,7 +35,7 @@ router.post('/', checkApiKey, (req, res) => {
     // 예시: 특정 방 이름이 "행복한 의사 (환자 소통방)" 일 때 작동하도록 거를 수 있습니다.
     const guideKeywords = ['~상담', '~진료', '아파요'];
     if (guideKeywords.some(kw => msg.includes(kw))) {
-        const replyMsg = `안녕하세요, ${sender}님! 🩺\n'행복한 의사'는 의료 취약계층 환자분들을 위해 의사들이 자원봉사로 운영하는 비영리 단체입니다. 누구든지 편하게 상담하실 수 있습니다.\n\n구체적인 의료 상담이나 증상 문의는 개인정보 보호를 위해 '행복한 의사 상담 챗봇'을 통해 1:1로 질문해 주셔야 합니다.\n\n아래 링크를 눌러 1:1 채팅을 시작해주세요!\n👉 http://pf.kakao.com/_PxaTxhX/chat`;
+        const replyMsg = `안녕하세요, ${sender}님! 🩺\n\n'행복한 의사'는 의료 취약계층을\n위해 의사들이 자원봉사로 운영하는\n비영리단체입니다.\n\n증상 상담은 개인정보 보호를 위해\n1:1 챗봇을 통해 진행됩니다.\n\n아래 링크로 채팅을 시작해주세요!\n👉 http://pf.kakao.com/_PxaTxhX/chat`;
         return res.status(200).json({ reply: replyMsg });
     }
 
