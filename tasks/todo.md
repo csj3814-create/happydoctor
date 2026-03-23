@@ -41,7 +41,7 @@
 
 ## Phase 6: Deployment & Polish ✅
 - [x] Initialize Git repository & Push to GitHub (csj3814-create/happydoctor)
-- [x] Connect repository to Render (auto-deploy from main branch)
+- [x] Connect repository to Render (auto-deploy from claude/upbeat-tharp branch)
 - [x] Set up Environment Variables on Render (GEMINI_API_KEY, MESSENGER_API_KEY)
 - [x] Gemini API: paid plan confirmed (via 해빛스쿨)
 - [x] Firebase Firestore: set up FIREBASE_SERVICE_ACCOUNT for persistent logging
@@ -50,10 +50,13 @@
 - [x] Chatbot launch announcement message updated
 
 ## Phase 7: Live Testing & Polish
-- [ ] Live E2E test via actual Kakao channel (환자 시뮬레이션)
-- [ ] 상담종료 블록 되묻기 질문 바로연결 버튼 설정 확인
-- [ ] MessengerBotR 공기계 배포 및 실제 동작 확인
-- [ ] Render cold start 대응 테스트 (keep-alive 14분 ping)
+- [x] 코드 정리 — upbeat-tharp→main 머지, 로그 태그 통일, 보안 엔드포인트 정리 ✅
+- [x] API E2E 테스트 — 헬스체크/슬롯미완료/예진중단/상담종료(3사유)/F/U만료 전체 통과 ✅
+- [x] close_reason 매칭 버그 확인 및 수정 (trim 추가, 인코딩 이슈 확인) ✅
+- [x] Render 배포 브랜치 확인 (claude/upbeat-tharp 배포 중 → 양쪽 동기화) ✅
+- [ ] **[사용자 확인 필요]** 카카오 채널 실제 E2E 테스트 (환자 역할 시뮬레이션)
+- [ ] **[사용자 확인 필요]** 상담종료 블록 되묻기 버튼 설정 오픈빌더에서 확인
+- [ ] **[사용자 확인 필요]** MessengerBotR 공기계 배포 및 실제 동작 확인
 
 ## Phase 8: Donation & Website (Future)
 - [ ] Build Happy Doctor website with donation page
@@ -62,9 +65,10 @@
 - [ ] Verify donation message tone (warm invitation, not pressure)
 
 ## Current Status
-- **Last updated**: 2026.03.15
+- **Last updated**: 2026.03.23
 - **MVP Status**: Full triage + F/U + close + ESCALATE flow working ✅
-- **Deployed at**: https://happydoctor.onrender.com (Render free tier)
+- **API E2E Tests**: 전체 통과 ✅
+- **Deployed at**: https://happydoctor.onrender.com (Render, claude/upbeat-tharp 브랜치)
 - **GitHub**: https://github.com/csj3814-create/happydoctor
 - **Model**: gemini-2.5-flash (paid plan via 해빛스쿨)
 - **Kakao Channel**: http://pf.kakao.com/_PxaTxhX/chat
