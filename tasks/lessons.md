@@ -25,6 +25,7 @@
 - **Lesson**: 바로연결 버튼의 타입이 "블록 연결"이면 슬롯필링 파라미터를 채우지 않음. "메시지" 타입으로 설정하여 사용자 발화로 인식되게 해야 함.
 - **Lesson**: 콜백 사용(callback) 토글이 OFF면 callbackUrl이 안 와서 동기 모드로 빠짐 → 5초 타임아웃 발생. 반드시 ON 확인.
 - **Lesson**: 스킬 서버 타임아웃 (1001) 에러는 대부분 Render 콜드스타트(50초+) 또는 API 할당량 초과가 원인.
+- **Lesson**: 상담종료 블록의 되묻기 버튼(바로연결 응답) 텍스트가 그대로 `close_reason` 파라미터 값으로 전달된다. 서버 closeMessages 키를 버튼 텍스트와 정확히 일치시켜야 함. (예: "호전" ❌ → "증상 호전" ✅)
 
 ## Gemini API
 - **Lesson**: `maxOutputTokens: 1024`는 한국어 JSON 응답에 너무 작음. SOAP 차트 포함 시 잘려서 JSON 파싱 실패 → 최소 2048 사용.
@@ -36,3 +37,6 @@
 ## Render Deployment
 - **Lesson**: Render 무료 티어는 비활성 시 서버가 꺼짐. 14분 keep-alive ping으로 완화하지만 완전 방지는 불가.
 - **Lesson**: Root directory를 `backend`로 설정해야 함 (모노레포 구조).
+- **Lesson**: Render 자동 배포 브랜치는 대시보드에서만 설정 가능. 이 프로젝트는 `claude/upbeat-tharp` 브랜치를 배포 중 → main 변경 시 양쪽 동시 push 필요: `git push origin main && git push origin main:claude/upbeat-tharp`
+- **Lesson**: curl로 한국어 JSON 테스트 시 인코딩 문제 발생 가능. `\uXXXX` 유니코드 이스케이프 사용 또는 `--data-binary @-` + echo 파이프 방식 사용.
+- **Lesson**: Render 배포 완료 확인은 헬스체크(/) 응답 변경 여부로 판단 (버전 스탬프 임시 추가 방법 유효).
