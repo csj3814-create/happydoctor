@@ -421,7 +421,7 @@ router.post('/close-consultation', async (req, res) => {
             '응급실 방문': '응급실에서 잘 치료 받으셨길\n바랍니다.\n퇴원 후에도 궁금하신 점은\n언제든 상담해 주세요.',
             '외래 진료': '외래 진료 예약하셨군요! 😊\n담당 선생님께 꾸준히 진료\n받으시길 바랍니다.\n궁금한 점이 생기면 언제든\n찾아주세요.',
         };
-        const personalMsg = closeMessages[reason] || '상담이 종결되었습니다. 문의사항이 있으면 언제든 다시 찾아주세요.';
+        const personalMsg = closeMessages[reason] || `[DEBUG] 받은 값: "${reason}" (len:${reason.length})\n키 목록: ${Object.keys(closeMessages).join(' / ')}`;
 
         const finalText = `🙏 보듬입니다.\n${personalMsg}\n\n환자분의 건강을 응원합니다! 😊\n\n🏥 해피닥터 행복한 의사는\n의료 취약계층을 위해 의사들이\n자원봉사로 운영하는 비영리단체입니다.\n도움이 되셨다면 응원 부탁드려요! 💛`;
 
