@@ -32,7 +32,7 @@ app.use('/api/messengerbot', messengerBotRoute);
 
 // Health check (루트 경로)
 app.get('/', (req, res) => {
-    res.send('<h1>Happy Doctor Chatbot Server is running. [v2026-03-23]</h1>');
+    res.send('<h1>Happy Doctor Chatbot Server is running.</h1>');
 });
 
 // Render 무료 서버 슬립 방지 (14분 간격 Ping)

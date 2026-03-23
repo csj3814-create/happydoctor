@@ -407,7 +407,7 @@ router.post('/close-consultation', async (req, res) => {
         const userId = req.body.userRequest?.user?.id || 'kakao_user_unknown';
         const reason = (params.close_reason || '환자 종결').toString().trim();
 
-        console.log(`[Close Consultation] ${userId}, reason: ${reason}, reason_hex: ${Buffer.from(reason).toString('hex')}`);
+        console.log(`[Close Consultation] ${userId}, reason: ${reason}`);
 
         // 1) F/U 타이머 및 대기 데이터 삭제
         followUpService.cancelFollowUp(userId);
@@ -421,7 +421,7 @@ router.post('/close-consultation', async (req, res) => {
             '응급실 방문': '응급실에서 잘 치료 받으셨길\n바랍니다.\n퇴원 후에도 궁금하신 점은\n언제든 상담해 주세요.',
             '외래 진료': '병원에서 진료 잘 받으셨군요! 😊\n추가 문의사항이 있으면\n언제든 찾아주세요.',
         };
-        const personalMsg = closeMessages[reason] || `상담이 종결되었습니다. 문의사항이 있으면 언제든 다시 찾아주세요. [DEBUG: reason="${reason}", len=${reason.length}]`;
+        const personalMsg = closeMessages[reason] || '상담이 종결되었습니다. 문의사항이 있으면 언제든 다시 찾아주세요.';
 
         const finalText = `🙏 보듬입니다.\n${personalMsg}\n\n환자분의 건강을 응원합니다! 😊\n\n🏥 해피닥터 행복한 의사는\n의료 취약계층을 위해 의사들이\n자원봉사로 운영하는 비영리단체입니다.\n도움이 되셨다면 응원 부탁드려요! 💛`;
 
