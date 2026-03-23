@@ -62,7 +62,7 @@ async function analyzeAndRouteTriage(patientData) {
         try {
             return JSON.parse(textResult);
         } catch (parseError) {
-            console.error('JSON Parse failed, raw response:', textResult.substring(0, 200));
+            console.error('[Triage] JSON Parse failed, raw response:', textResult.substring(0, 200));
             // 잘린 JSON 복구 시도: 응답이 잘려서 파싱 실패한 경우 기본 응답 반환
             return {
                 action: 'AUTONOMOUS_REPLY',
@@ -72,7 +72,7 @@ async function analyzeAndRouteTriage(patientData) {
         }
 
     } catch (error) {
-        console.error('Gemini Analysis Error:', error);
+        console.error('[Triage] Gemini Analysis Error:', error);
         throw error;
     }
 }
@@ -109,7 +109,7 @@ async function analyzeFollowUp(originalChart, nrsChange, additionalSymptom) {
         try {
             return JSON.parse(textResult);
         } catch (parseError) {
-            console.error('JSON Parse failed (F/U), raw response:', textResult.substring(0, 200));
+            console.error('[F/U] JSON Parse failed, raw response:', textResult.substring(0, 200));
             return {
                 action: 'AUTONOMOUS_FU',
                 replyToPatient: '확인해주셔서 감사합니다. 😊\n증상이 지속되거나 악화되면\n언제든 다시 알려주세요.\n불편하시면 가까운 병원이나\n응급실을 방문해 주세요. 💛',
@@ -118,7 +118,7 @@ async function analyzeFollowUp(originalChart, nrsChange, additionalSymptom) {
         }
 
     } catch (error) {
-        console.error('Gemini FollowUp Error:', error);
+        console.error('[F/U] Gemini FollowUp Error:', error);
         throw error;
     }
 }
