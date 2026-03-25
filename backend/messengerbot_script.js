@@ -60,9 +60,6 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
                 "[의료진]\n" +
                 "~차트확인   대기 중인 신규 예진 차트 조회\n" +
                 "※ 신규 차트는 10초마다 자동으로도 전송됩니다.\n\n" +
-                "[환자 안내]\n" +
-                "~상담 / ~진료     1:1 채널 안내\n" +
-                "아파요·통증 등    증상 키워드 자동 감지\n\n" +
                 "[공통]\n" +
                 "~도움말    이 도움말 표시\n" +
                 "━━━━━━━━━━━━━━━\n" +
@@ -79,11 +76,8 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
                 "👉 1:1 상담: " + CHANNEL_LINK;
         } else if (room === EXPERIMENT_ROOM) {
             helpMsg =
-                "🤖 해피닥터 봇 도움말 (실험방 — 전체 기능)\n" +
+                "🤖 해피닥터 봇 도움말 (실험방)\n" +
                 "━━━━━━━━━━━━━━━\n" +
-                "[환자 안내]\n" +
-                "~상담 / ~진료     1:1 채널 안내\n" +
-                "아파요·통증 등    증상 키워드 자동 감지\n\n" +
                 "[의료진]\n" +
                 "~차트확인   대기 차트 조회\n\n" +
                 "[공통]\n" +
@@ -97,8 +91,8 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
         return;
     }
 
-    // [1] 환자 오픈채팅방, 실험방, 의료진방(운영위 포함): 의료 키워드 → 1:1 채널 안내
-    if (room === PATIENT_ROOM || room === EXPERIMENT_ROOM || room === DOCTOR_ROOM) {
+    // [1] 환자 오픈채팅방("행복한 의사의 응급상담방")에서만 의료 키워드 → 1:1 채널 안내
+    if (room === PATIENT_ROOM) {
         var guideKeywords = [
             "~상담", "~진료", "아파요", "아픈데", "아프다", "아픕니다",
             "통증", "두통", "복통", "열이", "기침", "설사", "구토",
