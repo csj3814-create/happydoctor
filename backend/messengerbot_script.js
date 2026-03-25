@@ -124,7 +124,7 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
     // [2] 의료진 단톡방 또는 실험방: 차트 확인
     if ((room === DOCTOR_ROOM || room === EXPERIMENT_ROOM) && msg.trim() === "~차트확인") {
         try {
-            var chartRes = org.jsoup.Jsoup.connect(SERVER_URL + "/api/messengerbot")
+            var conn = org.jsoup.Jsoup.connect(SERVER_URL + "/api/messengerbot")
                 .header("Content-Type", "application/json")
                 .header("x-api-key", API_KEY)
                 .requestBody(JSON.stringify({
@@ -134,16 +134,24 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
                     isGroupChat: isGroupChat
                 }))
                 .ignoreContentType(true)
+                .ignoreHttpErrors(true)
                 .method(org.jsoup.Connection.Method.POST)
-                .execute()
-                .body();
+                .execute();
+
+            var status = conn.statusCode();
+            var chartRes = conn.body();
+
+            if (status !== 200) {
+                replier.reply("⚠️ 서버 응답 오류 (HTTP " + status + ")\n" + chartRes);
+                return;
+            }
 
             var data = JSON.parse(chartRes);
             if (data.reply) {
                 replier.reply(data.reply);
             }
         } catch (e) {
-            replier.reply("⚠️ 서버 연결 오류: " + e.message);
+            replier.reply("⚠️ 연결 오류: " + e.message);
         }
         return;
     }
