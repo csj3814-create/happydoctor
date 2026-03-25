@@ -28,10 +28,11 @@ async function enqueueDoctorNotification(message, patientId) {
 }
 
 /**
- * Firestore 큐에서 가장 오래된 pending 차트를 꺼냅니다.
- * 꺼낸 즉시 'delivered'로 마킹하여 중복 전송을 방지합니다.
+ * 폴링용: 가장 오래된 pending 차트를 'notified'로 마킹합니다.
+ * 'delivered'가 아닌 'notified'로 마킹하여, replyRoom이 실패해도
+ * ~차트확인으로 복구할 수 있습니다.
  */
-async function dequeueDoctorNotification() {
+async function peekDoctorNotification() {
     const db = getDb();
     if (!db) return null;
 
@@ -44,10 +45,37 @@ async function dequeueDoctorNotification() {
 
     const doc = snapshot.docs[0];
     await doc.ref.update({
-        status: 'delivered',
-        deliveredAt: getAdmin().firestore.FieldValue.serverTimestamp()
+        status: 'notified',
+        notifiedAt: getAdmin().firestore.FieldValue.serverTimestamp()
     });
     return { message: doc.data().message, patientId: doc.data().patientId };
+}
+
+/**
+ * ~차트확인용: pending + notified 상태의 모든 차트를 조회하고
+ * 'delivered'로 마킹합니다. 폴링이 실패해도 차트를 복구합니다.
+ */
+async function confirmDoctorNotifications() {
+    const db = getDb();
+    if (!db) return [];
+
+    const snapshot = await db.collection('doctor_notifications')
+        .where('status', 'in', ['pending', 'notified'])
+        .get();
+
+    if (snapshot.empty) return [];
+
+    const batch = db.batch();
+    const now = getAdmin().firestore.FieldValue.serverTimestamp();
+    snapshot.docs.forEach(doc => {
+        batch.update(doc.ref, { status: 'delivered', deliveredAt: now });
+    });
+    await batch.commit();
+
+    return snapshot.docs.map(doc => ({
+        message: doc.data().message,
+        patientId: doc.data().patientId
+    }));
 }
 
 /**
@@ -116,7 +144,8 @@ async function getQueueStatus() {
 
 module.exports = {
     enqueueDoctorNotification,
-    dequeueDoctorNotification,
+    peekDoctorNotification,
+    confirmDoctorNotifications,
     enqueueFUPush,
     dequeueFUPush,
     registerRoom,
