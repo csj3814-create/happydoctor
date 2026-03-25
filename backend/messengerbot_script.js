@@ -106,7 +106,7 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
                     "증상 상담은 개인정보 보호를 위해\n" +
                     "아래 1:1 채팅에서 진행됩니다.\n\n" +
                     "👉 " + CHANNEL_LINK + "\n\n" +
-                    "링크를 누르시면 AI 상담사 '보듬'이가\n" +
+                    "링크를 누르시면 AI 인턴 보듬이가\n" +
                     "증상을 여쭤보고, 필요하면 전문의\n" +
                     "선생님께 바로 연결해 드립니다. 😊"
                 );
