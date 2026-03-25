@@ -4,9 +4,9 @@ import { useEffect, useState, useCallback } from 'react'
 import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth'
 import Link from 'next/link'
 import { auth, googleProvider } from '@/lib/firebase'
-import { getConsultations, Consultation } from '@/lib/api'
+import { getConsultations, Consultation, getMyHDT, getLeaderboard, DoctorStats } from '@/lib/api'
 
-type Tab = 'pending' | 'replied' | 'closed'
+type Tab = 'pending' | 'replied' | 'closed' | 'leaderboard'
 
 function formatElapsed(createdAt: string): string {
   const diff = Date.now() - new Date(createdAt).getTime()
@@ -23,7 +23,7 @@ function genderLabel(gender: string): string {
   return gender
 }
 
-function categorize(c: Consultation): Tab {
+function categorize(c: Consultation): 'pending' | 'replied' | 'closed' {
   if (c.status === 'COMPLETED' || c.closedAt) return 'closed'
   if (c.doctorRepliedAt) return 'replied'
   return 'pending'
@@ -36,6 +36,9 @@ export default function HomePage() {
   const [listLoading, setListLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('pending')
+  const [myStats, setMyStats] = useState<DoctorStats | null>(null)
+  const [leaderboard, setLeaderboard] = useState<DoctorStats[]>([])
+  const [boardLoading, setBoardLoading] = useState(false)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -49,8 +52,9 @@ export default function HomePage() {
     setListLoading(true)
     setError(null)
     try {
-      const data = await getConsultations()
+      const [data, stats] = await Promise.all([getConsultations(), getMyHDT()])
       setConsultations(data)
+      setMyStats(stats)
     } catch (err) {
       setError(err instanceof Error ? err.message : '상담 목록을 불러오지 못했습니다.')
     } finally {
@@ -61,6 +65,15 @@ export default function HomePage() {
   useEffect(() => {
     if (user) fetchConsultations()
   }, [user, fetchConsultations])
+
+  useEffect(() => {
+    if (tab !== 'leaderboard' || leaderboard.length > 0) return
+    setBoardLoading(true)
+    getLeaderboard()
+      .then(setLeaderboard)
+      .catch(() => {})
+      .finally(() => setBoardLoading(false))
+  }, [tab, leaderboard.length])
 
   async function handleLogin() {
     setError(null)
@@ -74,6 +87,8 @@ export default function HomePage() {
   async function handleLogout() {
     await signOut(auth)
     setConsultations([])
+    setMyStats(null)
+    setLeaderboard([])
   }
 
   if (authLoading) {
@@ -114,19 +129,20 @@ export default function HomePage() {
     )
   }
 
-  const tabs: { key: Tab; label: string }[] = [
+  const consultTabs: { key: Tab; label: string }[] = [
     { key: 'pending', label: '미답변' },
     { key: 'replied', label: '답변 완료' },
     { key: 'closed', label: '상담 종료' },
+    { key: 'leaderboard', label: '🏆 리더보드' },
   ]
-
-  const filtered = consultations.filter((c) => categorize(c) === tab)
 
   const counts = {
     pending: consultations.filter((c) => categorize(c) === 'pending').length,
     replied: consultations.filter((c) => categorize(c) === 'replied').length,
     closed: consultations.filter((c) => categorize(c) === 'closed').length,
   }
+
+  const filtered = tab !== 'leaderboard' ? consultations.filter((c) => categorize(c) === tab) : []
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -135,7 +151,12 @@ export default function HomePage() {
         <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
           <h1 className="text-base font-bold text-zinc-900">해피닥터 포털</h1>
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-xs text-zinc-500 truncate max-w-[160px]">{user.email}</span>
+            {myStats !== null && (
+              <span className="inline-flex items-center gap-1 rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                🪙 {myStats.hdt.toLocaleString()} HDT
+              </span>
+            )}
+            <span className="text-xs text-zinc-500 truncate max-w-[120px] hidden sm:block">{user.email}</span>
             <button
               onClick={fetchConsultations}
               disabled={listLoading}
@@ -162,83 +183,118 @@ export default function HomePage() {
         )}
 
         {/* Tabs */}
-        <div className="flex gap-1 mb-5 border-b border-zinc-200">
-          {tabs.map(({ key, label }) => (
+        <div className="flex gap-1 mb-5 border-b border-zinc-200 overflow-x-auto">
+          {consultTabs.map(({ key, label }) => (
             <button
               key={key}
               onClick={() => setTab(key)}
-              className={`px-4 py-2.5 text-sm font-medium transition border-b-2 -mb-px ${
+              className={`shrink-0 px-4 py-2.5 text-sm font-medium transition border-b-2 -mb-px ${
                 tab === key
                   ? 'border-blue-600 text-blue-700'
                   : 'border-transparent text-zinc-500 hover:text-zinc-700'
               }`}
             >
               {label}
-              {!listLoading && (
+              {key !== 'leaderboard' && !listLoading && (
                 <span className={`ml-1.5 text-xs ${tab === key ? 'text-blue-500' : 'text-zinc-400'}`}>
-                  {counts[key]}
+                  {counts[key as keyof typeof counts]}
                 </span>
               )}
             </button>
           ))}
         </div>
 
-        {listLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <p className="text-sm text-zinc-400">불러오는 중...</p>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="flex items-center justify-center py-20">
-            <p className="text-sm text-zinc-400">해당 상담이 없습니다.</p>
-          </div>
-        ) : (
-          <ul className="flex flex-col gap-3">
-            {filtered.map((c) => (
-              <li key={c.id}>
-                <Link
-                  href={`/patient/${c.id}`}
-                  className="block rounded-2xl bg-white border border-zinc-200 px-5 py-4 shadow-sm transition hover:border-zinc-300 hover:shadow-md"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex flex-col gap-1.5 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-semibold text-zinc-800">
-                          {c.patientData.age}세 {genderLabel(c.patientData.gender)}
-                        </span>
-                        {tab === 'pending' && (
-                          <span className="inline-flex items-center rounded-md bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
-                            미답변
+        {/* Leaderboard */}
+        {tab === 'leaderboard' && (
+          boardLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <p className="text-sm text-zinc-400">불러오는 중...</p>
+            </div>
+          ) : (
+            <div className="rounded-2xl bg-white border border-zinc-200 shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-zinc-100">
+                <p className="text-xs text-zinc-500">답변 1건당 100 HDT 적립 · 환자 확인 시 +50 HDT 추가</p>
+              </div>
+              {leaderboard.length === 0 ? (
+                <div className="flex items-center justify-center py-16">
+                  <p className="text-sm text-zinc-400">아직 적립 내역이 없습니다.</p>
+                </div>
+              ) : (
+                <ul className="divide-y divide-zinc-100">
+                  {leaderboard.map((doc, i) => (
+                    <li key={doc.email} className={`flex items-center gap-4 px-5 py-3.5 ${doc.email === user.email ? 'bg-amber-50' : ''}`}>
+                      <span className={`w-7 text-center text-sm font-bold ${i === 0 ? 'text-amber-500' : i === 1 ? 'text-zinc-400' : i === 2 ? 'text-orange-400' : 'text-zinc-400'}`}>
+                        {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-zinc-800 truncate">
+                          {doc.name || doc.email}
+                          {doc.email === user.email && <span className="ml-1.5 text-xs text-amber-600">(나)</span>}
+                        </p>
+                        <p className="text-xs text-zinc-400">답변 {doc.totalReplies}건</p>
+                      </div>
+                      <span className="text-sm font-bold text-amber-600">
+                        {doc.hdt.toLocaleString()} HDT
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )
+        )}
+
+        {/* Consultation List */}
+        {tab !== 'leaderboard' && (
+          listLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <p className="text-sm text-zinc-400">불러오는 중...</p>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex items-center justify-center py-20">
+              <p className="text-sm text-zinc-400">해당 상담이 없습니다.</p>
+            </div>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {filtered.map((c) => (
+                <li key={c.id}>
+                  <Link
+                    href={`/patient/${c.id}`}
+                    className="block rounded-2xl bg-white border border-zinc-200 px-5 py-4 shadow-sm transition hover:border-zinc-300 hover:shadow-md"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex flex-col gap-1.5 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold text-zinc-800">
+                            {c.patientData.age}세 {genderLabel(c.patientData.gender)}
                           </span>
-                        )}
-                        {tab === 'replied' && (
-                          <span className="inline-flex items-center rounded-md bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-                            답변완료
-                          </span>
-                        )}
-                        {tab === 'closed' && (
-                          <span className="inline-flex items-center rounded-md bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-500">
-                            종료
-                          </span>
+                          {tab === 'pending' && (
+                            <span className="inline-flex items-center rounded-md bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">미답변</span>
+                          )}
+                          {tab === 'replied' && (
+                            <span className="inline-flex items-center rounded-md bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">답변완료</span>
+                          )}
+                          {tab === 'closed' && (
+                            <span className="inline-flex items-center rounded-md bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-500">종료</span>
+                          )}
+                        </div>
+                        <p className="text-sm text-zinc-700 truncate">
+                          <span className="font-medium text-zinc-500">주訴 </span>
+                          {c.patientData.cc}
+                        </p>
+                        {c.patientData.nrs && (
+                          <p className="text-xs text-zinc-400">통증 NRS {c.patientData.nrs}</p>
                         )}
                       </div>
-                      <p className="text-sm text-zinc-700 truncate">
-                        <span className="font-medium text-zinc-500">주訴 </span>
-                        {c.patientData.cc}
-                      </p>
-                      {c.patientData.nrs && (
-                        <p className="text-xs text-zinc-400">
-                          통증 NRS {c.patientData.nrs}
-                        </p>
-                      )}
+                      <span className="shrink-0 text-xs text-zinc-400 mt-0.5">
+                        {formatElapsed(c.createdAt)}
+                      </span>
                     </div>
-                    <span className="shrink-0 text-xs text-zinc-400 mt-0.5">
-                      {formatElapsed(c.createdAt)}
-                    </span>
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )
         )}
       </main>
     </div>

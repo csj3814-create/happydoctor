@@ -1,7 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { getActiveConsultations, getConsultationById, saveDoctorReply } = require('../services/dbService');
-const { getAdmin } = require('../services/dbService');
+const {
+    getActiveConsultations, getConsultationById, saveDoctorReply,
+    awardHDT, getHDTLeaderboard, getDoctorStats, HDT_REPLY,
+    getAdmin
+} = require('../services/dbService');
 
 // 허용된 의사 이메일 목록 (Render 환경변수 ALLOWED_DOCTOR_EMAILS에 콤마 구분으로 입력)
 function getAllowedEmails() {
@@ -107,11 +110,38 @@ router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
             req.doctor.name
         );
 
+        await awardHDT(req.doctor.email, req.doctor.name, HDT_REPLY, 'reply');
         console.log(`[Portal] ${req.doctor.email} → 환자 ${doc.userId} 답변 저장 (replyId: ${replyId})`);
         res.json({ ok: true, replyId });
     } catch (e) {
         console.error('[Portal Reply Error]', e);
         res.status(500).json({ error: '답변 저장 실패' });
+    }
+});
+
+/**
+ * GET /api/portal/hdt/me
+ * 내 HDT 잔액 조회
+ */
+router.get('/hdt/me', requireDoctorAuth, async (req, res) => {
+    try {
+        const stats = await getDoctorStats(req.doctor.email);
+        res.json(stats || { email: req.doctor.email, name: req.doctor.name, hdt: 0, totalReplies: 0 });
+    } catch (e) {
+        res.status(500).json({ error: 'HDT 조회 실패' });
+    }
+});
+
+/**
+ * GET /api/portal/hdt/leaderboard
+ * 리더보드 (상위 20명)
+ */
+router.get('/hdt/leaderboard', requireDoctorAuth, async (req, res) => {
+    try {
+        const board = await getHDTLeaderboard();
+        res.json({ leaderboard: board });
+    } catch (e) {
+        res.status(500).json({ error: '리더보드 조회 실패' });
     }
 });
 

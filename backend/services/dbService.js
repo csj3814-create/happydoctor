@@ -223,6 +223,71 @@ async function getConsultationById(consultationId) {
     }
 }
 
+const HDT_REPLY = 100;   // 답변 전송 시 지급
+const HDT_SEEN  = 50;    // 환자가 답변 확인 시 추가 지급
+
+/**
+ * HDT 적립 (doctor_stats 컬렉션 upsert)
+ */
+async function awardHDT(email, doctorName, amount, reason) {
+    if (!db || !email) return;
+    try {
+        const ref = db.collection('doctor_stats').doc(email);
+        await db.runTransaction(async (t) => {
+            const snap = await t.get(ref);
+            if (snap.exists) {
+                t.update(ref, {
+                    hdt: admin.firestore.FieldValue.increment(amount),
+                    totalReplies: reason === 'reply' ? admin.firestore.FieldValue.increment(1) : snap.data().totalReplies,
+                    lastActivityAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+            } else {
+                t.set(ref, {
+                    email,
+                    name: doctorName,
+                    hdt: amount,
+                    totalReplies: reason === 'reply' ? 1 : 0,
+                    lastActivityAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+            }
+        });
+        console.log(`[HDT] ${email} +${amount} HDT (${reason})`);
+    } catch (error) {
+        console.error('[HDT Award Error]', error);
+    }
+}
+
+/**
+ * HDT 리더보드 조회 (상위 20명)
+ */
+async function getHDTLeaderboard() {
+    if (!db) return [];
+    try {
+        const snap = await db.collection('doctor_stats')
+            .orderBy('hdt', 'desc')
+            .limit(20)
+            .get();
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (error) {
+        console.error('[HDT Leaderboard Error]', error);
+        return [];
+    }
+}
+
+/**
+ * 특정 의사 HDT 조회
+ */
+async function getDoctorStats(email) {
+    if (!db || !email) return null;
+    try {
+        const snap = await db.collection('doctor_stats').doc(email).get();
+        return snap.exists ? { id: snap.id, ...snap.data() } : null;
+    } catch (error) {
+        console.error('[HDT Stats Error]', error);
+        return null;
+    }
+}
+
 module.exports = {
     logConsultation,
     logFollowUp,
@@ -232,6 +297,11 @@ module.exports = {
     markReplyAsSeen,
     getActiveConsultations,
     getConsultationById,
+    awardHDT,
+    getHDTLeaderboard,
+    getDoctorStats,
+    HDT_REPLY,
+    HDT_SEEN,
     getDb: () => db,
     getAdmin: () => admin
 };
