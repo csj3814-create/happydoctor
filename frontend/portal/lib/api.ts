@@ -57,3 +57,22 @@ export async function postReply(consultationId: string, message: string): Promis
   });
   if (!res.ok) throw new Error(await res.text());
 }
+
+export interface DoctorStats {
+  email: string; name: string; hdt: number; totalReplies: number;
+}
+
+export async function getMyHDT(): Promise<DoctorStats> {
+  const headers = await authHeader();
+  const res = await fetch(`${BASE}/api/portal/hdt/me`, { headers });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function getLeaderboard(): Promise<DoctorStats[]> {
+  const headers = await authHeader();
+  const res = await fetch(`${BASE}/api/portal/hdt/leaderboard`, { headers });
+  if (!res.ok) throw new Error(await res.text());
+  const data = await res.json();
+  return data.leaderboard;
+}
