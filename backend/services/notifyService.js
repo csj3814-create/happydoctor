@@ -37,7 +37,6 @@ async function dequeueDoctorNotification() {
 
     const snapshot = await db.collection('doctor_notifications')
         .where('status', '==', 'pending')
-        .orderBy('createdAt', 'asc')
         .limit(1)
         .get();
 
