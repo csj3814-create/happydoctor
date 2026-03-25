@@ -30,10 +30,12 @@ const SERVER_URL = "https://happydoctor.onrender.com"; // Render 배포 URL
 const API_KEY = "happydoctor_bot_2026_secret"; // .env의 MESSENGER_API_KEY와 동일하게
 const CHANNEL_LINK = "http://pf.kakao.com/_PxaTxhX/chat"; // 카카오 채널 1:1 채팅 링크
 
-// 의료진 단톡방 이름 (정확히 일치해야 함)
-const DOCTOR_ROOM = "2기 행복한 의사 의료봉사방";
-// 환자 오픈채팅방 이름
-const PATIENT_ROOM = "행복한 의사의 응급상담방";
+// 의료진 단톡방 식별자 (MessengerBotR이 반환하는 실제 값)
+// ※ "2기 행복한 의사 의료봉사방"과 "2기 행복한 의사 운영위"가 동일 식별자를 가짐
+const DOCTOR_ROOM = "최석재 진료교수(가톨릭대학교 여의도성";
+// 환자 오픈채팅방 식별자
+// ※ "행복한 의사의 응급상담방" 실제 식별자
+const PATIENT_ROOM = "행복한의사";
 // 실험방 식별자
 // ※ MessengerBotR은 오픈채팅방 이름("해피닥터 AI 인턴 보듬 실험방") 대신
 //    "최석재"를 room 식별자로 사용합니다. (오픈채팅 특성상 고정값)
@@ -42,17 +44,29 @@ const EXPERIMENT_ROOM = "최석재";
 // ===== 메시지 수신 핸들러 =====
 function response(room, msg, sender, isGroupChat, replier, imageDB, packageName) {
 
+    // [디버그] 실제 room 식별자 확인용 — 작동 확인 후 삭제 가능
+    if (msg.trim() === "~방이름") {
+        replier.reply("📍 room: " + room);
+        return;
+    }
+
     // [0] 모든 방: ~도움말 명령어
     if (msg.trim() === "~도움말") {
         var helpMsg;
         if (room === DOCTOR_ROOM) {
             helpMsg =
-                "🤖 해피닥터 봇 도움말 (의료진)\n" +
+                "🤖 해피닥터 봇 도움말 (의료진/운영위)\n" +
                 "━━━━━━━━━━━━━━━\n" +
-                "~차트확인  대기 중인 신규 예진 차트 조회\n" +
+                "[의료진]\n" +
+                "~차트확인   대기 중인 신규 예진 차트 조회\n" +
+                "※ 신규 차트는 10초마다 자동으로도 전송됩니다.\n\n" +
+                "[환자 안내]\n" +
+                "~상담 / ~진료     1:1 채널 안내\n" +
+                "아파요·통증 등    증상 키워드 자동 감지\n\n" +
+                "[공통]\n" +
                 "~도움말    이 도움말 표시\n" +
                 "━━━━━━━━━━━━━━━\n" +
-                "※ 신규 차트는 10초마다 자동으로도 전송됩니다.";
+                "👉 1:1 상담: " + CHANNEL_LINK;
         } else if (room === PATIENT_ROOM) {
             helpMsg =
                 "🤖 해피닥터 봇 도움말 (환자 안내)\n" +
@@ -83,8 +97,8 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
         return;
     }
 
-    // [1] 환자 오픈채팅방 또는 실험방: 의료 키워드 → 1:1 채널 안내
-    if (room === PATIENT_ROOM || room === EXPERIMENT_ROOM) {
+    // [1] 환자 오픈채팅방, 실험방, 의료진방(운영위 포함): 의료 키워드 → 1:1 채널 안내
+    if (room === PATIENT_ROOM || room === EXPERIMENT_ROOM || room === DOCTOR_ROOM) {
         var guideKeywords = [
             "~상담", "~진료", "아파요", "아픈데", "아프다", "아픕니다",
             "통증", "두통", "복통", "열이", "기침", "설사", "구토",

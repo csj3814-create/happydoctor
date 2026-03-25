@@ -1,43 +1,58 @@
 const { randomUUID } = require('crypto');
+const { getDb, getAdmin } = require('./dbService');
 
-// 임시 메모리 기반 큐 (실제 프로덕션에서는 Redis나 DB를 권장)
-const messageQueue = [];
-
-// F/U 환자 푸시 전용 큐 (MessengerBotR이 폴링하여 환자에게 직접 전송)
+// F/U 환자 푸시 전용 큐 (메모리 — 서버 재시작 시 재등록됨)
 const fuPushQueue = [];
 
-// userId ↔ roomName 매핑 (MessengerBotR이 등록)
+// userId ↔ roomName 매핑 (메모리 — MessengerBotR이 메시지 올 때 재등록됨)
 const roomMapping = new Map();
 
 /**
- * 발생한 예진 차트를 큐에 넣습니다.
- * @param {string} message 전문의 방으로 전송할 차트 텍스트
- * @param {string} patientId 환자 식별자(오픈빌더의 user_id 등)
+ * 발생한 예진 차트를 Firestore 큐에 저장합니다.
+ * (서버 재시작해도 데이터 유지)
  */
-function enqueueDoctorNotification(message, patientId) {
-    messageQueue.push({
+async function enqueueDoctorNotification(message, patientId) {
+    const db = getDb();
+    if (!db) {
+        console.warn('[Notification] Firestore 없음 — 차트 저장 불가');
+        return;
+    }
+    await db.collection('doctor_notifications').add({
         id: randomUUID(),
-        message: message,
-        patientId: patientId,
-        timestamp: new Date()
+        message,
+        patientId,
+        status: 'pending',
+        createdAt: getAdmin().firestore.FieldValue.serverTimestamp()
     });
     console.log(`[Notification Enqueued] Patient: ${patientId}`);
 }
 
 /**
- * 큐에 쌓인 메시지를 하나 꺼내옵니다.
- * 메신저봇R이 주기적으로 폴링(polling)할 때 이 함수를 호출합니다.
+ * Firestore 큐에서 가장 오래된 pending 차트를 꺼냅니다.
+ * 꺼낸 즉시 'delivered'로 마킹하여 중복 전송을 방지합니다.
  */
-function dequeueDoctorNotification() {
-    if (messageQueue.length > 0) {
-        return messageQueue.shift();
-    }
-    return null;
+async function dequeueDoctorNotification() {
+    const db = getDb();
+    if (!db) return null;
+
+    const snapshot = await db.collection('doctor_notifications')
+        .where('status', '==', 'pending')
+        .orderBy('createdAt', 'asc')
+        .limit(1)
+        .get();
+
+    if (snapshot.empty) return null;
+
+    const doc = snapshot.docs[0];
+    await doc.ref.update({
+        status: 'delivered',
+        deliveredAt: getAdmin().firestore.FieldValue.serverTimestamp()
+    });
+    return { message: doc.data().message, patientId: doc.data().patientId };
 }
 
 /**
  * F/U 푸시 메시지를 환자 전송용 큐에 적재합니다.
- * MessengerBotR이 폴링하여 Api.replyRoom()으로 환자 카톡방에 직접 전송.
  */
 function enqueueFUPush(userId, message) {
     const roomName = roomMapping.get(userId);
@@ -84,9 +99,17 @@ function getRoomName(userId) {
 /**
  * 디버깅용 큐 상태 확인
  */
-function getQueueStatus() {
+async function getQueueStatus() {
+    const db = getDb();
+    let pendingCount = 0;
+    if (db) {
+        const snapshot = await db.collection('doctor_notifications')
+            .where('status', '==', 'pending')
+            .get();
+        pendingCount = snapshot.size;
+    }
     return {
-        pendingCount: messageQueue.length,
+        pendingCount,
         fuPushPending: fuPushQueue.length,
         registeredRooms: roomMapping.size
     };
