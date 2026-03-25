@@ -177,16 +177,26 @@ async function markReplyAsSeen(replyId) {
 }
 
 /**
- * 의사 포털: 대기 중인 ESCALATE 상담 목록 조회
+ * 의사 포털: ESCALATE 상담 목록 조회 (ACTIVE + COMPLETED 모두)
  */
 async function getActiveConsultations() {
     if (!db) return [];
     try {
-        const snapshot = await db.collection('consultations')
-            .where('aiAction', '==', 'ESCALATE')
-            .where('status', '==', 'ACTIVE')
-            .get();
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const [activeSnap, completedSnap] = await Promise.all([
+            db.collection('consultations').where('aiAction', '==', 'ESCALATE').where('status', '==', 'ACTIVE').get(),
+            db.collection('consultations').where('aiAction', '==', 'ESCALATE').where('status', '==', 'COMPLETED').get(),
+        ]);
+        const docs = [
+            ...activeSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+            ...completedSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+        ];
+        // 최신순 정렬
+        docs.sort((a, b) => {
+            const ta = a.createdAt?.toMillis?.() ?? 0;
+            const tb = b.createdAt?.toMillis?.() ?? 0;
+            return tb - ta;
+        });
+        return docs;
     } catch (error) {
         console.error('[DB GetActive Error]', error);
         return [];
