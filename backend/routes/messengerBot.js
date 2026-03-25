@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { dequeueDoctorNotification, dequeueFUPush, registerRoom } = require('../services/notifyService');
+const { peekDoctorNotification, confirmDoctorNotifications, dequeueFUPush, registerRoom } = require('../services/notifyService');
 
 // API Key 검사 미들웨어
 function checkApiKey(req, res, next) {
@@ -43,11 +43,16 @@ router.post('/', checkApiKey, async (req, res) => {
     // 메신저봇이 "!확인" 과 같은 메세지를 보내거나 정기적으로 ping을 시도하면
     // 쌓여있는 차트를 응답으로 내려보냄.
     if (msg.trim() === '~차트확인') {
-        const latestChart = await dequeueDoctorNotification();
-        if (latestChart) {
-            return res.status(200).json({ reply: latestChart.message });
-        } else {
-            return res.status(200).json({ reply: "✅ 대기 중인 신규 예진 차트가 없습니다." });
+        try {
+            const charts = await confirmDoctorNotifications();
+            if (charts.length > 0) {
+                return res.status(200).json({ reply: charts.map(c => c.message).join('\n\n---\n\n') });
+            } else {
+                return res.status(200).json({ reply: "✅ 대기 중인 신규 예진 차트가 없습니다." });
+            }
+        } catch (e) {
+            console.error('[차트확인 오류]', e);
+            return res.status(200).json({ reply: "⚠️ 차트 조회 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요." });
         }
     }
 
@@ -61,11 +66,11 @@ router.post('/', checkApiKey, async (req, res) => {
  * 신규 알림이 있으면 리턴 받아 카톡방에 자동으로 쏘기 위한 용도로 제공.
  */
 router.get('/poll', checkApiKey, async (req, res) => {
-    const latestChart = await dequeueDoctorNotification();
-    if (latestChart) {
-        return res.status(200).json({ 
-            hasNew: true, 
-            reply: latestChart.message 
+    const chart = await peekDoctorNotification();
+    if (chart) {
+        return res.status(200).json({
+            hasNew: true,
+            reply: chart.message
         });
     }
     res.status(200).json({ hasNew: false });
