@@ -59,20 +59,23 @@ async function confirmDoctorNotifications() {
     const db = getDb();
     if (!db) return [];
 
-    const snapshot = await db.collection('doctor_notifications')
-        .where('status', 'in', ['pending', 'notified'])
-        .get();
+    // 'in' 쿼리 대신 두 번 조회 — 단순 단일 필드 쿼리만 사용
+    const [pendingSnap, notifiedSnap] = await Promise.all([
+        db.collection('doctor_notifications').where('status', '==', 'pending').get(),
+        db.collection('doctor_notifications').where('status', '==', 'notified').get()
+    ]);
 
-    if (snapshot.empty) return [];
+    const docs = [...pendingSnap.docs, ...notifiedSnap.docs];
+    if (docs.length === 0) return [];
 
     const batch = db.batch();
     const now = getAdmin().firestore.FieldValue.serverTimestamp();
-    snapshot.docs.forEach(doc => {
+    docs.forEach(doc => {
         batch.update(doc.ref, { status: 'delivered', deliveredAt: now });
     });
     await batch.commit();
 
-    return snapshot.docs.map(doc => ({
+    return docs.map(doc => ({
         message: doc.data().message,
         patientId: doc.data().patientId
     }));
