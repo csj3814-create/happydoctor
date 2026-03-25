@@ -18,8 +18,11 @@ app.use('/api/portal', cors({
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
-// 그 외 /api/* 는 서버간 호출이므로 CORS 차단
-app.use('/api/', cors({ origin: false }));
+// 그 외 /api/* 는 서버간 호출이므로 CORS 차단 (portal 제외)
+app.use('/api/', (req, res, next) => {
+    if (req.path.startsWith('/portal')) return next();
+    cors({ origin: false })(req, res, next);
+});
 app.use(express.json());
 
 // Rate Limiting (분당 30회)
