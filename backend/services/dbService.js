@@ -112,10 +112,116 @@ async function closeConsultation(userId, reason) {
     }
 }
 
+/**
+ * 의사 포털에서 환자에게 답변을 저장합니다.
+ * doctor_replies 컬렉션에 별도 저장 (seen:false 쿼리를 위해 배열 대신 컬렉션 사용)
+ */
+async function saveDoctorReply(consultationId, userId, message, doctorName) {
+    if (!db) return null;
+    const { randomUUID } = require('crypto');
+    try {
+        const docRef = db.collection('doctor_replies').doc();
+        await docRef.set({
+            id: docRef.id,
+            consultationId,
+            userId,
+            message,
+            doctorName: doctorName || '담당 의사',
+            seen: false,
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        // consultation에도 replies 카운트 업데이트
+        await db.collection('consultations').doc(consultationId).update({
+            doctorRepliedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        console.log(`[DB] Doctor reply saved for userId: ${userId}`);
+        return docRef.id;
+    } catch (error) {
+        console.error('[DB Doctor Reply Error]', error);
+        return null;
+    }
+}
+
+/**
+ * 환자에게 전달 안 된(seen:false) 의사 답변 조회
+ */
+async function getPendingDoctorReply(userId) {
+    if (!db) return null;
+    try {
+        const snapshot = await db.collection('doctor_replies')
+            .where('userId', '==', userId)
+            .where('seen', '==', false)
+            .limit(1)
+            .get();
+        if (snapshot.empty) return null;
+        return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+    } catch (error) {
+        console.error('[DB GetPendingReply Error]', error);
+        return null;
+    }
+}
+
+/**
+ * 환자가 확인한 답변을 seen:true로 마킹
+ */
+async function markReplyAsSeen(replyId) {
+    if (!db) return;
+    try {
+        await db.collection('doctor_replies').doc(replyId).update({
+            seen: true,
+            seenAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+    } catch (error) {
+        console.error('[DB MarkSeen Error]', error);
+    }
+}
+
+/**
+ * 의사 포털: 대기 중인 ESCALATE 상담 목록 조회
+ */
+async function getActiveConsultations() {
+    if (!db) return [];
+    try {
+        const snapshot = await db.collection('consultations')
+            .where('aiAction', '==', 'ESCALATE')
+            .where('status', '==', 'ACTIVE')
+            .get();
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+        console.error('[DB GetActive Error]', error);
+        return [];
+    }
+}
+
+/**
+ * 의사 포털: 상담 단건 조회
+ */
+async function getConsultationById(consultationId) {
+    if (!db) return null;
+    try {
+        const doc = await db.collection('consultations').doc(consultationId).get();
+        if (!doc.exists) return null;
+        // doctor_replies도 함께 조회
+        const repliesSnap = await db.collection('doctor_replies')
+            .where('consultationId', '==', consultationId)
+            .get();
+        const replies = repliesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        return { id: doc.id, ...doc.data(), doctorReplies: replies };
+    } catch (error) {
+        console.error('[DB GetById Error]', error);
+        return null;
+    }
+}
+
 module.exports = {
     logConsultation,
     logFollowUp,
     closeConsultation,
+    saveDoctorReply,
+    getPendingDoctorReply,
+    markReplyAsSeen,
+    getActiveConsultations,
+    getConsultationById,
     getDb: () => db,
     getAdmin: () => admin
 };

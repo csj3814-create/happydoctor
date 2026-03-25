@@ -444,4 +444,52 @@ router.post('/close-consultation', async (req, res) => {
     }
 });
 
+/**
+ * POST /kakao/check-doctor-reply
+ * 환자가 채널에 접속하거나 메시지를 보낼 때 대기 중인 의사 답변을 확인합니다.
+ * 카카오 오픈빌더 폴백 블록 또는 "처음으로" 블록에 연결하세요.
+ */
+router.post('/check-doctor-reply', async (req, res) => {
+    try {
+        const userId = req.body.userRequest?.user?.id || 'kakao_user_unknown';
+        const pending = await dbService.getPendingDoctorReply(userId);
+
+        if (pending) {
+            await dbService.markReplyAsSeen(pending.id);
+            const replyText =
+                `💬 담당 의사 선생님의 답변이 도착했습니다!\n\n` +
+                `👨‍⚕️ ${pending.doctorName}\n\n` +
+                `${pending.message}`;
+
+            return res.status(200).json({
+                version: "2.0",
+                template: {
+                    outputs: [{ simpleText: { text: replyText } }],
+                    quickReplies: [
+                        { label: "예진상담", action: "message", messageText: "예진상담" },
+                        { label: "상담종료", action: "message", messageText: "상담종료" }
+                    ]
+                }
+            });
+        }
+
+        // 대기 중인 답변 없음 → 일반 환영 메시지
+        return res.status(200).json({
+            version: "2.0",
+            template: {
+                outputs: [{ simpleText: { text: "안녕하세요! 해피닥터 보듬입니다. 😊\n무엇을 도와드릴까요?" } }],
+                quickReplies: [
+                    { label: "예진상담", action: "message", messageText: "예진상담" }
+                ]
+            }
+        });
+    } catch (error) {
+        console.error('[CheckDoctorReply Error]', error);
+        return res.status(200).json({
+            version: "2.0",
+            template: { outputs: [{ simpleText: { text: "잠시 후 다시 시도해주세요." } }] }
+        });
+    }
+});
+
 module.exports = router;

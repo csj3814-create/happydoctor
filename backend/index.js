@@ -6,13 +6,19 @@ const axios = require('axios');
 
 const kakaoWebhookRoute = require('./routes/kakaoWebhook');
 const messengerBotRoute = require('./routes/messengerBot');
+const portalRoute = require('./routes/portal');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
 // Middleware
-// /api/* 는 카카오 오픈빌더·메신저봇R 서버간 호출이므로 브라우저 CORS 불필요.
-// 헬스체크(/) 등 공개 경로만 CORS 허용하고 API 경로는 차단.
+// /api/portal/* 는 의사 포털(브라우저)에서 호출하므로 CORS 허용 필요
+app.use('/api/portal', cors({
+    origin: process.env.PORTAL_ORIGIN || '*',
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+// 그 외 /api/* 는 서버간 호출이므로 CORS 차단
 app.use('/api/', cors({ origin: false }));
 app.use(express.json());
 
@@ -29,6 +35,7 @@ app.use('/api/', apiLimiter);
 // Routes
 app.use('/api/kakao', kakaoWebhookRoute);
 app.use('/api/messengerbot', messengerBotRoute);
+app.use('/api/portal', portalRoute);
 
 // Health check (루트 경로)
 app.get('/', (req, res) => {
