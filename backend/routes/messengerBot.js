@@ -22,7 +22,7 @@ function checkApiKey(req, res, next) {
  * MessengerBot R Endpoint
  * 앱에서 메세지 수신 시 HTTP POST를 날려 이리로 옵니다.
  */
-router.post('/', checkApiKey, (req, res) => {
+router.post('/', checkApiKey, async (req, res) => {
     const { room, msg, sender, isGroupChat } = req.body;
 
     if (!msg) {
@@ -43,7 +43,7 @@ router.post('/', checkApiKey, (req, res) => {
     // 메신저봇이 "!확인" 과 같은 메세지를 보내거나 정기적으로 ping을 시도하면
     // 쌓여있는 차트를 응답으로 내려보냄.
     if (msg.trim() === '~차트확인') {
-        const latestChart = dequeueDoctorNotification();
+        const latestChart = await dequeueDoctorNotification();
         if (latestChart) {
             return res.status(200).json({ reply: latestChart.message });
         } else {
@@ -60,8 +60,8 @@ router.post('/', checkApiKey, (req, res) => {
  * 공기계(메신저봇R)가 특정 초(예: 3초)마다 백그라운드로 이 주소를 찔러서
  * 신규 알림이 있으면 리턴 받아 카톡방에 자동으로 쏘기 위한 용도로 제공.
  */
-router.get('/poll', checkApiKey, (req, res) => {
-    const latestChart = dequeueDoctorNotification();
+router.get('/poll', checkApiKey, async (req, res) => {
+    const latestChart = await dequeueDoctorNotification();
     if (latestChart) {
         return res.status(200).json({ 
             hasNew: true, 

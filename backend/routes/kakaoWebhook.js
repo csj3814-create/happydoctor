@@ -197,7 +197,7 @@ async function processTriageSync(userId, patientData) {
             const fallbackChart = `[최초 자동 해결된 경증 환자]\n증상: ${patientData.cc}\n증상점수: ${patientData.nrs}`;
             followUpService.scheduleFollowUp(userId, fallbackChart, 15);
         } else {
-            enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId);
+            enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId).catch(e => console.error('[Enqueue Error]', e));
             followUpService.scheduleFollowUp(userId, analysisResult.soapChartForDoctor, 15);
             finalResponseText = analysisResult.replyToPatient +
                 "\n\n🩺 차트를 담당 전문의 선생님께\n보고드렸습니다.\n진료 틈틈이 확인 후 이곳으로\n직접 답변드릴 예정입니다.\n잠시만 대기해 주세요.\n(힘드시면 지체 없이 119!)";
@@ -234,7 +234,7 @@ async function processTriageAsync(callbackUrl, userId, patientData) {
             const fallbackChart = `[최초 자동 해결된 경증 환자]\n증상: ${patientData.cc}\n증상점수: ${patientData.nrs}`;
             followUpService.scheduleFollowUp(userId, fallbackChart, 15);
         } else {
-            enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId);
+            enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId).catch(e => console.error('[Enqueue Error]', e));
             followUpService.scheduleFollowUp(userId, analysisResult.soapChartForDoctor, 15);
             finalResponseText = analysisResult.replyToPatient +
                 "\n\n🩺 차트를 담당 전문의 선생님께\n보고드렸습니다.\n진료 틈틈이 확인 후 이곳으로\n직접 답변드릴 예정입니다.\n잠시만 대기해 주세요.\n(힘드시면 지체 없이 119!)";
@@ -325,7 +325,7 @@ router.post('/fu-reply', async (req, res) => {
 
         // 3. 악화 시 전문의 큐 재할당
         if (fuAnalysis.action === 'ESCALATE_FU') {
-            enqueueDoctorNotification(`🚨 **[F/U 경고: 증상 악화 감지]**\n${fuAnalysis.fuChartForDoctor}`, userId);
+            enqueueDoctorNotification(`🚨 **[F/U 경고: 증상 악화 감지]**\n${fuAnalysis.fuChartForDoctor}`, userId).catch(e => console.error('[Enqueue Error]', e));
             finalResponseText += "\n\n⚠️ 담당 전문의 선생님께\n긴급으로 재보고 드렸습니다.\n잠시 대기해 주세요.\n힘드시면 지체 없이 119!";
         } else {
              // 상황 유지/호전 시 F/U 타이머를 1시간 뒤로 연장 (선택사항)

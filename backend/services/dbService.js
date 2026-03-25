@@ -115,5 +115,7 @@ async function closeConsultation(userId, reason) {
 module.exports = {
     logConsultation,
     logFollowUp,
-    closeConsultation
+    closeConsultation,
+    getDb: () => db,
+    getAdmin: () => admin
 };
