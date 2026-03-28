@@ -49,26 +49,44 @@
 - [x] maxOutputTokens 2048→4096 for Korean SOAP charts
 - [x] Chatbot launch announcement message updated
 
-## Phase 7: Live Testing & Polish
-- [x] 코드 정리 — upbeat-tharp→main 머지, 로그 태그 통일, 보안 엔드포인트 정리 ✅
-- [x] API E2E 테스트 — 헬스체크/슬롯미완료/예진중단/상담종료(3사유)/F/U만료 전체 통과 ✅
-- [x] close_reason 매칭 버그 확인 및 수정 (trim 추가, 인코딩 이슈 확인) ✅
-- [x] Render 배포 브랜치 확인 (claude/upbeat-tharp 배포 중 → 양쪽 동기화) ✅
-- [x] 카카오 채널 실제 E2E 테스트 — 상담종료 사유별 메시지 정상 확인 ✅
-- [x] 상담종료 블록 close_reason 키 수정 (증상 호전/단순 취소 매칭 버그 픽스) ✅
-- [ ] **[사용자 확인 필요]** MessengerBotR 공기계 배포 및 실제 동작 확인
+## Phase 7: Live Testing & Polish ✅
+- [x] 코드 정리 — upbeat-tharp→main 머지, 로그 태그 통일, 보안 엔드포인트 정리
+- [x] API E2E 테스트 — 헬스체크/슬롯미완료/예진중단/상담종료(3사유)/F/U만료 전체 통과
+- [x] close_reason 매칭 버그 확인 및 수정 (trim 추가, 인코딩 이슈 확인)
+- [x] 카카오 채널 실제 E2E 테스트 — 상담종료 사유별 메시지 정상 확인
+- [x] SOAP 차트 Assessment에 감별진단(DDx) 3~5개 + 확률(%) 추가
+- [x] MessengerBotR 스크립트 디버그 및 room 식별자 수정
+- [x] Firestore 영속 알림 큐 (doctor_notifications) 구축 — 2단계 상태 전환(pending→notified→delivered)
+- [x] 증상 키워드 반응을 PATIENT_ROOM(행복한 의사의 응급상담방)에만 국한
 
-## Phase 8: Donation & Website (Future)
-- [ ] Build Happy Doctor website with donation page
-- [ ] Add donation link back to Gemini system prompt & bot responses
-- [ ] Add donation button to Kakao OpenBuilder post-consultation block
-- [ ] Verify donation message tone (warm invitation, not pressure)
+## Phase 8: 의사-환자 양방향 소통 & 포털 ✅ (2026.03.26)
+- [x] 백엔드 Portal API — GET consultations, GET consultation/:id, POST reply
+- [x] Firebase Admin SDK ID 토큰 검증 + ALLOWED_DOCTOR_EMAILS 접근 제어
+- [x] 의사 포털 프론트엔드 (Next.js + Tailwind) — Vercel 배포
+  - [x] Google OAuth 로그인
+  - [x] 환자 목록 (미답변 / 답변 완료 / 상담 종료 탭)
+  - [x] 최신순 정렬, COMPLETED 상담도 표시
+  - [x] 환자 상세 차트 + 답변 입력
+- [x] CORS 미들웨어 순서 버그 수정 (/api/portal이 /api/ 전체차단에 덮어씌워지던 문제)
+- [x] 차트 알림에 포털 사용 안내 추가 (카카오 단톡방 → 포털 URL + 사용법)
+- [x] HDT (Happy Doctor Token) 시스템
+  - [x] 답변 전송 시 +100 HDT 자동 적립
+  - [x] 환자 확인(seen) 시 +50 HDT 추가
+  - [x] doctor_stats 컬렉션 (Firestore)
+  - [x] 리더보드 탭 (🏆 순위 + 내 HDT 헤더 표시)
+
+## Phase 9: 잔여 과제
+- [ ] 카카오 오픈빌더 폴백 블록에 /kakao/check-doctor-reply 연결 (환자 재접속 시 의사 답변 전달)
+- [ ] 홈페이지(Phase 8-C) — 단체 소개 + 누적 상담 통계 + 기부 페이지
+- [ ] HDT 환자 확인(seen) 시 +50 HDT 트리거 연결 (현재 저장만, 지급 미연결)
+- [ ] MessengerBotR 공기계 스크립트 재컴파일 확인
 
 ## Current Status
-- **Last updated**: 2026.03.23
-- **MVP Status**: Full triage + F/U + close + ESCALATE flow working ✅
-- **API E2E Tests**: 전체 통과 ✅
-- **Deployed at**: https://happydoctor.onrender.com (Render, claude/upbeat-tharp 브랜치)
+- **Last updated**: 2026.03.26
+- **MVP Status**: Full triage + F/U + close + ESCALATE + 의사 포털 working ✅
+- **Deployed at**:
+  - Backend: https://happydoctor.onrender.com (Render, main 브랜치)
+  - Frontend Portal: https://happydoctor.vercel.app (Vercel)
 - **GitHub**: https://github.com/csj3814-create/happydoctor
 - **Model**: gemini-2.5-flash (paid plan via 해빛스쿨)
 - **Kakao Channel**: http://pf.kakao.com/_PxaTxhX/chat

@@ -116,7 +116,7 @@ async function closeConsultation(userId, reason) {
  * 의사 포털에서 환자에게 답변을 저장합니다.
  * doctor_replies 컬렉션에 별도 저장 (seen:false 쿼리를 위해 배열 대신 컬렉션 사용)
  */
-async function saveDoctorReply(consultationId, userId, message, doctorName) {
+async function saveDoctorReply(consultationId, userId, message, doctorName, doctorEmail) {
     if (!db) return null;
     const { randomUUID } = require('crypto');
     try {
@@ -127,6 +127,7 @@ async function saveDoctorReply(consultationId, userId, message, doctorName) {
             userId,
             message,
             doctorName: doctorName || '담당 의사',
+            doctorEmail: doctorEmail || '',
             seen: false,
             createdAt: admin.firestore.FieldValue.serverTimestamp()
         });

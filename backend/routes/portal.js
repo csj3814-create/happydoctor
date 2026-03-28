@@ -107,7 +107,8 @@ router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
             req.params.id,
             doc.userId,
             message.trim(),
-            req.doctor.name
+            req.doctor.name,
+            req.doctor.email
         );
 
         await awardHDT(req.doctor.email, req.doctor.name, HDT_REPLY, 'reply');
