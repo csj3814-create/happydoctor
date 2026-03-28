@@ -38,15 +38,6 @@ function useStats() {
   return stats
 }
 
-
-// --- 활동 스토리 ---
-const STORIES = [
-  { title: '대한응급의학의사회 MOU', img: '/stories/mou-emergency.jpg' },
-  { title: '해피닥터 정기총회', img: '/stories/general-meeting.jpg' },
-  { title: '서대문농아인복지관 MOU', img: '/stories/mou-deaf.jpg' },
-  { title: '행복한 의사 봉사활동', img: '/stories/volunteer.jpg' },
-]
-
 // ===== 섹션 컴포넌트 =====
 
 function Hero() {
@@ -88,6 +79,77 @@ function Hero() {
   )
 }
 
+// --- 설립 이야기 ---
+function FoundingStory() {
+  return (
+    <section className="py-20 px-4 bg-white">
+      <div className="max-w-3xl mx-auto">
+        <div className="flex flex-col md:flex-row gap-10 items-center">
+          <div className="shrink-0 flex flex-col items-center gap-3">
+            <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl"
+              style={{ background: C.sky }}>
+              🐦
+            </div>
+            <p className="text-xs font-semibold text-center" style={{ color: C.mainBlue }}>2020.10 설립</p>
+          </div>
+          <div>
+            <h2 className="text-2xl md:text-3xl font-bold mb-4" style={{ color: C.deepBlue }}>
+              왜 행복한 의사인가요?
+            </h2>
+            <p className="text-sm md:text-base text-zinc-600 leading-relaxed mb-4">
+              동화 <em className="not-italic font-semibold" style={{ color: C.mainBlue }}>「행복한 왕자」</em> 속 제비는
+              왕자의 금장식과 보석을 어려운 이웃들에게 전달하는 의로운 메신저였습니다.
+              행복한 의사는 그 제비처럼, 의사 선생님의 손길이 필요한 곳에 닿고자 합니다.
+            </p>
+            <p className="text-sm md:text-base text-zinc-600 leading-relaxed mb-4">
+              코로나19 대유행은 계층 간·지역 간 의료 사각지대를 여실히 드러냈습니다.
+              무의촌 거주자, 경제적으로 어려운 취약계층, 언어소통에 어려움을 겪는 농아인·
+              다문화가정이 의료 혜택에서 소외되고 있었습니다.
+            </p>
+            <p className="text-sm md:text-base text-zinc-600 leading-relaxed">
+              자원봉사 의료진이 재능을 기부하고, 어려운 이웃에게 <strong>완전 무료</strong>로
+              전문 의료상담을 제공합니다. 모든 서비스는 100% 무료입니다.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// --- 통계 ---
+function StatsSection() {
+  const stats = useStats()
+  const items = [
+    { label: '누적 상담', value: stats?.total ?? null, unit: '건', dynamic: true },
+    { label: '전문의 직접 회신', value: stats?.doctorReplied ?? null, unit: '건', dynamic: true },
+    { label: '잠재 수혜 인구', value: 67700, unit: '명+', dynamic: false },
+    { label: 'MOU 협력기관', value: 6, unit: '개', dynamic: false },
+  ]
+  return (
+    <section className="py-16 px-4 text-white" style={{ background: C.mainBlue }}>
+      <div className="max-w-4xl mx-auto text-center">
+        <p className="text-sm font-medium mb-10" style={{ opacity: 0.7 }}>지금까지 함께한 기록</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          {items.map((it) => (
+            <div key={it.label}>
+              <div className="text-3xl md:text-4xl font-bold">
+                {it.dynamic
+                  ? (it.value !== null ? it.value.toLocaleString() : <span className="opacity-30">—</span>)
+                  : it.value!.toLocaleString()
+                }
+                <span className="text-sm md:text-base ml-1" style={{ opacity: 0.6 }}>{it.unit}</span>
+              </div>
+              <div className="text-xs mt-1" style={{ opacity: 0.6 }}>{it.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// --- 서비스 소개 ---
 function Features() {
   const items = [
     { icon: '🩺', title: '완전 무료', desc: '건강보험 없이도 누구나. 노숙자, 외국인, 다문화 가정 등 의료 접근이 어려운 모든 분들을 위한 서비스입니다.' },
@@ -123,32 +185,7 @@ function Features() {
   )
 }
 
-function StatsSection() {
-  const stats = useStats()
-  const items = [
-    { label: '누적 상담', value: stats?.total ?? null, unit: '건' },
-    { label: '전문의 직접 회신', value: stats?.doctorReplied ?? null, unit: '건' },
-  ]
-  return (
-    <section className="py-16 px-4 text-white" style={{ background: C.mainBlue }}>
-      <div className="max-w-3xl mx-auto text-center">
-        <p className="text-sm font-medium mb-10" style={{ opacity: 0.7 }}>지금까지 함께한 기록</p>
-        <div className="flex justify-center gap-16 md:gap-24">
-          {items.map((it) => (
-            <div key={it.label}>
-              <div className="text-4xl md:text-6xl font-bold">
-                {it.value !== null ? it.value.toLocaleString() : <span className="opacity-30">—</span>}
-                <span className="text-lg md:text-xl ml-1" style={{ opacity: 0.6 }}>{it.unit}</span>
-              </div>
-              <div className="text-xs mt-2" style={{ opacity: 0.6 }}>{it.label}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
-}
-
+// --- 이용방법 ---
 function HowToSection() {
   const steps = [
     { n: '01', title: '카카오 채널 접속', desc: '아래 버튼 또는 카카오톡에서 "행복한 의사"를 검색하세요.' },
@@ -176,13 +213,9 @@ function HowToSection() {
           ))}
         </div>
         <div className="mt-12 text-center">
-          <a
-            href="http://pf.kakao.com/_PxaTxhX/chat"
-            target="_blank"
-            rel="noopener noreferrer"
+          <a href="http://pf.kakao.com/_PxaTxhX/chat" target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-2 rounded-full px-8 py-4 text-sm font-bold text-white transition-all hover:opacity-90 hover:scale-105"
-            style={{ background: C.mainBlue }}
-          >
+            style={{ background: C.mainBlue }}>
             지금 바로 상담하기 →
           </a>
         </div>
@@ -191,9 +224,157 @@ function HowToSection() {
   )
 }
 
-// --- Q&A 섹션: 질문 앞 20자 + 의사 답변 전체 ---
-interface QAItem { idx: number; q: string; a: string; date: string }
+// --- 협력기관 ---
+const PARTNERS = [
+  { name: '대한응급의학의사회', desc: '전국 응급의학과 의사 네트워크', icon: '🏥' },
+  { name: '부평구다문화가족센터', desc: '다문화가족 회원 약 7,700명', icon: '🌏' },
+  { name: '서울특별시농아인협회', desc: '농아인 및 관계자 약 60,000명', icon: '🤝' },
+  { name: '서울시립서대문농아인복지관', desc: '청각장애인 복지서비스 기관', icon: '💙' },
+  { name: '요셉의원', desc: '국내외 외국인·빈민지역 환자 지원', icon: '✝️' },
+  { name: '다가치', desc: '이주민 의료지원 체계 구축 협력', icon: '🌱' },
+]
 
+function PartnersSection() {
+  return (
+    <section className="py-20 px-4" style={{ background: C.sky }}>
+      <div className="max-w-4xl mx-auto">
+        <h2 className="text-2xl md:text-3xl font-bold text-center mb-2" style={{ color: C.deepBlue }}>
+          함께하는 기관
+        </h2>
+        <p className="text-center text-sm mb-12 text-zinc-400">
+          MOU 협력기관과 함께 의료 사각지대 해소에 나서고 있습니다
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {PARTNERS.map((p) => (
+            <div key={p.name} className="bg-white rounded-2xl p-5 shadow-sm flex gap-3 items-start">
+              <span className="text-2xl shrink-0">{p.icon}</span>
+              <div>
+                <p className="font-bold text-sm mb-0.5" style={{ color: C.deepBlue }}>{p.name}</p>
+                <p className="text-xs text-zinc-500 leading-relaxed">{p.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// --- 연혁 타임라인 ---
+const TIMELINE = [
+  { year: '2020.10', title: '행복한 의사 설립', desc: 'COVID-19 의료 사각지대 해소를 위해 자원봉사 의사들이 뭉쳐 설립' },
+  { year: '2021.09', title: '요셉의원 MOU', desc: '국내외 외국인·빈민지역 환자 의료상담 협력 체결. 동아일보 보도' },
+  { year: '2022.01', title: '부평구다문화가족센터 MOU', desc: '인천 다문화가족 7,700명 대상 무료 온라인 의료상담 서비스 개시' },
+  { year: '2022.08', title: '서울특별시농아인협회 MOU', desc: '농아인 60,000명 대상 의료상담 서비스 확대' },
+  { year: '2022.10', title: '서대문농아인복지관 MOU 및 소아응급 강의', desc: '다문화·농아인 대상 의료 교육 봉사 정례화' },
+  { year: '2023.02', title: '사단법인 창립총회', desc: '임의단체에서 비영리법인으로 전환. 자원봉사 의료진 16명 체제' },
+  { year: '2023.04', title: '다가치 MOU', desc: '이주민 의료지원 체계 구축을 위한 협약 체결' },
+  { year: '2023.05', title: '인천 세계인의날 봉사', desc: '다문화가정 대상 현장 의료상담 봉사 참여' },
+  { year: '2024', title: '카카오톡 채널 + AI 예진 도입', desc: '언제 어디서나 상담 가능한 AI 기반 스마트 의료상담 시스템 구축' },
+]
+
+function TimelineSection() {
+  return (
+    <section className="py-20 px-4 bg-white">
+      <div className="max-w-2xl mx-auto">
+        <h2 className="text-2xl md:text-3xl font-bold text-center mb-12" style={{ color: C.deepBlue }}>
+          활동 연혁
+        </h2>
+        <div className="relative">
+          {/* 세로선 */}
+          <div className="absolute left-[72px] top-0 bottom-0 w-px" style={{ background: C.sky }} />
+          <div className="flex flex-col gap-8">
+            {TIMELINE.map((item, i) => (
+              <div key={i} className="flex gap-5 items-start">
+                <div className="shrink-0 w-[72px] text-right">
+                  <span className="text-xs font-bold" style={{ color: C.mainBlue }}>{item.year}</span>
+                </div>
+                <div className="shrink-0 w-3 h-3 rounded-full mt-0.5 relative z-10"
+                  style={{ background: i === TIMELINE.length - 1 ? C.green : C.mainBlue }} />
+                <div className="pb-2">
+                  <p className="font-bold text-sm mb-0.5" style={{ color: C.deepBlue }}>{item.title}</p>
+                  <p className="text-xs text-zinc-500 leading-relaxed">{item.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// --- 활동 갤러리 ---
+const GALLERY = [
+  { src: '/gallery/founding-ceremony.jpg', caption: '사단법인 창립총회 (2023.02)' },
+  { src: '/gallery/founding-ceremony2.jpg', caption: '창립총회 — 함께하는 사람들' },
+  { src: '/gallery/lecture-deaf.jpg', caption: '서울시농아인협회 의료강의' },
+  { src: '/gallery/mou-dagachi.jpg', caption: '다가치 MOU 체결 (2023.04)' },
+  { src: '/gallery/mou-dagachi2.jpg', caption: '다가치 업무협약식' },
+  { src: '/gallery/world-day1.jpg', caption: '인천 세계인의날 봉사 (2023.05)' },
+  { src: '/gallery/world-day2.jpg', caption: '세계인의날 — 다문화가정 현장상담' },
+  { src: '/gallery/world-day3.jpg', caption: '세계인의날 — 어린이 상담' },
+  { src: '/stories/mou-emergency.jpg', caption: '대한응급의학의사회 MOU' },
+  { src: '/stories/mou-deaf.jpg', caption: '서대문농아인복지관 MOU' },
+  { src: '/stories/general-meeting.jpg', caption: '해피닥터 정기총회' },
+  { src: '/stories/volunteer.jpg', caption: '행복한 의사 봉사활동' },
+]
+
+function GallerySection() {
+  const [selected, setSelected] = useState<number | null>(null)
+  return (
+    <section className="py-20 px-4" style={{ background: C.sky }}>
+      <div className="max-w-5xl mx-auto">
+        <h2 className="text-2xl md:text-3xl font-bold text-center mb-2" style={{ color: C.deepBlue }}>
+          Happy Doctor Story
+        </h2>
+        <p className="text-center text-sm mb-10 text-zinc-400">현장에서 함께한 순간들</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {GALLERY.map((g, i) => (
+            <button
+              key={i}
+              onClick={() => setSelected(i)}
+              className="rounded-xl overflow-hidden shadow-sm border border-zinc-100 bg-white group text-left"
+            >
+              <div className="aspect-square overflow-hidden bg-zinc-100">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={g.src} alt={g.caption}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+              </div>
+              <div className="p-2">
+                <p className="text-xs text-zinc-600 leading-snug">{g.caption}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 라이트박스 */}
+      {selected !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setSelected(null)}>
+          <div className="max-w-2xl w-full" onClick={e => e.stopPropagation()}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={GALLERY[selected].src} alt={GALLERY[selected].caption}
+              className="w-full rounded-xl shadow-2xl" />
+            <p className="text-white text-center text-sm mt-3 opacity-80">{GALLERY[selected].caption}</p>
+            <div className="flex justify-center gap-4 mt-4">
+              <button onClick={() => setSelected(Math.max(0, selected - 1))} disabled={selected === 0}
+                className="px-4 py-2 rounded-lg bg-white/20 text-white text-sm disabled:opacity-30">← 이전</button>
+              <button onClick={() => setSelected(null)}
+                className="px-4 py-2 rounded-lg bg-white/20 text-white text-sm">닫기</button>
+              <button onClick={() => setSelected(Math.min(GALLERY.length - 1, selected + 1))} disabled={selected === GALLERY.length - 1}
+                className="px-4 py-2 rounded-lg bg-white/20 text-white text-sm disabled:opacity-30">다음 →</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
+// --- Q&A 섹션 ---
+interface QAItem { idx: number; q: string; a: string; date: string }
 const PAGE_SIZE = 8
 
 function QASection() {
@@ -209,7 +390,6 @@ function QASection() {
   const filtered = allQA.filter(d => {
     if (!search.trim()) return true
     const kw = search.trim().toLowerCase()
-    // 질문 전체 + 답변에서 검색 (표시는 20자만)
     return d.q.toLowerCase().includes(kw) || d.a.toLowerCase().includes(kw)
   })
 
@@ -217,10 +397,10 @@ function QASection() {
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   function handleSearch(v: string) { setSearch(v); setPage(1); setExpanded(null) }
-  function handlePage(p: number) { setPage(p); setExpanded(null); }
+  function handlePage(p: number) { setPage(p); setExpanded(null) }
 
   return (
-    <section className="py-20 px-4" style={{ background: C.sky }}>
+    <section className="py-20 px-4 bg-white">
       <div className="max-w-3xl mx-auto">
         <h2 className="text-2xl md:text-3xl font-bold text-center mb-2" style={{ color: C.deepBlue }}>
           이런 상담을 도와드리고 있어요
@@ -231,15 +411,10 @@ function QASection() {
             : '다양한 증상과 상황에 대해 전문의가 답변드립니다'}
         </p>
 
-        {/* 검색 */}
         <div className="relative mb-6">
-          <input
-            type="text"
-            placeholder="증상이나 키워드로 검색..."
-            value={search}
+          <input type="text" placeholder="증상이나 키워드로 검색..." value={search}
             onChange={e => handleSearch(e.target.value)}
-            className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-3 pl-10 text-sm shadow-sm focus:outline-none"
-          />
+            className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-3 pl-10 text-sm shadow-sm focus:outline-none" />
           <svg className="absolute left-3 top-3.5 opacity-40" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
           </svg>
@@ -249,7 +424,6 @@ function QASection() {
         </div>
         {search && <p className="text-xs text-zinc-400 mb-4">&ldquo;{search}&rdquo; 검색 결과 {filtered.length}건</p>}
 
-        {/* 목록 */}
         {allQA.length === 0 ? (
           <div className="text-center py-16 text-zinc-400 text-sm">불러오는 중...</div>
         ) : paged.length === 0 ? (
@@ -263,11 +437,11 @@ function QASection() {
                 <div key={qa.idx} className="rounded-2xl overflow-hidden shadow-sm border border-zinc-100 bg-white">
                   <button
                     className="w-full text-left px-5 py-4 flex gap-3 items-center hover:bg-zinc-50 transition-colors"
-                    onClick={() => setExpanded(isOpen ? null : qa.idx)}
-                  >
+                    onClick={() => setExpanded(isOpen ? null : qa.idx)}>
                     <span className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: C.mainBlue }}>Q</span>
                     <p className="flex-1 text-sm font-medium text-zinc-700">{qPreview}</p>
-                    <svg className="shrink-0 transition-transform duration-200" style={{ transform: isOpen ? 'rotate(180deg)' : 'none', opacity: 0.4 }}
+                    <svg className="shrink-0 transition-transform duration-200"
+                      style={{ transform: isOpen ? 'rotate(180deg)' : 'none', opacity: 0.4 }}
                       width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M6 9l6 6 6-6"/>
                     </svg>
@@ -284,23 +458,22 @@ function QASection() {
           </div>
         )}
 
-        {/* 페이지네이션 */}
         {totalPages > 1 && (
           <div className="flex items-center justify-center gap-2 mt-8 flex-wrap">
-            <button onClick={() => handlePage(Math.max(1, page-1))} disabled={page===1}
+            <button onClick={() => handlePage(Math.max(1, page - 1))} disabled={page === 1}
               className="px-3 py-1.5 rounded-lg text-sm border border-zinc-200 bg-white disabled:opacity-40">←</button>
             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              const start = Math.max(1, Math.min(page-2, totalPages-4))
+              const start = Math.max(1, Math.min(page - 2, totalPages - 4))
               const p = start + i
               return (
                 <button key={p} onClick={() => handlePage(p)}
                   className="px-3 py-1.5 rounded-lg text-sm border font-medium transition"
-                  style={page===p ? {background:C.mainBlue,color:'#fff',borderColor:C.mainBlue} : {background:'#fff',borderColor:'#e4e4e7'}}>
+                  style={page === p ? { background: C.mainBlue, color: '#fff', borderColor: C.mainBlue } : { background: '#fff', borderColor: '#e4e4e7' }}>
                   {p}
                 </button>
               )
             })}
-            <button onClick={() => handlePage(Math.min(totalPages, page+1))} disabled={page===totalPages}
+            <button onClick={() => handlePage(Math.min(totalPages, page + 1))} disabled={page === totalPages}
               className="px-3 py-1.5 rounded-lg text-sm border border-zinc-200 bg-white disabled:opacity-40">→</button>
           </div>
         )}
@@ -317,35 +490,102 @@ function QASection() {
   )
 }
 
-function StoriesSection() {
+// --- 대표 소개 ---
+function CEOSection() {
   return (
-    <section className="py-20 px-4 bg-white">
-      <div className="max-w-4xl mx-auto">
+    <section className="py-20 px-4" style={{ background: C.sky }}>
+      <div className="max-w-3xl mx-auto">
         <h2 className="text-2xl md:text-3xl font-bold text-center mb-12" style={{ color: C.deepBlue }}>
-          Happy Doctor Story
+          대표 소개
         </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {STORIES.map((s) => (
-            <div key={s.title} className="rounded-2xl overflow-hidden shadow-sm border border-zinc-100">
-              <div className="aspect-square overflow-hidden bg-zinc-100">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={s.img}
-                  alt={s.title}
-                  className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                />
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+          <div className="flex flex-col md:flex-row">
+            {/* 사진 */}
+            <div className="shrink-0 md:w-52 bg-zinc-50 flex items-center justify-center p-8">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/ceo.png" alt="최석재 대표" className="w-36 h-36 md:w-40 md:h-40 object-cover rounded-full shadow" />
+            </div>
+            {/* 정보 */}
+            <div className="flex-1 p-8">
+              <div className="mb-4">
+                <h3 className="text-xl font-bold" style={{ color: C.deepBlue }}>최석재</h3>
+                <p className="text-sm text-zinc-500">응급의학과 전문의 · 행복한 의사 대표</p>
               </div>
-              <div className="p-3">
-                <p className="text-xs font-semibold text-zinc-700 leading-snug">{s.title}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-xs font-bold mb-1.5" style={{ color: C.mainBlue }}>현직</p>
+                  <ul className="space-y-0.5 text-zinc-600">
+                    <li>화홍병원 응급의학과 과장</li>
+                    <li>대한응급의학의사회 홍보이사</li>
+                  </ul>
+                </div>
+                <div>
+                  <p className="text-xs font-bold mb-1.5" style={{ color: C.mainBlue }}>학력 및 경력</p>
+                  <ul className="space-y-0.5 text-zinc-600">
+                    <li>가천대학교 의과대학 졸업</li>
+                    <li>가천대 길병원 수련의</li>
+                    <li>김포 뉴고려병원 응급의학과장</li>
+                    <li>이천 이엘리아병원 응급센터장</li>
+                  </ul>
+                </div>
+                <div>
+                  <p className="text-xs font-bold mb-1.5" style={{ color: C.mainBlue }}>저서</p>
+                  <ul className="space-y-0.5 text-zinc-600">
+                    <li>우리 아이 응급 주치의 (2020)</li>
+                    <li>응급실에 아는 의사가 생겼다 (2017)</li>
+                  </ul>
+                </div>
+                <div>
+                  <p className="text-xs font-bold mb-1.5" style={{ color: C.mainBlue }}>방송 출연</p>
+                  <ul className="space-y-0.5 text-zinc-600">
+                    <li>tvN 유 퀴즈 온 더 블럭 56회</li>
+                    <li>JTBC 나는 몸신이다 357회</li>
+                    <li>EBS 일단해봐요 생방송 외 다수</li>
+                  </ul>
+                </div>
+              </div>
+              <div className="mt-5 flex gap-3 flex-wrap">
+                <a href="https://blog.naver.com/csj3814" target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border font-medium hover:opacity-80 transition"
+                  style={{ borderColor: C.mainBlue, color: C.mainBlue }}>
+                  📝 네이버 블로그
+                </a>
+                <a href="https://www.youtube.com/@csj3814" target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border font-medium hover:opacity-80 transition"
+                  style={{ borderColor: '#FF0000', color: '#FF0000' }}>
+                  ▶ 유튜브 채널
+                </a>
               </div>
             </div>
-          ))}
+          </div>
         </div>
       </div>
     </section>
   )
 }
 
+// --- 자원봉사 의사 모집 ---
+function VolunteerSection() {
+  return (
+    <section className="py-16 px-4 text-white" style={{ background: C.deepBlue }}>
+      <div className="max-w-2xl mx-auto text-center">
+        <p className="text-2xl mb-3">👩‍⚕️</p>
+        <h2 className="text-xl md:text-2xl font-bold mb-3">함께할 의사 선생님을 찾습니다</h2>
+        <p className="text-sm leading-relaxed mb-6" style={{ opacity: 0.75 }}>
+          재능기부 형태로 참여하는 자원봉사 의료진을 모집합니다.<br />
+          여러분의 전문성이 의료 사각지대에 닿을 수 있습니다.
+        </p>
+        <a href="http://pf.kakao.com/_PxaTxhX/chat" target="_blank" rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 rounded-full px-7 py-3 text-sm font-bold transition hover:opacity-90"
+          style={{ background: '#fff', color: C.deepBlue }}>
+          참여 문의하기 →
+        </a>
+      </div>
+    </section>
+  )
+}
+
+// --- 후원 ---
 function DonateSection() {
   return (
     <section className="py-20 px-4 text-white" style={{ background: C.green }}>
@@ -370,6 +610,7 @@ function DonateSection() {
   )
 }
 
+// --- 푸터 ---
 function Footer() {
   return (
     <footer className="py-12 px-4 text-white" style={{ background: C.deepBlue }}>
@@ -386,32 +627,35 @@ function Footer() {
           <p>대표 최석재 (응급의학과 전문의)</p>
           <p>서울특별시 영등포구 선유로9길 10, skv1 616</p>
         </div>
-        <a
-          href="http://pf.kakao.com/_PxaTxhX/chat"
-          target="_blank"
-          rel="noopener noreferrer"
+        <a href="http://pf.kakao.com/_PxaTxhX/chat" target="_blank" rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold transition hover:opacity-80 shrink-0"
-          style={{ background: '#FEE500', color: '#3C1E1E' }}
-        >
+          style={{ background: '#FEE500', color: '#3C1E1E' }}>
           카카오 채널 바로가기
         </a>
       </div>
-      <div className="max-w-4xl mx-auto mt-8 pt-6 border-t text-xs text-center" style={{ borderColor: 'rgba(255,255,255,0.1)', opacity: 0.4 }}>
+      <div className="max-w-4xl mx-auto mt-8 pt-6 border-t text-xs text-center"
+        style={{ borderColor: 'rgba(255,255,255,0.1)', opacity: 0.4 }}>
         © 2024–2026 행복한 의사 / Happy Doctor. All rights reserved.
       </div>
     </footer>
   )
 }
 
+// ===== 메인 =====
 export default function HomePage() {
   return (
     <main>
       <Hero />
-      <Features />
+      <FoundingStory />
       <StatsSection />
+      <Features />
       <HowToSection />
+      <PartnersSection />
+      <TimelineSection />
+      <GallerySection />
       <QASection />
-      <StoriesSection />
+      <CEOSection />
+      <VolunteerSection />
       <DonateSection />
       <Footer />
     </main>
