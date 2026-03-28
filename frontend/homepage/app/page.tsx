@@ -501,7 +501,7 @@ function CEOSection() {
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
           <div className="flex flex-col md:flex-row">
             {/* 사진 */}
-            <div className="shrink-0 md:w-52 bg-zinc-50 flex items-center justify-center p-8">
+            <div className="shrink-0 md:w-52 flex items-center justify-center p-6" style={{ background: '#111' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/ceo.png" alt="최석재 대표" className="w-36 h-36 md:w-40 md:h-40 object-cover rounded-full shadow" />
             </div>
@@ -535,32 +535,57 @@ function CEOSection() {
                     <li>몸이 보내는 마지막 신호들 30 (2025)</li>
                     <li>우리 아이 응급 주치의 (2020)</li>
                     <li>응급실에 아는 의사가 생겼다 (2017)</li>
-                    <li>50대 이후 모르면 안되는 건강 지식한상 (공저)</li>
+                    <li>50대 이후 모르면 안되는 건강 지식한상</li>
                     <li>응급의학과 1막 22장, 개척자들 (공저)</li>
                   </ul>
                 </div>
                 <div>
                   <p className="text-xs font-bold mb-1.5" style={{ color: C.mainBlue }}>방송 출연</p>
                   <ul className="space-y-0.5 text-zinc-600">
-                    <li>MBC 기분좋은날 명사특강, 심뇌혈관질환 편 (2025)</li>
-                    <li>MBC 닥터스, 길병원 편 (2007)</li>
-                    <li>EBS 극한직업, 응급실 의사 편 (2008)</li>
-                    <li>KBS 생명최전선, 요셉의원 편 (2014)</li>
+                    <li>MBC 기분좋은날, 명사특강 (2025)</li>
+                    <li>SBS 빅퀘스천, 현대인과 암 (2024)</li>
                     <li>TvN 유퀴즈온더블록 (2020)</li>
-                    <li>SBS 빅퀘스천 (2024) 외 다수</li>
+                    <li>KBS 생명최전선, 요셉의원 (2014)</li>
+                    <li>EBS 극한직업, 응급실 의사 (2008)</li>
+                    <li>MBC 닥터스, 길병원 (2007) 등</li>
                   </ul>
                 </div>
               </div>
               <div className="mt-5 flex gap-3 flex-wrap">
-                <a href="https://blog.naver.com/csj3814" target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border font-medium hover:opacity-80 transition"
-                  style={{ borderColor: C.mainBlue, color: C.mainBlue }}>
-                  📝 네이버 블로그
-                </a>
                 <a href="https://www.youtube.com/@doctors0" target="_blank" rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border font-medium hover:opacity-80 transition"
                   style={{ borderColor: '#FF0000', color: '#FF0000' }}>
                   ▶ 건방진 닥터스
+                </a>
+                <a href="https://blog.naver.com/csj3814" target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border font-medium hover:opacity-80 transition"
+                  style={{ borderColor: C.mainBlue, color: C.mainBlue }}>
+                  📝 블로그
+                </a>
+                <a href="https://brunch.co.kr/@csj3814" target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border font-medium hover:opacity-80 transition"
+                  style={{ borderColor: '#FFCD00', color: '#7B6200' }}>
+                  ✍️ 브런치
+                </a>
+                <a href="https://www.instagram.com/csj3814/" target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border font-medium hover:opacity-80 transition"
+                  style={{ borderColor: '#E1306C', color: '#E1306C' }}>
+                  📸 인스타그램
+                </a>
+                <a href="https://www.threads.com/@csj3814" target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border font-medium hover:opacity-80 transition"
+                  style={{ borderColor: '#000', color: '#000' }}>
+                  🧵 쓰레드
+                </a>
+                <a href="https://habitschool.web.app/" target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border font-medium hover:opacity-80 transition"
+                  style={{ borderColor: C.green, color: C.green }}>
+                  🌱 해빛스쿨
+                </a>
+                <a href="https://product.kyobobook.co.kr/detail/S000218013730" target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border font-medium hover:opacity-80 transition"
+                  style={{ borderColor: '#666', color: '#666' }}>
+                  📚 책 구매
                 </a>
               </div>
             </div>
