@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 
 // BI 컬러
 const C = {
@@ -38,15 +38,13 @@ function useStats() {
   return stats
 }
 
-// --- Q&A 타입 ---
-interface QAItem { idx: number; q: string; a: string; date: string }
 
 // --- 활동 스토리 ---
 const STORIES = [
-  { title: '대한응급의학의사회 MOU', img: 'http://happydoctors.net/bbs/files//jb_30/17013099874575.jpg' },
-  { title: '해피닥터 정기총회', img: 'http://happydoctors.net/bbs/files//jb_30/17006303397931.jpg' },
-  { title: '서대문농아인복지관 MOU', img: 'http://happydoctors.net/bbs/files//jb_30/17006297534585.jpg' },
-  { title: '행복한 의사 봉사활동', img: 'http://happydoctors.net/bbs/files//jb_30/17006270873194.jpg' },
+  { title: '대한응급의학의사회 MOU', img: '/stories/mou-emergency.jpg' },
+  { title: '해피닥터 정기총회', img: '/stories/general-meeting.jpg' },
+  { title: '서대문농아인복지관 MOU', img: '/stories/mou-deaf.jpg' },
+  { title: '행복한 의사 봉사활동', img: '/stories/volunteer.jpg' },
 ]
 
 // ===== 섹션 컴포넌트 =====
@@ -194,158 +192,46 @@ function HowToSection() {
   )
 }
 
-const PAGE_SIZE = 10
+// 상담 유형 예시 — 실제 환자 정보 없이 카테고리만 표시
+const CONSULT_TYPES = [
+  { icon: '💊', label: '약물·복약 상담' },
+  { icon: '🦴', label: '정형외과·통증' },
+  { icon: '😴', label: '수면 장애' },
+  { icon: '🤒', label: '감염·발열' },
+  { icon: '🧠', label: '신경·정신건강' },
+  { icon: '🫀', label: '내과·소화기' },
+  { icon: '🩹', label: '외상·상처' },
+  { icon: '🌍', label: '해외 응급 상담' },
+]
 
-function QASection() {
-  const [allQA, setAllQA] = useState<QAItem[]>([])
-  const [search, setSearch] = useState('')
-  const [page, setPage] = useState(1)
-  const [expanded, setExpanded] = useState<number | null>(null)
-
-  useEffect(() => {
-    fetch('/qna.json').then(r => r.json()).then(setAllQA).catch(() => {})
-  }, [])
-
-  const filtered = useMemo(() => {
-    if (!search.trim()) return allQA
-    const kw = search.trim().toLowerCase()
-    return allQA.filter(d =>
-      d.q.toLowerCase().includes(kw) || d.a.toLowerCase().includes(kw)
-    )
-  }, [allQA, search])
-
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-
-  function handleSearch(v: string) {
-    setSearch(v)
-    setPage(1)
-    setExpanded(null)
-  }
-
+function ConsultSection() {
+  const stats = useStats()
   return (
     <section className="py-20 px-4" style={{ background: C.sky }}>
-      <div className="max-w-3xl mx-auto">
-        <h2 className="text-2xl md:text-3xl font-bold text-center mb-2" style={{ color: C.deepBlue }}>
+      <div className="max-w-3xl mx-auto text-center">
+        <h2 className="text-2xl md:text-3xl font-bold mb-2" style={{ color: C.deepBlue }}>
           이런 상담을 도와드리고 있어요
         </h2>
-        <p className="text-center text-sm mb-8 text-zinc-400">
-          실제 상담 사례 {allQA.length > 0 && <span>({allQA.length.toLocaleString()}건, 익명 처리)</span>}
+        <p className="text-sm mb-12 text-zinc-400">
+          {stats ? `지금까지 ${stats.total.toLocaleString()}건의 상담이 완료됐습니다` : '다양한 증상과 상황에 대해 전문의가 답변드립니다'}
         </p>
-
-        {/* 검색 */}
-        <div className="relative mb-6">
-          <input
-            type="text"
-            placeholder="증상이나 키워드로 검색..."
-            value={search}
-            onChange={e => handleSearch(e.target.value)}
-            className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-3 pl-10 text-sm shadow-sm focus:outline-none focus:ring-2"
-            style={{ '--tw-ring-color': C.mainBlue } as React.CSSProperties}
-          />
-          <svg className="absolute left-3 top-3.5 opacity-40" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-          </svg>
-          {search && (
-            <button onClick={() => handleSearch('')} className="absolute right-3 top-3 text-zinc-400 hover:text-zinc-600">
-              ✕
-            </button>
-          )}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-12">
+          {CONSULT_TYPES.map((t) => (
+            <div key={t.label} className="bg-white rounded-2xl px-4 py-5 shadow-sm flex flex-col items-center gap-2">
+              <span className="text-2xl">{t.icon}</span>
+              <span className="text-xs font-semibold text-zinc-600">{t.label}</span>
+            </div>
+          ))}
         </div>
-
-        {search && (
-          <p className="text-xs text-zinc-400 mb-4">
-            &quot;{search}&quot; 검색 결과 {filtered.length}건
-          </p>
-        )}
-
-        {/* Q&A 목록 */}
-        {allQA.length === 0 ? (
-          <div className="text-center py-16 text-zinc-400 text-sm">불러오는 중...</div>
-        ) : paged.length === 0 ? (
-          <div className="text-center py-16 text-zinc-400 text-sm">검색 결과가 없습니다.</div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {paged.map((qa) => (
-              <div key={qa.idx} className="rounded-2xl overflow-hidden shadow-sm border border-zinc-100 bg-white">
-                {/* 질문 - 클릭 시 답변 펼침 */}
-                <button
-                  className="w-full text-left px-5 py-4 flex gap-3 items-start hover:bg-zinc-50 transition-colors"
-                  onClick={() => setExpanded(expanded === qa.idx ? null : qa.idx)}
-                >
-                  <span className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold mt-0.5" style={{ background: C.mainBlue }}>Q</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-zinc-800 leading-relaxed">{qa.q}</p>
-                    {qa.date && <p className="text-xs text-zinc-400 mt-1">{qa.date}</p>}
-                  </div>
-                  <svg
-                    className="shrink-0 mt-1 transition-transform duration-200"
-                    style={{ transform: expanded === qa.idx ? 'rotate(180deg)' : 'rotate(0deg)', opacity: 0.4 }}
-                    width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                  >
-                    <path d="M6 9l6 6 6-6"/>
-                  </svg>
-                </button>
-                {/* 답변 */}
-                {expanded === qa.idx && (
-                  <div className="px-5 py-4 flex gap-3 border-t border-zinc-100" style={{ background: C.sky }}>
-                    <span className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold mt-0.5" style={{ background: C.green }}>A</span>
-                    <p className="text-sm text-zinc-700 leading-relaxed whitespace-pre-line">{qa.a}</p>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* 페이지네이션 */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2 mt-8">
-            <button
-              onClick={() => { setPage(p => Math.max(1, p-1)); setExpanded(null) }}
-              disabled={page === 1}
-              className="px-3 py-1.5 rounded-lg text-sm font-medium border border-zinc-200 bg-white disabled:opacity-40 hover:bg-zinc-50"
-            >
-              ←
-            </button>
-            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              const start = Math.max(1, Math.min(page - 2, totalPages - 4))
-              const p = start + i
-              return (
-                <button
-                  key={p}
-                  onClick={() => { setPage(p); setExpanded(null) }}
-                  className="px-3 py-1.5 rounded-lg text-sm font-medium border transition"
-                  style={page === p
-                    ? { background: C.mainBlue, color: '#fff', borderColor: C.mainBlue }
-                    : { background: '#fff', borderColor: '#e4e4e7' }
-                  }
-                >
-                  {p}
-                </button>
-              )
-            })}
-            <button
-              onClick={() => { setPage(p => Math.min(totalPages, p+1)); setExpanded(null) }}
-              disabled={page === totalPages}
-              className="px-3 py-1.5 rounded-lg text-sm font-medium border border-zinc-200 bg-white disabled:opacity-40 hover:bg-zinc-50"
-            >
-              →
-            </button>
-          </div>
-        )}
-
-        <div className="mt-10 text-center">
-          <a
-            href="http://pf.kakao.com/_PxaTxhX/chat"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-full px-7 py-3 text-sm font-bold text-white transition-all hover:opacity-90"
-            style={{ background: C.mainBlue }}
-          >
-            나도 상담받기 →
-          </a>
-        </div>
+        <a
+          href="http://pf.kakao.com/_PxaTxhX/chat"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 rounded-full px-7 py-3 text-sm font-bold text-white transition-all hover:opacity-90"
+          style={{ background: C.mainBlue }}
+        >
+          나도 상담받기 →
+        </a>
       </div>
     </section>
   )
@@ -445,7 +331,7 @@ export default function HomePage() {
       <Features />
       <StatsSection />
       <HowToSection />
-      <QASection />
+      <ConsultSection />
       <StoriesSection />
       <DonateSection />
       <Footer />
