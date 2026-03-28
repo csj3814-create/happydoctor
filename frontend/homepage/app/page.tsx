@@ -25,7 +25,7 @@ function LogoSVG({ size = 48, color = '#fff' }: { size?: number; color?: string 
 }
 
 // --- 통계 훅 ---
-interface Stats { total: number; escalated: number; completed: number }
+interface Stats { total: number; doctorReplied: number }
 
 function useStats() {
   const [stats, setStats] = useState<Stats | null>(null)
@@ -33,7 +33,7 @@ function useStats() {
     fetch('https://happydoctor.onrender.com/api/stats')
       .then(r => r.json())
       .then(setStats)
-      .catch(() => setStats({ total: 312, escalated: 0, completed: 0 }))
+      .catch(() => setStats({ total: 312, doctorReplied: 295 }))
   }, [])
   return stats
 }
@@ -127,21 +127,20 @@ function StatsSection() {
   const stats = useStats()
   const items = [
     { label: '누적 상담', value: stats?.total ?? null, unit: '건' },
-    { label: '전문의 직접 회신', value: stats?.escalated ?? null, unit: '건' },
-    { label: '상담 완료', value: stats?.completed ?? null, unit: '건' },
+    { label: '전문의 직접 회신', value: stats?.doctorReplied ?? null, unit: '건' },
   ]
   return (
     <section className="py-16 px-4 text-white" style={{ background: C.mainBlue }}>
       <div className="max-w-3xl mx-auto text-center">
         <p className="text-sm font-medium mb-10" style={{ opacity: 0.7 }}>지금까지 함께한 기록</p>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="flex justify-center gap-16 md:gap-24">
           {items.map((it) => (
             <div key={it.label}>
-              <div className="text-3xl md:text-5xl font-bold">
+              <div className="text-4xl md:text-6xl font-bold">
                 {it.value !== null ? it.value.toLocaleString() : <span className="opacity-30">—</span>}
-                <span className="text-base md:text-lg ml-1" style={{ opacity: 0.6 }}>{it.unit}</span>
+                <span className="text-lg md:text-xl ml-1" style={{ opacity: 0.6 }}>{it.unit}</span>
               </div>
-              <div className="text-xs mt-1" style={{ opacity: 0.6 }}>{it.label}</div>
+              <div className="text-xs mt-2" style={{ opacity: 0.6 }}>{it.label}</div>
             </div>
           ))}
         </div>

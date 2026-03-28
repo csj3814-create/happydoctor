@@ -49,13 +49,14 @@ app.get('/api/stats', async (req, res) => {
     const LEGACY_COMPLETED = 295; // 답변 완료 건수
     try {
         const db = dbService.getDb();
-        if (!db) return res.json({ total: LEGACY_TOTAL, escalated: 0, completed: LEGACY_COMPLETED });
+        if (!db) return res.json({ total: LEGACY_TOTAL, doctorReplied: LEGACY_COMPLETED });
         const snap = await db.collection('consultations').get();
         const docs = snap.docs.map(d => d.data());
+        // 행복한 의사의 모든 답변은 전문의 직접 답변이므로 완료 건수 = 전문의 직접 회신 건수
+        const newCompleted = docs.filter(d => d.status === 'COMPLETED').length;
         res.json({
             total: LEGACY_TOTAL + docs.length,
-            escalated: docs.filter(d => d.aiAction === 'ESCALATE').length,
-            completed: LEGACY_COMPLETED + docs.filter(d => d.status === 'COMPLETED').length
+            doctorReplied: LEGACY_COMPLETED + newCompleted
         });
     } catch (e) {
         console.error('[Stats Error]', e);
