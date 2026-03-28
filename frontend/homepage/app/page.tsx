@@ -62,7 +62,7 @@ function Hero() {
           <p className="mt-1 text-base md:text-lg font-medium" style={{ opacity: 0.7 }}>Happy Doctor</p>
         </div>
         <p className="text-xl md:text-2xl font-medium leading-relaxed" style={{ opacity: 0.92 }}>
-          동화 행복한 왕자 속 제비처럼, 필요한 곳에 닿는 의료
+          동화 행복한 왕자 속 제비처럼,<br />필요할 때 가까이 손 닿는 의료
         </p>
         <p className="text-sm md:text-base leading-relaxed max-w-md" style={{ opacity: 0.65 }}>
           의료 취약계층을 위한 무료 온라인 의료상담.<br />
