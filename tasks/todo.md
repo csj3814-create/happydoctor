@@ -24,7 +24,7 @@
 - [x] Configure parameter order: consent → gender → age → chief_complaint → onset → symptom_detail → nrs → associated_symptom → past_medical_history
 - [x] Remove location, symptom_image params (simplification)
 
-## Phase 4: Bug Fixes & Optimization (2026.03.14) ✅
+## Phase 4: Bug Fixes & Optimization ✅
 - [x] Fix Gemini JSON truncation (maxOutputTokens 1024→2048, add responseMimeType)
 - [x] Add JSON parse fallback (graceful error instead of crash)
 - [x] Add sys.* literal value sanitizer (onset "sys.date" → default value)
@@ -67,27 +67,56 @@
   - [x] 환자 목록 (미답변 / 답변 완료 / 상담 종료 탭)
   - [x] 최신순 정렬, COMPLETED 상담도 표시
   - [x] 환자 상세 차트 + 답변 입력
-- [x] CORS 미들웨어 순서 버그 수정 (/api/portal이 /api/ 전체차단에 덮어씌워지던 문제)
-- [x] 차트 알림에 포털 사용 안내 추가 (카카오 단톡방 → 포털 URL + 사용법)
+- [x] CORS 미들웨어 순서 버그 수정
+- [x] 차트 알림에 포털 사용 안내 추가
 - [x] HDT (Happy Doctor Token) 시스템
   - [x] 답변 전송 시 +100 HDT 자동 적립
   - [x] 환자 확인(seen) 시 +50 HDT 추가
   - [x] doctor_stats 컬렉션 (Firestore)
   - [x] 리더보드 탭 (🏆 순위 + 내 HDT 헤더 표시)
 
+## Phase 8-C: 공개 홈페이지 ✅ (2026.03.28)
+- [x] Next.js 홈페이지 신규 구축 (frontend/homepage)
+- [x] BI 디자인 적용 (메인블루 #185FA5, 딥블루 #0C447C, 스카이 #E6F1FB, 그린 #1D9E75)
+- [x] 섹션 구성 (13개):
+  - [x] Hero — 슬로건, 카카오 상담 CTA
+  - [x] 설립 이야기 — 행복한 왕자 제비 + 2020.10 설립 취지
+  - [x] 통계 — 누적 상담·전문의 회신(레거시 312건 포함)·잠재수혜인구 67,700명·MOU 6개
+  - [x] 서비스 소개 (Features)
+  - [x] 이용방법 (HowTo)
+  - [x] 협력기관 — MOU 6개 기관 카드
+  - [x] 활동 연혁 — 타임라인 2020~2026
+  - [x] 갤러리 — 12장 + 라이트박스
+  - [x] Q&A — 실제 상담 282건, 질문 앞 20자 + 전체 답변, 검색·페이지네이션
+  - [x] 대표 소개 — 최석재 원장 프로필·약력·저서·방송·SNS 7개 링크
+  - [x] 자원봉사 의사 모집
+  - [x] 후원 안내 (신한은행 100-034-864699)
+  - [x] Footer
+- [x] Q&A 282건 크롤링 (구 happydoctors.net)
+- [x] 활동사진 12장 정리 (창립총회·MOU·강의·봉사)
+- [x] 공개 /api/stats 엔드포인트 (레거시 312건 기본값 포함)
+- [x] Vercel 배포: https://homepage-five-fawn.vercel.app
+
 ## Phase 9: 잔여 과제
-- [ ] 카카오 오픈빌더 폴백 블록에 /kakao/check-doctor-reply 연결 (환자 재접속 시 의사 답변 전달)
-- [ ] 홈페이지(Phase 8-C) — 단체 소개 + 누적 상담 통계 + 기부 페이지
-- [ ] HDT 환자 확인(seen) 시 +50 HDT 트리거 연결 (현재 저장만, 지급 미연결)
-- [ ] MessengerBotR 공기계 스크립트 재컴파일 확인
+- [ ] **카카오 오픈빌더**: 폴백 블록 → `/kakao/check-doctor-reply` 연결 (환자 재접속 시 의사 답변 전달)
+  - 사용자가 "1번 했어"라고 했으나 실제 동작 확인 필요
+- [ ] **MessengerBotR** 공기계 스크립트 재컴파일 확인
+- [ ] **홈페이지 고도화** (우선순위 낮음):
+  - [ ] 도메인 연결 (happydoctors.net 또는 신규 도메인)
+  - [ ] 다국어 지원 (영어·베트남어·중국어)
+  - [ ] 의사 사진 — 동의 재취득 후 자원봉사 의사 소개 섹션 추가
+  - [ ] SEO: Q&A 정적 페이지 생성 (/qna/[idx])
+  - [ ] 언론보도 섹션 (동아일보 등 추가 보도 확보 시)
+  - [ ] 스크롤 fade-in 애니메이션
 
 ## Current Status
-- **Last updated**: 2026.03.26
-- **MVP Status**: Full triage + F/U + close + ESCALATE + 의사 포털 working ✅
+- **Last updated**: 2026.03.28
+- **MVP Status**: Full triage + F/U + close + ESCALATE + 의사 포털 + 공개 홈페이지 ✅
 - **Deployed at**:
-  - Backend: https://happydoctor.onrender.com (Render, main 브랜치)
-  - Frontend Portal: https://happydoctor.vercel.app (Vercel)
+  - Backend: https://happydoctor.onrender.com
+  - 의사 포털: https://happydoctor.vercel.app
+  - 공개 홈페이지: https://homepage-five-fawn.vercel.app
 - **GitHub**: https://github.com/csj3814-create/happydoctor
-- **Model**: gemini-2.5-flash (paid plan via 해빛스쿨)
-- **Kakao Channel**: http://pf.kakao.com/_PxaTxhX/chat
+- **Kakao 채널**: https://pf.kakao.com/_PxaTxhX
 - **Firebase**: happydoctor0 (Firestore logging active)
+- **Model**: gemini-2.5-flash (paid plan via 해빛스쿨)
