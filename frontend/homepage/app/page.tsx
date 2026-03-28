@@ -62,11 +62,11 @@ function Hero() {
           <p className="mt-1 text-base md:text-lg font-medium" style={{ opacity: 0.7 }}>Happy Doctor</p>
         </div>
         <p className="text-xl md:text-2xl font-medium leading-relaxed" style={{ opacity: 0.92 }}>
-          제비처럼, 필요한 곳에 닿는 의료
+          동화 행복한 왕자 속 제비처럼, 필요한 곳에 닿는 의료
         </p>
         <p className="text-sm md:text-base leading-relaxed max-w-md" style={{ opacity: 0.65 }}>
           의료 취약계층을 위한 무료 온라인 의료상담.<br />
-          응급의학과 전문의가 직접 답변합니다.
+          각 과 의료진이 직접 답변합니다.
         </p>
         <a
           href="http://pf.kakao.com/_PxaTxhX/chat"
@@ -91,7 +91,7 @@ function Hero() {
 function Features() {
   const items = [
     { icon: '🩺', title: '완전 무료', desc: '건강보험 없이도 누구나. 노숙자, 외국인, 다문화 가정 등 의료 접근이 어려운 모든 분들을 위한 서비스입니다.' },
-    { icon: '👨‍⚕️', title: '전문의 직접 답변', desc: '자원봉사 응급의학과 전문의 선생님들이 직접 검토하고 답변드립니다.' },
+    { icon: '👨‍⚕️', title: '전문의 직접 답변', desc: '자원봉사 각 과 의료진 선생님들이 직접 검토하고 답변드립니다.' },
     { icon: '⏱️', title: '8시간 이내 목표', desc: '긴급 상황에서도 최대한 빠르게. 8시간 이내 답변을 목표로 합니다.' },
     { icon: '🌍', title: '다국어 지원', desc: '모국어로 상담하세요. 한국어가 아니어도 괜찮습니다.' },
   ]
@@ -153,7 +153,7 @@ function HowToSection() {
   const steps = [
     { n: '01', title: '카카오 채널 접속', desc: '아래 버튼 또는 카카오톡에서 "행복한 의사"를 검색하세요.' },
     { n: '02', title: '증상 입력', desc: '나이, 성별, 주요 증상을 안내에 따라 입력합니다. 모국어로 작성해도 됩니다.' },
-    { n: '03', title: 'AI 예진 + 전문의 검토', desc: 'AI가 먼저 분석하고, 필요 시 응급의학과 전문의가 직접 답변합니다.' },
+    { n: '03', title: 'AI 예진 + 전문의 검토', desc: 'AI가 먼저 분석하고, 필요 시 각 과 의료진이 직접 답변합니다.' },
     { n: '04', title: '카카오톡으로 답변 수신', desc: '최대 8시간 이내 답변을 목표로 합니다. 추가 질문도 가능합니다.' },
   ]
   return (
@@ -385,7 +385,6 @@ function Footer() {
           <p>비영리법인 고유번호 111-82-67141</p>
           <p>대표 최석재 (응급의학과 전문의)</p>
           <p>서울특별시 영등포구 선유로9길 10, skv1 616</p>
-          <p>Donated by Mediinside.inc</p>
         </div>
         <a
           href="http://pf.kakao.com/_PxaTxhX/chat"
@@ -398,7 +397,7 @@ function Footer() {
         </a>
       </div>
       <div className="max-w-4xl mx-auto mt-8 pt-6 border-t text-xs text-center" style={{ borderColor: 'rgba(255,255,255,0.1)', opacity: 0.4 }}>
-        © 2024 행복한 의사 / Happy Doctor. All rights reserved.
+        © 2024–2026 행복한 의사 / Happy Doctor. All rights reserved.
       </div>
     </footer>
   )
