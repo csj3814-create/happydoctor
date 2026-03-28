@@ -501,7 +501,7 @@ function CEOSection() {
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
           <div className="flex flex-col md:flex-row">
             {/* 사진 */}
-            <div className="shrink-0 md:w-52 flex items-center justify-center p-6" style={{ background: '#111' }}>
+            <div className="shrink-0 md:w-52 bg-white flex items-center justify-center p-6">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/ceo.png" alt="최석재 대표" className="w-36 h-36 md:w-40 md:h-40 object-cover rounded-full shadow" />
             </div>
