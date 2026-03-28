@@ -40,6 +40,26 @@ app.use('/api/kakao', kakaoWebhookRoute);
 app.use('/api/messengerbot', messengerBotRoute);
 app.use('/api/portal', portalRoute);
 
+// Public stats endpoint (홈페이지용 — 인증 불필요)
+const dbService = require('./services/dbService');
+app.use('/api/stats', cors({ origin: '*', methods: ['GET', 'OPTIONS'] }));
+app.get('/api/stats', async (req, res) => {
+    try {
+        const db = dbService.getDb();
+        if (!db) return res.json({ total: 0, escalated: 0, completed: 0 });
+        const snap = await db.collection('consultations').get();
+        const docs = snap.docs.map(d => d.data());
+        res.json({
+            total: docs.length,
+            escalated: docs.filter(d => d.aiAction === 'ESCALATE').length,
+            completed: docs.filter(d => d.status === 'COMPLETED').length
+        });
+    } catch (e) {
+        console.error('[Stats Error]', e);
+        res.status(500).json({ error: 'stats error' });
+    }
+});
+
 // Health check (루트 경로)
 app.get('/', (req, res) => {
     res.send('<h1>Happy Doctor Chatbot Server is running.</h1>');
