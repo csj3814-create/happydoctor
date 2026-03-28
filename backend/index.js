@@ -44,15 +44,18 @@ app.use('/api/portal', portalRoute);
 const dbService = require('./services/dbService');
 app.use('/api/stats', cors({ origin: '*', methods: ['GET', 'OPTIONS'] }));
 app.get('/api/stats', async (req, res) => {
+    // happydoctors.net 기존 시스템 누적 건수 (2023~2025)
+    const LEGACY_TOTAL = 312;
+    const LEGACY_COMPLETED = 295; // 답변 완료 건수
     try {
         const db = dbService.getDb();
-        if (!db) return res.json({ total: 0, escalated: 0, completed: 0 });
+        if (!db) return res.json({ total: LEGACY_TOTAL, escalated: 0, completed: LEGACY_COMPLETED });
         const snap = await db.collection('consultations').get();
         const docs = snap.docs.map(d => d.data());
         res.json({
-            total: docs.length,
+            total: LEGACY_TOTAL + docs.length,
             escalated: docs.filter(d => d.aiAction === 'ESCALATE').length,
-            completed: docs.filter(d => d.status === 'COMPLETED').length
+            completed: LEGACY_COMPLETED + docs.filter(d => d.status === 'COMPLETED').length
         });
     } catch (e) {
         console.error('[Stats Error]', e);
