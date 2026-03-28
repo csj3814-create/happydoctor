@@ -456,6 +456,9 @@ router.post('/check-doctor-reply', async (req, res) => {
 
         if (pending) {
             await dbService.markReplyAsSeen(pending.id);
+            if (pending.doctorEmail) {
+                await dbService.awardHDT(pending.doctorEmail, pending.doctorName, dbService.HDT_SEEN, 'seen');
+            }
             const replyText =
                 `💬 담당 의사 선생님의 답변이 도착했습니다!\n\n` +
                 `👨‍⚕️ ${pending.doctorName}\n\n` +
