@@ -53,7 +53,7 @@ function Hero() {
           <p className="mt-1 text-base md:text-lg font-medium" style={{ opacity: 0.7 }}>Happy Doctor</p>
         </div>
         <p className="text-xl md:text-2xl font-medium leading-relaxed" style={{ opacity: 0.92 }}>
-          동화 행복한 왕자 속 제비처럼,<br />필요할 때 가까이 손 닿는 의료
+          동화 행복한 왕자 속 제비처럼<br />필요할 때 가까이 손 닿는 의료
         </p>
         <p className="text-sm md:text-base leading-relaxed max-w-md" style={{ opacity: 0.65 }}>
           의료 취약계층을 위한 무료 온라인 의료상담.<br />
@@ -99,7 +99,7 @@ function FoundingStory() {
             <p className="text-sm md:text-base text-zinc-600 leading-relaxed mb-4">
               동화 <em className="not-italic font-semibold" style={{ color: C.mainBlue }}>「행복한 왕자」</em> 속 제비는
               왕자의 금장식과 보석을 어려운 이웃들에게 전달하는 의로운 메신저였습니다.
-              행복한 의사는 그 제비처럼 의사 선생님의 손길이 필요한 곳에 닿게 하고자 합니다.
+              행복한 의사는 그 제비처럼, 의사 선생님의 손길이 필요한 곳에 닿게 하고자 합니다.
             </p>
             <p className="text-sm md:text-base text-zinc-600 leading-relaxed mb-4">
               코로나19 대유행은 계층 간·지역 간 의료 사각지대를 여실히 드러냈습니다.
@@ -515,9 +515,10 @@ function CEOSection() {
                 <div>
                   <p className="text-xs font-bold mb-1.5" style={{ color: C.mainBlue }}>현직</p>
                   <ul className="space-y-0.5 text-zinc-600">
-                    <li>베지닥터 상임이사</li>
                     <li>행복한 의사 Happy Doctor 대표</li>
+                    <li>습관학교 해빛스쿨 운영</li>
                     <li>유튜브 건방진 닥터스 채널 운영</li>
+                    <li>베지닥터 상임이사</li>
                   </ul>
                 </div>
                 <div>
@@ -531,14 +532,17 @@ function CEOSection() {
                 <div>
                   <p className="text-xs font-bold mb-1.5" style={{ color: C.mainBlue }}>저서</p>
                   <ul className="space-y-0.5 text-zinc-600">
-                    <li>응급실에 아는 의사가 생겼다 (2017)</li>
-                    <li>응급의학과 1막 22장, 개척자들 (공저)</li>
+                    <li>몸이 보내는 마지막 신호들 30 (2025)</li>
                     <li>우리 아이 응급 주치의 (2020)</li>
+                    <li>응급실에 아는 의사가 생겼다 (2017)</li>
+                    <li>50대 이후 모르면 안되는 건강 지식한상 (공저)</li>
+                    <li>응급의학과 1막 22장, 개척자들 (공저)</li>
                   </ul>
                 </div>
                 <div>
                   <p className="text-xs font-bold mb-1.5" style={{ color: C.mainBlue }}>방송 출연</p>
                   <ul className="space-y-0.5 text-zinc-600">
+                    <li>MBC 기분좋은날 명사특강, 심뇌혈관질환 편 (2025)</li>
                     <li>MBC 닥터스, 길병원 편 (2007)</li>
                     <li>EBS 극한직업, 응급실 의사 편 (2008)</li>
                     <li>KBS 생명최전선, 요셉의원 편 (2014)</li>
