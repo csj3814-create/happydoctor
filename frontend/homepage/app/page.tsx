@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 
 // BI 컬러
 const C = {
@@ -38,24 +38,8 @@ function useStats() {
   return stats
 }
 
-// --- 상담 예시 ---
-const QA_SAMPLES = [
-  {
-    q: '레보트론정(위장관운동조절제)와 아목크라건정625mg 함께 복용 가능한가요?',
-    a: '위장운동 조절제는 증상 완화제로, 약물 상호작용상 큰 문제는 없습니다. 다만 처방받은 약에 관해서는 처방 의사와 상의하시는 것이 맞습니다.',
-    tag: '약물 상담',
-  },
-  {
-    q: '20일째 잠을 못 자고 있는데, 병원 어디를 가야 하나요?',
-    a: '다른 원인이 없어 보인다면 정신건강의학과에서 상담하시면 도움 받으실 수 있습니다.',
-    tag: '수면 장애',
-  },
-  {
-    q: '아킬레스 부위가 찢어져 봉합 후 진물이 나고 통증이 있어요.',
-    a: '아킬레스건 자체는 이상 없이 피부만 봉합했다면 크게 걱정 않으셔도 됩니다. 진물이 지속되고 통증이 있다면 치료받은 병원을 한 번 더 방문해 확인하시길 권합니다.',
-    tag: '외상 상담',
-  },
-]
+// --- Q&A 타입 ---
+interface QAItem { idx: number; q: string; a: string; date: string }
 
 // --- 활동 스토리 ---
 const STORIES = [
@@ -210,31 +194,147 @@ function HowToSection() {
   )
 }
 
+const PAGE_SIZE = 10
+
 function QASection() {
+  const [allQA, setAllQA] = useState<QAItem[]>([])
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [expanded, setExpanded] = useState<number | null>(null)
+
+  useEffect(() => {
+    fetch('/qna.json').then(r => r.json()).then(setAllQA).catch(() => {})
+  }, [])
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return allQA
+    const kw = search.trim().toLowerCase()
+    return allQA.filter(d =>
+      d.q.toLowerCase().includes(kw) || d.a.toLowerCase().includes(kw)
+    )
+  }, [allQA, search])
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  function handleSearch(v: string) {
+    setSearch(v)
+    setPage(1)
+    setExpanded(null)
+  }
+
   return (
     <section className="py-20 px-4" style={{ background: C.sky }}>
       <div className="max-w-3xl mx-auto">
         <h2 className="text-2xl md:text-3xl font-bold text-center mb-2" style={{ color: C.deepBlue }}>
           이런 상담을 도와드리고 있어요
         </h2>
-        <p className="text-center text-sm mb-12 text-zinc-400">실제 상담 사례 (익명 처리)</p>
-        <div className="flex flex-col gap-5">
-          {QA_SAMPLES.map((qa, i) => (
-            <div key={i} className="rounded-2xl overflow-hidden shadow-sm border border-zinc-100">
-              <div className="px-5 py-4 flex gap-3 bg-white">
-                <span className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: C.mainBlue }}>Q</span>
-                <div className="flex-1 min-w-0">
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full inline-block mb-1.5" style={{ background: C.sky, color: C.mainBlue }}>{qa.tag}</span>
-                  <p className="text-sm font-medium text-zinc-800">{qa.q}</p>
-                </div>
-              </div>
-              <div className="px-5 py-4 flex gap-3" style={{ background: C.sky }}>
-                <span className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: C.green }}>A</span>
-                <p className="text-sm text-zinc-700 leading-relaxed">{qa.a}</p>
-              </div>
-            </div>
-          ))}
+        <p className="text-center text-sm mb-8 text-zinc-400">
+          실제 상담 사례 {allQA.length > 0 && <span>({allQA.length.toLocaleString()}건, 익명 처리)</span>}
+        </p>
+
+        {/* 검색 */}
+        <div className="relative mb-6">
+          <input
+            type="text"
+            placeholder="증상이나 키워드로 검색..."
+            value={search}
+            onChange={e => handleSearch(e.target.value)}
+            className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-3 pl-10 text-sm shadow-sm focus:outline-none focus:ring-2"
+            style={{ '--tw-ring-color': C.mainBlue } as React.CSSProperties}
+          />
+          <svg className="absolute left-3 top-3.5 opacity-40" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+          {search && (
+            <button onClick={() => handleSearch('')} className="absolute right-3 top-3 text-zinc-400 hover:text-zinc-600">
+              ✕
+            </button>
+          )}
         </div>
+
+        {search && (
+          <p className="text-xs text-zinc-400 mb-4">
+            &quot;{search}&quot; 검색 결과 {filtered.length}건
+          </p>
+        )}
+
+        {/* Q&A 목록 */}
+        {allQA.length === 0 ? (
+          <div className="text-center py-16 text-zinc-400 text-sm">불러오는 중...</div>
+        ) : paged.length === 0 ? (
+          <div className="text-center py-16 text-zinc-400 text-sm">검색 결과가 없습니다.</div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {paged.map((qa) => (
+              <div key={qa.idx} className="rounded-2xl overflow-hidden shadow-sm border border-zinc-100 bg-white">
+                {/* 질문 - 클릭 시 답변 펼침 */}
+                <button
+                  className="w-full text-left px-5 py-4 flex gap-3 items-start hover:bg-zinc-50 transition-colors"
+                  onClick={() => setExpanded(expanded === qa.idx ? null : qa.idx)}
+                >
+                  <span className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold mt-0.5" style={{ background: C.mainBlue }}>Q</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-zinc-800 leading-relaxed">{qa.q}</p>
+                    {qa.date && <p className="text-xs text-zinc-400 mt-1">{qa.date}</p>}
+                  </div>
+                  <svg
+                    className="shrink-0 mt-1 transition-transform duration-200"
+                    style={{ transform: expanded === qa.idx ? 'rotate(180deg)' : 'rotate(0deg)', opacity: 0.4 }}
+                    width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                  >
+                    <path d="M6 9l6 6 6-6"/>
+                  </svg>
+                </button>
+                {/* 답변 */}
+                {expanded === qa.idx && (
+                  <div className="px-5 py-4 flex gap-3 border-t border-zinc-100" style={{ background: C.sky }}>
+                    <span className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold mt-0.5" style={{ background: C.green }}>A</span>
+                    <p className="text-sm text-zinc-700 leading-relaxed whitespace-pre-line">{qa.a}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 페이지네이션 */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 mt-8">
+            <button
+              onClick={() => { setPage(p => Math.max(1, p-1)); setExpanded(null) }}
+              disabled={page === 1}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium border border-zinc-200 bg-white disabled:opacity-40 hover:bg-zinc-50"
+            >
+              ←
+            </button>
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              const start = Math.max(1, Math.min(page - 2, totalPages - 4))
+              const p = start + i
+              return (
+                <button
+                  key={p}
+                  onClick={() => { setPage(p); setExpanded(null) }}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium border transition"
+                  style={page === p
+                    ? { background: C.mainBlue, color: '#fff', borderColor: C.mainBlue }
+                    : { background: '#fff', borderColor: '#e4e4e7' }
+                  }
+                >
+                  {p}
+                </button>
+              )
+            })}
+            <button
+              onClick={() => { setPage(p => Math.min(totalPages, p+1)); setExpanded(null) }}
+              disabled={page === totalPages}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium border border-zinc-200 bg-white disabled:opacity-40 hover:bg-zinc-50"
+            >
+              →
+            </button>
+          </div>
+        )}
+
         <div className="mt-10 text-center">
           <a
             href="http://pf.kakao.com/_PxaTxhX/chat"
