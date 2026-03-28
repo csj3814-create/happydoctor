@@ -60,7 +60,7 @@ function Hero() {
           각 과 의료진이 직접 답변합니다.
         </p>
         <a
-          href="http://pf.kakao.com/_PxaTxhX/chat"
+          href="https://pf.kakao.com/_PxaTxhX/chat"
           target="_blank"
           rel="noopener noreferrer"
           className="mt-2 inline-flex items-center gap-2 rounded-full px-8 py-4 text-base font-bold shadow-lg transition-transform hover:scale-105 active:scale-95"
@@ -99,7 +99,7 @@ function FoundingStory() {
             <p className="text-sm md:text-base text-zinc-600 leading-relaxed mb-4">
               동화 <em className="not-italic font-semibold" style={{ color: C.mainBlue }}>「행복한 왕자」</em> 속 제비는
               왕자의 금장식과 보석을 어려운 이웃들에게 전달하는 의로운 메신저였습니다.
-              행복한 의사는 그 제비처럼, 의사 선생님의 손길이 필요한 곳에 닿고자 합니다.
+              행복한 의사는 그 제비처럼 의사 선생님의 손길이 필요한 곳에 닿게 하고자 합니다.
             </p>
             <p className="text-sm md:text-base text-zinc-600 leading-relaxed mb-4">
               코로나19 대유행은 계층 간·지역 간 의료 사각지대를 여실히 드러냈습니다.
@@ -213,7 +213,7 @@ function HowToSection() {
           ))}
         </div>
         <div className="mt-12 text-center">
-          <a href="http://pf.kakao.com/_PxaTxhX/chat" target="_blank" rel="noopener noreferrer"
+          <a href="https://pf.kakao.com/_PxaTxhX/chat" target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-2 rounded-full px-8 py-4 text-sm font-bold text-white transition-all hover:opacity-90 hover:scale-105"
             style={{ background: C.mainBlue }}>
             지금 바로 상담하기 →
@@ -270,7 +270,7 @@ const TIMELINE = [
   { year: '2023.02', title: '사단법인 창립총회', desc: '임의단체에서 비영리법인으로 전환. 자원봉사 의료진 16명 체제' },
   { year: '2023.04', title: '다가치 MOU', desc: '이주민 의료지원 체계 구축을 위한 협약 체결' },
   { year: '2023.05', title: '인천 세계인의날 봉사', desc: '다문화가정 대상 현장 의료상담 봉사 참여' },
-  { year: '2024', title: '카카오톡 채널 + AI 예진 도입', desc: '언제 어디서나 상담 가능한 AI 기반 스마트 의료상담 시스템 구축' },
+  { year: '2024–2026', title: '카카오톡 채널 + AI 예진 도입', desc: '언제 어디서나 상담 가능한 AI 기반 스마트 의료상담 시스템 구축' },
 ]
 
 function TimelineSection() {
@@ -316,7 +316,7 @@ const GALLERY = [
   { src: '/gallery/world-day3.jpg', caption: '세계인의날 — 어린이 상담' },
   { src: '/stories/mou-emergency.jpg', caption: '대한응급의학의사회 MOU' },
   { src: '/stories/mou-deaf.jpg', caption: '서대문농아인복지관 MOU' },
-  { src: '/stories/general-meeting.jpg', caption: '해피닥터 정기총회' },
+  { src: '/gallery/lecture-multicultural.jpg', caption: '부평구다문화가족센터 의료강의 (2023.11)' },
   { src: '/stories/volunteer.jpg', caption: '행복한 의사 봉사활동' },
 ]
 
@@ -479,7 +479,7 @@ function QASection() {
         )}
 
         <div className="mt-10 text-center">
-          <a href="http://pf.kakao.com/_PxaTxhX/chat" target="_blank" rel="noopener noreferrer"
+          <a href="https://pf.kakao.com/_PxaTxhX/chat" target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-2 rounded-full px-7 py-3 text-sm font-bold text-white transition-all hover:opacity-90"
             style={{ background: C.mainBlue }}>
             나도 상담받기 →
@@ -515,32 +515,35 @@ function CEOSection() {
                 <div>
                   <p className="text-xs font-bold mb-1.5" style={{ color: C.mainBlue }}>현직</p>
                   <ul className="space-y-0.5 text-zinc-600">
-                    <li>화홍병원 응급의학과 과장</li>
-                    <li>대한응급의학의사회 홍보이사</li>
+                    <li>베지닥터 상임이사</li>
+                    <li>행복한 의사 Happy Doctor 대표</li>
+                    <li>유튜브 건방진 닥터스 채널 운영</li>
                   </ul>
                 </div>
                 <div>
-                  <p className="text-xs font-bold mb-1.5" style={{ color: C.mainBlue }}>학력 및 경력</p>
+                  <p className="text-xs font-bold mb-1.5" style={{ color: C.mainBlue }}>전직</p>
                   <ul className="space-y-0.5 text-zinc-600">
+                    <li>대한응급의학의사회 홍보이사</li>
+                    <li>대한응급의학회 공보위원</li>
                     <li>가천대학교 의과대학 졸업</li>
-                    <li>가천대 길병원 수련의</li>
-                    <li>김포 뉴고려병원 응급의학과장</li>
-                    <li>이천 이엘리아병원 응급센터장</li>
                   </ul>
                 </div>
                 <div>
                   <p className="text-xs font-bold mb-1.5" style={{ color: C.mainBlue }}>저서</p>
                   <ul className="space-y-0.5 text-zinc-600">
-                    <li>우리 아이 응급 주치의 (2020)</li>
                     <li>응급실에 아는 의사가 생겼다 (2017)</li>
+                    <li>응급의학과 1막 22장, 개척자들 (공저)</li>
+                    <li>우리 아이 응급 주치의 (2020)</li>
                   </ul>
                 </div>
                 <div>
                   <p className="text-xs font-bold mb-1.5" style={{ color: C.mainBlue }}>방송 출연</p>
                   <ul className="space-y-0.5 text-zinc-600">
-                    <li>tvN 유 퀴즈 온 더 블럭 56회</li>
-                    <li>JTBC 나는 몸신이다 357회</li>
-                    <li>EBS 일단해봐요 생방송 외 다수</li>
+                    <li>MBC 닥터스, 길병원 편 (2007)</li>
+                    <li>EBS 극한직업, 응급실 의사 편 (2008)</li>
+                    <li>KBS 생명최전선, 요셉의원 편 (2014)</li>
+                    <li>TvN 유퀴즈온더블록 (2020)</li>
+                    <li>SBS 빅퀘스천 (2024) 외 다수</li>
                   </ul>
                 </div>
               </div>
@@ -550,10 +553,10 @@ function CEOSection() {
                   style={{ borderColor: C.mainBlue, color: C.mainBlue }}>
                   📝 네이버 블로그
                 </a>
-                <a href="https://www.youtube.com/@csj3814" target="_blank" rel="noopener noreferrer"
+                <a href="https://www.youtube.com/@doctors0" target="_blank" rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border font-medium hover:opacity-80 transition"
                   style={{ borderColor: '#FF0000', color: '#FF0000' }}>
-                  ▶ 유튜브 채널
+                  ▶ 건방진 닥터스
                 </a>
               </div>
             </div>
@@ -575,7 +578,7 @@ function VolunteerSection() {
           재능기부 형태로 참여하는 자원봉사 의료진을 모집합니다.<br />
           여러분의 전문성이 의료 사각지대에 닿을 수 있습니다.
         </p>
-        <a href="http://pf.kakao.com/_PxaTxhX/chat" target="_blank" rel="noopener noreferrer"
+        <a href="https://open.kakao.com/me/csj3814" target="_blank" rel="noopener noreferrer"
           className="inline-flex items-center gap-2 rounded-full px-7 py-3 text-sm font-bold transition hover:opacity-90"
           style={{ background: '#fff', color: C.deepBlue }}>
           참여 문의하기 →
@@ -627,7 +630,7 @@ function Footer() {
           <p>대표 최석재 (응급의학과 전문의)</p>
           <p>서울특별시 영등포구 선유로9길 10, skv1 616</p>
         </div>
-        <a href="http://pf.kakao.com/_PxaTxhX/chat" target="_blank" rel="noopener noreferrer"
+        <a href="https://pf.kakao.com/_PxaTxhX" target="_blank" rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold transition hover:opacity-80 shrink-0"
           style={{ background: '#FEE500', color: '#3C1E1E' }}>
           카카오 채널 바로가기
