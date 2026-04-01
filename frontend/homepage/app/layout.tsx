@@ -10,6 +10,7 @@ const notoSansKR = Noto_Sans_KR({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://happydoctor.co.kr"),
   title: "행복한 의사 | Happy Doctor",
   description: "제비처럼, 필요할 때 가까이 손 닿는 의료. 의료 취약계층을 위한 무료 온라인 의료상담 서비스.",
   keywords: "무료 의료상담, 행복한의사, 해피닥터, 응급의학과, 의료봉사",
@@ -18,6 +19,15 @@ export const metadata: Metadata = {
     description: "제비처럼, 필요할 때 가까이 손 닿는 의료",
     locale: "ko_KR",
     type: "website",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "행복한 의사 Happy Doctor" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: ["/og-image.png"],
+  },
+  icons: {
+    icon: "/app-icon.png",
+    apple: "/app-icon.png",
   },
 };
 
