@@ -199,18 +199,25 @@ function HowToSection() {
         <h2 className="text-2xl md:text-3xl font-bold text-center mb-12" style={{ color: C.deepBlue }}>
           이렇게 사용하세요
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-          {steps.map((s) => (
-            <div key={s.n} className="flex gap-4">
-              <div className="shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: C.mainBlue }}>
-                {s.n}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+            {steps.map((s) => (
+              <div key={s.n} className="flex gap-4">
+                <div className="shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: C.mainBlue }}>
+                  {s.n}
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm mb-1" style={{ color: C.deepBlue }}>{s.title}</h3>
+                  <p className="text-sm text-zinc-500 leading-relaxed">{s.desc}</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-bold text-sm mb-1" style={{ color: C.deepBlue }}>{s.title}</h3>
-                <p className="text-sm text-zinc-500 leading-relaxed">{s.desc}</p>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
+          <div className="flex justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/app-screenshot.png" alt="카카오 채팅 화면 예시"
+              className="w-44 md:w-52 rounded-2xl shadow-xl" />
+          </div>
         </div>
         <div className="mt-12 text-center">
           <a href="https://pf.kakao.com/_PxaTxhX/chat" target="_blank" rel="noopener noreferrer"
