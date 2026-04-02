@@ -193,3 +193,24 @@
 - [x] Redesign the homepage hero and section framing around stronger art direction
 - [x] Upgrade CTA, stats, gallery, and contact blocks so the page feels more premium and cohesive
 - [x] Verify with `npm run lint` and `npm run build` in `frontend/homepage`
+
+## Phase 12: Domain, Language, and Platform Direction (2026.04.02)
+
+### Strategy Decisions
+- [x] Decide Korean-first primary domain: `happydoctor.kr`
+- [x] Reserve `happydoctors.net` for future international expansion
+- [x] Choose one multilingual public site over two duplicate public homepages for now
+- [x] Choose web app / PWA as the first app direction
+- [x] Separate future product surfaces into homepage / app / portal
+
+### Documentation
+- [x] Record the domain and platform strategy in `docs/domain_platform_strategy.md`
+- [x] Update homepage canonical / metadata assumptions from temporary deployment URLs to the agreed production domain strategy
+- [x] Document final DNS / redirect tasks for domain cutover
+
+### Next Build Steps
+- [x] Refactor homepage structure for multilingual routing (`/ko`, `/en`)
+- [ ] Extract homepage copy/content into structured data for localization
+- [ ] Define `app.happydoctor.kr` scope and initial web app shell requirements
+- [ ] Define `portal.happydoctor.kr` cutover requirements
+- [ ] Plan redirect behavior for `happydoctors.net` during the pre-international stage

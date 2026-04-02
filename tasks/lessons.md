@@ -40,3 +40,9 @@
 - **Lesson**: Render 자동 배포 브랜치는 대시보드에서만 설정 가능. 이 프로젝트는 `claude/upbeat-tharp` 브랜치를 배포 중 → main 변경 시 양쪽 동시 push 필요: `git push origin main && git push origin main:claude/upbeat-tharp`
 - **Lesson**: curl로 한국어 JSON 테스트 시 인코딩 문제 발생 가능. `\uXXXX` 유니코드 이스케이프 사용 또는 `--data-binary @-` + echo 파이프 방식 사용.
 - **Lesson**: Render 배포 완료 확인은 헬스체크(/) 응답 변경 여부로 판단 (버전 스탬프 임시 추가 방법 유효).
+
+## Domain & Canonical URL
+- **Lesson**: Public homepage canonical should use the agreed primary brand domain (currently `happydoctor.kr`), not temporary Vercel deployment URLs like `*.vercel.app`.
+- **Lesson**: If the product strategy separates Korean-first branding from future global expansion, use `happydoctor.kr` as the Korean primary domain now and reserve `happydoctors.net` for a later international site, but do not run duplicate public homepages on both domains at the same time.
+- **Lesson**: For the current Happy Doctor strategy, prefer one multilingual public site under the primary domain instead of operating separate Korean and international homepages too early.
+- **Lesson**: Reserve subdomains by product surface early: homepage on the root domain, future web app on `app.*`, and doctor portal on `portal.*`.

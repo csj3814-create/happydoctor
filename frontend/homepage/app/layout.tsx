@@ -10,15 +10,23 @@ const notoSansKR = Noto_Sans_KR({
 })
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://homepage-five-fawn.vercel.app'),
+  metadataBase: new URL('https://happydoctor.kr'),
   title: '행복한 의사 | Happy Doctor',
   description: '제비처럼, 필요한 곳에 닿는 의료. 의료 취약계층을 위한 무료 온라인 의료상담 서비스.',
   keywords: '무료 의료상담, 행복한의사, 해피닥터, 응급의학과, 의료봉사, 카카오 의료상담',
+  alternates: {
+    canonical: '/ko',
+    languages: {
+      'ko-KR': '/ko',
+      'en-US': '/en',
+    },
+  },
   openGraph: {
     title: '행복한 의사 | Happy Doctor',
     description: '제비처럼, 필요한 곳에 닿는 의료',
     locale: 'ko_KR',
     type: 'website',
+    url: '/ko',
     images: [{ url: '/design/brand-og.png', width: 1200, height: 630, alt: '행복한 의사 Happy Doctor' }],
   },
   twitter: {
