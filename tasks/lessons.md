@@ -50,3 +50,4 @@
 ## Homepage UI
 - **Lesson**: Keep browser tab branding consistent by removing default template favicon files and explicitly wiring Happy Doctor icon assets in Next metadata/app icon files.
 - **Lesson**: In public Q&A lists, expose only a short question preview (about 50 characters) while keeping professional answers visible, to balance readability and privacy tone.
+- **Lesson**: Favicon readability depends on optical fill, not file size; use a tightly cropped icon variant for tab/browser contexts.

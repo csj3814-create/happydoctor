@@ -219,6 +219,7 @@
 
 ### Requested UI Adjustments
 - [x] Replace browser tab icon with Happy Doctor brand icon (remove Vercel default favicon path conflict)
+- [x] Rebuild favicon/icon with tighter logo crop so tab icon appears visually larger
 - [x] Adjust hero section so the main right visual block sits slightly lower
 - [x] Keep the hero headline and core description visually as single-line on desktop
 - [x] Move the Story section white overlay card so it does not cover the background tagline
