@@ -30,7 +30,7 @@ interface Stats { total: number; doctorReplied: number }
 function useStats() {
   const [stats, setStats] = useState<Stats | null>(null)
   useEffect(() => {
-    fetch('https://happydoctor.onrender.com/api/stats')
+    fetch('/api/stats')
       .then(r => r.json())
       .then(setStats)
       .catch(() => setStats({ total: 312, doctorReplied: 295 }))

@@ -1,87 +1,49 @@
 require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const rateLimit = require('express-rate-limit');
+
 const axios = require('axios');
 
-const kakaoWebhookRoute = require('./routes/kakaoWebhook');
-const messengerBotRoute = require('./routes/messengerBot');
-const portalRoute = require('./routes/portal');
+const { createApp } = require('./app');
+const followUpService = require('./services/followUpService');
+const { port, renderExternalUrl } = require('./config');
 
-const app = express();
-const port = process.env.PORT || 3000;
+const PING_INTERVAL_MS = 14 * 60 * 1000;
 
-// Middleware
-// /api/portal/* 는 의사 포털(브라우저)에서 호출하므로 CORS 허용 필요
-app.use('/api/portal', cors({
-    origin: process.env.PORTAL_ORIGIN || '*',
-    methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
-// 그 외 /api/* 는 서버간 호출이므로 CORS 차단 (portal 제외)
-app.use('/api/', (req, res, next) => {
-    if (req.path.startsWith('/portal')) return next();
-    cors({ origin: false })(req, res, next);
-});
-app.use(express.json());
-
-// Rate Limiting (분당 30회)
-const apiLimiter = rateLimit({
-    windowMs: 60 * 1000,
-    max: 30,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { version: "2.0", template: { outputs: [{ simpleText: { text: "처리량이 너무 많습니다. 잠시 후 시도해주세요." } }] } }
-});
-app.use('/api/', apiLimiter);
-
-// Routes
-app.use('/api/kakao', kakaoWebhookRoute);
-app.use('/api/messengerbot', messengerBotRoute);
-app.use('/api/portal', portalRoute);
-
-// Public stats endpoint (홈페이지용 — 인증 불필요)
-const dbService = require('./services/dbService');
-app.use('/api/stats', cors({ origin: '*', methods: ['GET', 'OPTIONS'] }));
-app.get('/api/stats', async (req, res) => {
-    // happydoctors.net 기존 시스템 누적 건수 (2023~2025)
-    const LEGACY_TOTAL = 312;
-    const LEGACY_COMPLETED = 295; // 답변 완료 건수
+function startKeepAlive() {
+  return setInterval(async () => {
     try {
-        const db = dbService.getDb();
-        if (!db) return res.json({ total: LEGACY_TOTAL, doctorReplied: LEGACY_COMPLETED });
-        const snap = await db.collection('consultations').get();
-        const docs = snap.docs.map(d => d.data());
-        // 행복한 의사의 모든 답변은 전문의 직접 답변이므로 완료 건수 = 전문의 직접 회신 건수
-        const newCompleted = docs.filter(d => d.status === 'COMPLETED').length;
-        res.json({
-            total: LEGACY_TOTAL + docs.length,
-            doctorReplied: LEGACY_COMPLETED + newCompleted
-        });
-    } catch (e) {
-        console.error('[Stats Error]', e);
-        res.status(500).json({ error: 'stats error' });
-    }
-});
-
-// Health check (루트 경로)
-app.get('/', (req, res) => {
-    res.send('<h1>Happy Doctor Chatbot Server is running.</h1>');
-});
-
-// Render 무료 서버 슬립 방지 (14분 간격 Ping)
-const PING_INTERVAL = 14 * 60 * 1000; // 14분
-setInterval(async () => {
-    try {
-        // Render에서 제공하는 외부 URL을 환경변수 또는 기본값으로 사용
-        const pingUrl = process.env.RENDER_EXTERNAL_URL || 'https://happydoctor.onrender.com';
-        await axios.get(pingUrl);
-        console.log(`[Keep-Alive] Pinged ${pingUrl} successfully to prevent sleeping.`);
+      await axios.get(renderExternalUrl);
+      console.log(`[Keep-Alive] Pinged ${renderExternalUrl} successfully to prevent sleeping.`);
     } catch (error) {
-        console.error(`[Keep-Alive Error] Failed to ping:`, error.message);
+      console.error('[Keep-Alive Error] Failed to ping:', error.message);
     }
-}, PING_INTERVAL);
+  }, PING_INTERVAL_MS);
+}
 
-app.listen(port, () => {
+async function startServer() {
+  const app = createApp();
+  const server = app.listen(Number(port), async () => {
     console.log(`Happy Doctor Chatbot Server listening on port ${port}`);
-});
+    try {
+      await followUpService.initialize();
+    } catch (error) {
+      console.error('[FollowUp Init Error]', error);
+    }
+  });
+
+  const keepAliveTimer = process.env.DISABLE_KEEP_ALIVE === 'true'
+    ? null
+    : startKeepAlive();
+
+  return { app, server, keepAliveTimer };
+}
+
+if (require.main === module) {
+  startServer().catch((error) => {
+    console.error('[Startup Error]', error);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = {
+  startServer,
+};
