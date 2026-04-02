@@ -43,19 +43,17 @@ function useStats() {
 function Hero() {
   return (
     <section
-      className="relative flex flex-col items-center justify-center min-h-screen text-white text-center px-4 py-24"
+      className="relative flex flex-col items-center justify-center min-h-screen text-white text-center px-4 py-16"
       style={{ background: `linear-gradient(155deg, ${C.deepBlue} 0%, ${C.mainBlue} 100%)` }}
     >
-      <div className="flex flex-col items-center gap-6 max-w-2xl">
-        <LogoSVG size={72} color="#fff" />
-        <div>
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight">행복한 의사</h1>
-          <p className="mt-1 text-base md:text-lg font-medium" style={{ opacity: 0.7 }}>Happy Doctor</p>
-        </div>
-        <p className="text-xl md:text-2xl font-medium leading-relaxed" style={{ opacity: 0.92 }}>
-          동화 행복한 왕자 속 제비처럼<br />필요할 때 가까이 손 닿는 의료
-        </p>
-        <p className="text-sm md:text-base leading-relaxed max-w-md" style={{ opacity: 0.65 }}>
+      <div className="flex flex-col items-center gap-6 w-full max-w-3xl">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/header-banner.png"
+          alt="행복한 의사 Happy Doctor"
+          className="w-full rounded-2xl shadow-2xl"
+        />
+        <p className="text-sm md:text-base leading-relaxed max-w-md" style={{ opacity: 0.75 }}>
           의료 취약계층을 위한 무료 온라인 의료상담.<br />
           각 과 의료진이 직접 답변합니다.
         </p>
@@ -86,10 +84,13 @@ function FoundingStory() {
       <div className="max-w-3xl mx-auto">
         <div className="flex flex-col md:flex-row gap-10 items-center">
           <div className="shrink-0 flex flex-col items-center gap-3">
-            <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl"
-              style={{ background: C.sky }}>
-              🐦
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/chatbot-character.png"
+              alt="행복한 의사 캐릭터"
+              className="w-20 h-20 rounded-full object-contain"
+              style={{ background: C.sky, padding: '8px' }}
+            />
             <p className="text-xs font-semibold text-center" style={{ color: C.mainBlue }}>2020.10 설립</p>
           </div>
           <div>
@@ -112,6 +113,12 @@ function FoundingStory() {
             </p>
           </div>
         </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/brand-banner.png"
+          alt="행복한 의사 AI 의료 상담 봉사"
+          className="w-full rounded-xl mt-8 shadow-md"
+        />
       </div>
     </section>
   )
