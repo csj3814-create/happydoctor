@@ -231,3 +231,13 @@
 ### Verification
 - [x] `frontend/homepage`: `npm run lint`
 - [x] `frontend/homepage`: `npm run build`
+
+## Phase 14: happydoctors.net Vercel Cutover + Cafe24 Hosting Sunset (2026.04.02)
+
+### Build
+- [x] Add host-based redirect so `happydoctors.net` traffic lands on `https://happydoctor.kr/en`
+- [x] Document domain cutover steps that allow Cafe24 hosting cancellation without service break
+
+### Verification
+- [x] `frontend/homepage`: `npm run lint`
+- [x] `frontend/homepage`: `npm run build`

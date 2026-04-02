@@ -65,6 +65,14 @@ Use values exactly as shown in Vercel domain settings.
 - [ ] `http://www.happydoctors.net` -> `https://happydoctor.kr`
 - [ ] `https://www.happydoctors.net` -> `https://happydoctor.kr`
 
+### Expansion Domain to English Entry
+
+If product policy is "international traffic enters via `/en`":
+
+- [ ] In Vercel domain UI, set domain-level redirect target to `happydoctor.kr` (domain only, no `/en` path)
+- [ ] In app-level proxy (`proxy.ts`), redirect requests with host `happydoctors.net` / `www.happydoctors.net` to `https://happydoctor.kr/en`
+- [ ] Verify query params (UTM) are preserved to `/en`
+
 ## Content/SEO Validation
 
 - [ ] Confirm canonical URLs resolve to `https://happydoctor.kr/ko` and `https://happydoctor.kr/en`
@@ -88,3 +96,14 @@ If critical issue appears after cutover:
 - [ ] Temporarily rollback DNS records to previous known-good host
 - [ ] Keep HTTPS redirect behavior deterministic during rollback
 - [ ] Log root cause and re-run this checklist before next cutover attempt
+
+## Cafe24 Hosting Sunset (When Domain Works on Vercel)
+
+If you plan to stop paid Cafe24 web hosting:
+
+- [ ] Confirm `happydoctors.net` and `www.happydoctors.net` both resolve to Vercel records
+- [ ] Confirm `https://happydoctors.net` and `https://www.happydoctors.net` redirect correctly
+- [ ] Keep only required DNS records for mail if still needed (MX/TXT)
+- [ ] Remove legacy web A/CNAME records pointing to old Cafe24 web server
+- [ ] Take final backup/screenshot/export from Cafe24 hosting before cancellation
+- [ ] Cancel Cafe24 hosting product after 24-48h stable monitoring
