@@ -20,6 +20,8 @@ interface QAItem {
   date: string
 }
 
+const QUESTION_PREVIEW_LIMIT = 50
+
 const HERO_BADGES = ['무료 의료상담', '다국어 지원', '전문의 직접 검토']
 
 const HERO_POINTS = [
@@ -148,6 +150,11 @@ function useQA() {
   return items
 }
 
+function truncateQuestion(text: string, maxLength = QUESTION_PREVIEW_LIMIT) {
+  if (text.length <= maxLength) return text
+  return `${text.slice(0, maxLength).trimEnd()}…`
+}
+
 function SectionHeading({
   eyebrow,
   title,
@@ -243,12 +250,11 @@ function Hero({ stats }: { stats: Stats | null }) {
               ))}
             </div>
 
-            <h1 className="text-4xl font-bold leading-tight md:text-6xl md:leading-[1.08]">
+            <h1 className="text-4xl font-bold leading-tight md:text-5xl md:leading-[1.08] xl:whitespace-nowrap">
               제비처럼, 필요한 곳에 닿는 의료
             </h1>
-            <p className="mt-6 max-w-xl text-base leading-8 text-white/78 md:text-lg">
-              행복한 의사는 의료 취약계층을 위한 무료 온라인 의료상담 서비스입니다.
-              AI 인턴 보듬이와 자원봉사 의료진이 함께 움직이며, 더 빨리 더 쉽게 도움에 닿도록 돕습니다.
+            <p className="mt-6 text-sm leading-7 text-white/78 md:text-base md:leading-8 xl:whitespace-nowrap">
+              행복한 의사는 의료 취약계층을 위한 무료 온라인 의료상담 서비스입니다. AI 인턴 보듬이와 자원봉사 의료진이 함께 움직이며, 더 빨리 더 쉽게 도움에 닿도록 돕습니다.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -268,7 +274,7 @@ function Hero({ stats }: { stats: Stats | null }) {
             </div>
           </div>
 
-          <div className="relative">
+          <div className="relative lg:translate-y-8">
             <div className="mesh-panel overflow-hidden rounded-[2rem] border border-white/14 p-3 shadow-[0_40px_90px_rgba(3,15,30,0.35)]">
               <div className="relative aspect-[16/11] overflow-hidden rounded-[1.5rem]">
                 <Image
@@ -375,7 +381,7 @@ function StorySection() {
             </div>
           </div>
 
-          <div className="lift-card absolute -bottom-6 left-6 max-w-xs rounded-[1.5rem] bg-white p-5 shadow-xl shadow-slate-900/10">
+          <div className="lift-card absolute -bottom-14 left-4 max-w-sm rounded-[1.5rem] bg-white p-5 shadow-xl shadow-slate-900/10 md:-bottom-16 md:left-8">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-700">Since 2020.10</p>
             <p className="mt-2 text-lg font-semibold text-slate-900">봉사와 AI가 만나는 새로운 의료 접근성</p>
             <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -752,7 +758,7 @@ function QASection() {
                       Q
                     </span>
                     <div className="flex-1">
-                      <p className="text-sm font-semibold text-slate-900 md:text-base">{item.q}</p>
+                      <p className="text-sm font-semibold text-slate-900 md:text-base">{truncateQuestion(item.q)}</p>
                       <p className="mt-1 text-xs text-slate-400">{item.date}</p>
                     </div>
                     <svg
