@@ -17,3 +17,72 @@ body {
   color: var(--foreground);
   font-family: 'Noto Sans KR', sans-serif;
 }
+
+main {
+  isolation: isolate;
+}
+
+.section-shell {
+  position: relative;
+  padding: 5.5rem 0;
+}
+
+.hero-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(70px);
+  pointer-events: none;
+}
+
+.glass-card {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.07));
+  box-shadow: 0 22px 45px rgba(5, 18, 34, 0.18);
+  backdrop-filter: blur(16px);
+}
+
+.mesh-panel {
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.18), transparent 35%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  backdrop-filter: blur(18px);
+}
+
+.stat-card {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 1.75rem;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1.5rem;
+  box-shadow: 0 22px 45px rgba(5, 18, 34, 0.18);
+  backdrop-filter: blur(16px);
+}
+
+.lift-card {
+  transition: transform 220ms ease, box-shadow 220ms ease;
+}
+
+.lift-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+}
+
+.floating-chip {
+  animation: floatY 5.4s ease-in-out infinite;
+}
+
+@keyframes floatY {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@media (max-width: 767px) {
+  .section-shell {
+    padding: 4.25rem 0;
+  }
+}
