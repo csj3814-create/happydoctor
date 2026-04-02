@@ -53,7 +53,7 @@ router.post('/triage-complete', async (req, res) => {
         // confirm 파라미터 처리: "다시" → 세션 초기화 후 재시작 안내, "종료" → 상담 종료
         const confirm = (merged.confirm || '').toString().trim();
         if (confirm === '다시') {
-            followUpService.resetSession(userId);
+            await followUpService.resetSession(userId);
             return res.status(200).json({
                 version: "2.0",
                 template: {
@@ -63,7 +63,7 @@ router.post('/triage-complete', async (req, res) => {
             });
         }
         if (confirm === '종료') {
-            followUpService.resetSession(userId);
+            await followUpService.resetSession(userId);
             return res.status(200).json({
                 version: "2.0",
                 template: {
@@ -109,7 +109,7 @@ router.post('/triage-complete', async (req, res) => {
 
         // 대기 중인 F/U 질문이 있으면 새 상담 대신 F/U 질문을 먼저 표시
         // ※ resetSession() 호출 전에 체크해야 pending 플래그가 살아있음
-        const pendingFU = followUpService.consumePendingFollowUp(userId);
+        const pendingFU = await followUpService.consumePendingFollowUp(userId);
         if (pendingFU) {
             console.log(`[F/U Pending] ${userId} — 대기 중인 F/U 질문 전달`);
             return res.status(200).json({
@@ -122,7 +122,7 @@ router.post('/triage-complete', async (req, res) => {
 
         // 새로운 상담 시작: 이전 상담 상태(타이머 등) 초기화
         // ※ consumePendingFollowUp() 이후에 호출해야 pending 플래그가 유지됨
-        followUpService.resetSession(userId);
+        await followUpService.resetSession(userId);
 
         if (callbackUrl) {
             // 콜백 모드: 대기 메시지 먼저 반환 후 비동기 처리
@@ -195,10 +195,10 @@ async function processTriageSync(userId, patientData) {
         if (analysisResult.action === 'AUTONOMOUS_REPLY') {
             finalResponseText = analysisResult.replyToPatient;
             const fallbackChart = `[최초 자동 해결된 경증 환자]\n증상: ${patientData.cc}\n증상점수: ${patientData.nrs}`;
-            followUpService.scheduleFollowUp(userId, fallbackChart, 15);
+            await followUpService.scheduleFollowUp(userId, fallbackChart, 15);
         } else {
             enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId).catch(e => console.error('[Enqueue Error]', e));
-            followUpService.scheduleFollowUp(userId, analysisResult.soapChartForDoctor, 15);
+            await followUpService.scheduleFollowUp(userId, analysisResult.soapChartForDoctor, 15);
             finalResponseText = analysisResult.replyToPatient +
                 "\n\n🩺 차트를 담당 전문의 선생님께\n보고드렸습니다.\n진료 틈틈이 확인 후 이곳으로\n직접 답변드릴 예정입니다.\n잠시만 대기해 주세요.\n(힘드시면 지체 없이 119!)";
         }
@@ -232,10 +232,10 @@ async function processTriageAsync(callbackUrl, userId, patientData) {
         if (analysisResult.action === 'AUTONOMOUS_REPLY') {
             finalResponseText = analysisResult.replyToPatient;
             const fallbackChart = `[최초 자동 해결된 경증 환자]\n증상: ${patientData.cc}\n증상점수: ${patientData.nrs}`;
-            followUpService.scheduleFollowUp(userId, fallbackChart, 15);
+            await followUpService.scheduleFollowUp(userId, fallbackChart, 15);
         } else {
             enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId).catch(e => console.error('[Enqueue Error]', e));
-            followUpService.scheduleFollowUp(userId, analysisResult.soapChartForDoctor, 15);
+            await followUpService.scheduleFollowUp(userId, analysisResult.soapChartForDoctor, 15);
             finalResponseText = analysisResult.replyToPatient +
                 "\n\n🩺 차트를 담당 전문의 선생님께\n보고드렸습니다.\n진료 틈틈이 확인 후 이곳으로\n직접 답변드릴 예정입니다.\n잠시만 대기해 주세요.\n(힘드시면 지체 없이 119!)";
         }
@@ -301,7 +301,7 @@ router.post('/fu-reply', async (req, res) => {
         const additionalSymptom = params.additional_symptom || '특이사항 없음';
 
         // 1. 기존 차트 가져오기
-        const originalChart = followUpService.getOriginalChart(userId);
+        const originalChart = await followUpService.getOriginalChart(userId);
 
         // 세션 만료 또는 기록 없는 경우 — Gemini 호출 없이 안내 메시지 반환
         if (!originalChart || originalChart === '이전 차트 기록 없음') {
@@ -329,7 +329,7 @@ router.post('/fu-reply', async (req, res) => {
             finalResponseText += "\n\n⚠️ 담당 전문의 선생님께\n긴급으로 재보고 드렸습니다.\n잠시 대기해 주세요.\n힘드시면 지체 없이 119!";
         } else {
              // 상황 유지/호전 시 F/U 타이머를 1시간 뒤로 연장 (선택사항)
-             followUpService.scheduleFollowUp(userId, originalChart, 60); 
+             await followUpService.scheduleFollowUp(userId, originalChart, 60); 
         }
 
         // [추가] 4. F/U 내역에 대한 상태 점검 기록을 추후 홈페이지 조회를 위해 DB에 병합
@@ -361,11 +361,11 @@ router.post('/fu-reply', async (req, res) => {
  * - F/U 타이머 및 세션 초기화
  * - 따뜻한 중단 안내 메시지 반환
  */
-router.post('/cancel-triage', (req, res) => {
+router.post('/cancel-triage', async (req, res) => {
     const userId = req.body.userRequest?.user?.id || 'kakao_user_unknown';
     console.log(`[Cancel Triage] ${userId} — 예진 도중 중단 요청`);
 
-    followUpService.resetSession(userId);
+    await followUpService.resetSession(userId);
 
     return res.status(200).json({
         version: "2.0",
@@ -379,7 +379,7 @@ router.post('/cancel-triage', (req, res) => {
 });
 
 // 테스트용: F/U 타이머를 수동으로 즉시 실행 (개발/테스트 환경에서만 사용)
-router.post('/test-trigger-fu', (req, res) => {
+router.post('/test-trigger-fu', async (req, res) => {
     // MESSENGER_API_KEY로 인증 — 설정되지 않으면 항상 거부
     const apiKey = req.headers['x-api-key'];
     const validKey = process.env.MESSENGER_API_KEY;
@@ -390,7 +390,7 @@ router.post('/test-trigger-fu', (req, res) => {
     const { userId } = req.body;
     if (!userId) return res.status(400).json({ error: 'userId required' });
 
-    followUpService.executeFollowUpPush(userId);
+    await followUpService.executeFollowUpPush(userId);
     res.status(200).json({ ok: true, message: `F/U push triggered for ${userId}` });
 });
 
@@ -410,7 +410,7 @@ router.post('/close-consultation', async (req, res) => {
         console.log(`[Close Consultation] ${userId}, reason: ${reason}`);
 
         // 1) F/U 타이머 및 대기 데이터 삭제
-        followUpService.cancelFollowUp(userId);
+        await followUpService.cancelFollowUp(userId);
 
         // 2) DB 상태 업데이트
         dbService.closeConsultation(userId, reason).catch(err => console.error('DB Close Error:', err));

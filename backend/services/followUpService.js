@@ -1,144 +1,210 @@
-// 추적 관찰(F/U) 일정을 관리하는 클래스 기반 서비스 모의 구현
-// 실제 운영 환경에서는 Node-Cron, Redis, RabbitMQ 등으로 내구성을 보장해야 합니다.
-
 const { enqueueDoctorNotification } = require('./notifyService');
+const dbService = require('./dbService');
 
 class FollowUpService {
-    constructor() {
-        this.timers = new Map();
-        // userId -> { chart: string, lastActiveAt: Date, createdAt: Date }
-        this.patientDataStore = new Map(); // F/U 비교를 위해 환자의 1차 차트를 임시 보관
-        this.pendingFollowUps = new Map(); // 환자가 재접속 시 F/U 질문을 전달하기 위한 대기 플래그
+  constructor() {
+    this.timers = new Map();
+    this.memorySessions = new Map();
+    this.sessionExpiryMs = 30 * 60 * 1000;
+    this.absoluteExpiryMs = 2 * 60 * 60 * 1000;
+  }
 
-        // 슬라이딩 만료: 마지막 접근 후 30분 비활성 시 만료
-        this.SESSION_EXPIRY_MS = 30 * 60 * 1000; // 30분
-        // 절대 만료: 상담 생성 후 최대 2시간이 지나면 무조건 만료 (무한 연장 방지)
-        this.SESSION_ABSOLUTE_EXPIRY_MS = 2 * 60 * 60 * 1000; // 2시간
+  async initialize() {
+    const sessions = await dbService.getScheduledFollowUpSessions();
+    for (const session of sessions) {
+      const dueAt = this.toDate(session.dueAt);
+      if (!dueAt) continue;
+      this.scheduleLocalTimer(session.userId, dueAt);
+    }
+  }
+
+  toDate(value) {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    if (typeof value.toDate === 'function') return value.toDate();
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  scheduleLocalTimer(userId, dueAt) {
+    this.clearLocalTimer(userId);
+
+    const delayMs = Math.max(0, dueAt.getTime() - Date.now());
+    const timerId = setTimeout(() => {
+      this.executeFollowUpPush(userId).catch((error) => {
+        console.error('[F/U Timer Error]', error);
+      });
+    }, delayMs);
+
+    this.timers.set(userId, timerId);
+  }
+
+  clearLocalTimer(userId) {
+    if (!this.timers.has(userId)) return;
+    clearTimeout(this.timers.get(userId));
+    this.timers.delete(userId);
+  }
+
+  async scheduleFollowUp(userId, originalSoapChart, delayMinutes = 15) {
+    const now = new Date();
+    const dueAt = new Date(now.getTime() + delayMinutes * 60 * 1000);
+
+    this.memorySessions.set(userId, {
+      userId,
+      chart: originalSoapChart,
+      createdAt: now,
+      lastActiveAt: now,
+      dueAt,
+      status: 'scheduled',
+      pendingMessage: null,
+      pendingCreatedAt: null,
+    });
+
+    await dbService.saveFollowUpSession(userId, {
+      chart: originalSoapChart,
+      createdAt: now,
+      lastActiveAt: now,
+      dueAt,
+      status: 'scheduled',
+      pendingMessage: null,
+      pendingCreatedAt: null,
+    });
+
+    this.scheduleLocalTimer(userId, dueAt);
+    console.log(`[Follow-Up Scheduled] ${userId} follow-up in ${delayMinutes} minutes.`);
+  }
+
+  async loadSession(userId) {
+    const persisted = await dbService.getFollowUpSession(userId);
+    if (persisted) {
+      const normalized = {
+        ...persisted,
+        createdAt: this.toDate(persisted.createdAt),
+        lastActiveAt: this.toDate(persisted.lastActiveAt),
+        dueAt: this.toDate(persisted.dueAt),
+        pendingCreatedAt: this.toDate(persisted.pendingCreatedAt),
+      };
+      this.memorySessions.set(userId, normalized);
+      return normalized;
     }
 
-    /**
-     * 1차 상담이 완료된 후, 설정된 시간 뒤에 카카오 알림톡(Event API 대체)으로 연락하도록 스케줄링.
-     */
-    scheduleFollowUp(userId, originalSoapChart, delayMinutes = 15) {
-        if (this.timers.has(userId)) {
-            clearTimeout(this.timers.get(userId));
-        }
+    return this.memorySessions.get(userId) || null;
+  }
 
-        // 1차 차트 보관 (세션 만료 타임스탬프 포함)
-        this.patientDataStore.set(userId, {
-            chart: originalSoapChart,
-            createdAt: new Date(),
-            lastActiveAt: new Date()
-        });
+  isExpired(session) {
+    if (!session) return true;
 
-        const delayMs = delayMinutes * 60 * 1000;
-        console.log(`[Follow-Up Scheduled] ${userId} 회원님, ${delayMinutes}분 뒤 상태 체크 예약 완료.`);
+    const now = Date.now();
+    const createdAt = this.toDate(session.createdAt);
+    const lastActiveAt = this.toDate(session.lastActiveAt);
 
-        const timerId = setTimeout(() => {
-            this.executeFollowUpPush(userId);
-        }, delayMs);
+    if (!createdAt || !lastActiveAt) return true;
+    if (now - createdAt.getTime() > this.absoluteExpiryMs) return true;
+    if (now - lastActiveAt.getTime() > this.sessionExpiryMs) return true;
 
-        this.timers.set(userId, timerId);
+    return false;
+  }
+
+  async executeFollowUpPush(userId) {
+    console.log(`[F/U Timer Fired] ${userId}`);
+
+    const session = await this.loadSession(userId);
+    if (!session) return;
+
+    if (this.isExpired(session)) {
+      await this.cancelFollowUp(userId);
+      return;
     }
 
-    /**
-     * 지정된 시간이 지나면:
-     * 1) 의료진 큐에 "F/U 점검 시간 도래" 알림 발송 (의료진 인지용)
-     * 2) pending F/U 플래그 저장 (환자 재접속 시 상태 질문 자동 표시)
-     * 
-     * 카카오 알림톡(유료) 또는 Event API(비즈 채널 전용)로
-     * 환자에게 직접 Push하려면 아래 주석 부분을 활성화하세요.
-     */
-    executeFollowUpPush(userId) {
-        console.log(`[F/U Timer Fired] ${userId} — 추적 관찰 시간 도래`);
+    const message = [
+      '보듬입니다. :)',
+      '상담하신 지 시간이 지났어요.',
+      '',
+      '지금 증상 점수는 어느 정도인가요?',
+      '(0=없음, 10=극심)',
+      '',
+      '새로운 증상이 있다면 함께 알려주세요.',
+    ].join('\n');
 
-        const originalChart = this.getOriginalChart(userId);
-        const fuMessage = '보듬입니다! 😊\n상담하신 지 시간이 지났네요.\n\n현재 증상 점수는 어떠신가요?\n(0=없음, 10=극심)\n\n새로운 증상이 있다면 함께\n알려주세요.';
+    await enqueueDoctorNotification(
+      `**[F/U 알림]**\n환자 ${userId}의 추적 관찰 시점이 도래했습니다.\n\n${session.chart}`,
+      userId,
+    );
 
-        // 1) 의료진 큐에 F/U 점검 알림 발송 (의료진 인지용 — 항상 동작)
-        // ※ 카카오 알림톡 API 없이는 환자에게 직접 푸시할 수 없음.
-        //    (MessengerBotR의 userId=sender는 OpenBuilder userId=hash와 시스템이 달라 매핑 불가)
-        enqueueDoctorNotification(
-            `⏰ **[F/U 점검 알림]**\n환자 ${userId}의 추적 관찰 시간이 도래했습니다.\n\n${originalChart}`,
-            userId
-        );
+    const nextSession = {
+      ...session,
+      lastActiveAt: new Date(),
+      dueAt: null,
+      pendingMessage: message,
+      pendingCreatedAt: new Date(),
+      status: 'pending',
+    };
 
-        // 2) 환자 재접속 시 F/U 질문을 보여주기 위한 대기 플래그 저장 (주 전달 경로)
-        //    환자가 채널에 다음 메시지를 보내면 이 질문이 우선 표시됨
-        this.pendingFollowUps.set(userId, {
-            message: fuMessage,
-            createdAt: new Date()
-        });
+    this.memorySessions.set(userId, nextSession);
+    await dbService.saveFollowUpSession(userId, nextSession);
 
-        this.timers.delete(userId);
+    this.clearLocalTimer(userId);
+  }
+
+  async getOriginalChart(userId) {
+    const session = await this.loadSession(userId);
+    if (!session || this.isExpired(session)) {
+      await this.cancelFollowUp(userId);
+      return '이전 차트 기록 없음';
     }
 
-    getOriginalChart(userId) {
-        const session = this.patientDataStore.get(userId);
-        if (!session) return "이전 차트 기록 없음";
+    const nextSession = {
+      ...session,
+      lastActiveAt: new Date(),
+    };
 
-        const now = Date.now();
+    this.memorySessions.set(userId, nextSession);
+    await dbService.saveFollowUpSession(userId, { lastActiveAt: nextSession.lastActiveAt });
 
-        // 절대 만료 체크: 생성 후 2시간 초과 시 무조건 만료
-        const absoluteAgeMs = now - new Date(session.createdAt).getTime();
-        if (absoluteAgeMs > this.SESSION_ABSOLUTE_EXPIRY_MS) {
-            this.cancelFollowUp(userId);
-            return "이전 차트 기록 없음";
-        }
+    return session.chart;
+  }
 
-        // 슬라이딩 만료 체크: 마지막 접근 후 30분 비활성 시 만료
-        const inactiveMs = now - new Date(session.lastActiveAt).getTime();
-        if (inactiveMs > this.SESSION_EXPIRY_MS) {
-            this.cancelFollowUp(userId);
-            return "이전 차트 기록 없음";
-        }
+  async consumePendingFollowUp(userId) {
+    const session = await this.loadSession(userId);
+    if (!session || !session.pendingMessage) return null;
 
-        // 접근 시마다 슬라이딩 활동 시간 갱신
-        session.lastActiveAt = new Date();
-        this.patientDataStore.set(userId, session);
-
-        return session.chart;
+    const pendingCreatedAt = this.toDate(session.pendingCreatedAt);
+    if (!pendingCreatedAt || Date.now() - pendingCreatedAt.getTime() > this.sessionExpiryMs) {
+      await this.cancelFollowUp(userId);
+      return null;
     }
 
-    /**
-     * 환자 재접속 시 대기 중인 F/U 질문이 있으면 반환하고 플래그 제거.
-     */
-    consumePendingFollowUp(userId) {
-        const pending = this.pendingFollowUps.get(userId);
-        if (!pending) return null;
+    const message = session.pendingMessage;
+    const nextSession = {
+      ...session,
+      lastActiveAt: new Date(),
+      pendingMessage: null,
+      pendingCreatedAt: null,
+      status: 'active',
+    };
 
-        const ageMs = Date.now() - new Date(pending.createdAt).getTime();
-        if (ageMs > this.SESSION_EXPIRY_MS) {
-            // 오래된 F/U 질문은 무시
-            this.pendingFollowUps.delete(userId);
-            return null;
-        }
+    this.memorySessions.set(userId, nextSession);
+    await dbService.saveFollowUpSession(userId, {
+      lastActiveAt: nextSession.lastActiveAt,
+      pendingMessage: null,
+      pendingCreatedAt: null,
+      status: 'active',
+    });
 
-        this.pendingFollowUps.delete(userId);
-        return pending.message;
-    }
+    return message;
+  }
 
-    /**
-     * 새로운 상담이 시작될 때 이전 상담 상태가 남아있으면 초기화합니다.
-     */
-    resetSession(userId) {
-        this.cancelFollowUp(userId);
-        console.log(`[Session Reset] ${userId} — 이전 상담 상태 초기화`);
-    }
+  async resetSession(userId) {
+    await this.cancelFollowUp(userId);
+    console.log(`[Session Reset] ${userId}`);
+  }
 
-    /**
-     * 상담 종결 시 F/U 타이머 및 모든 대기 데이터를 삭제합니다.
-     */
-    cancelFollowUp(userId) {
-        if (this.timers.has(userId)) {
-            clearTimeout(this.timers.get(userId));
-            this.timers.delete(userId);
-        }
-        this.pendingFollowUps.delete(userId);
-        this.patientDataStore.delete(userId);
-        console.log(`[F/U Cancelled] ${userId} — 상담종결로 추적관찰 취소`);
-    }
+  async cancelFollowUp(userId) {
+    this.clearLocalTimer(userId);
+    this.memorySessions.delete(userId);
+    await dbService.deleteFollowUpSession(userId);
+    console.log(`[F/U Cancelled] ${userId}`);
+  }
 }
 
-const followUpService = new FollowUpService();
-module.exports = followUpService;
+module.exports = new FollowUpService();

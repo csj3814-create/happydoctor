@@ -120,3 +120,63 @@
 - **Kakao 채널**: https://pf.kakao.com/_PxaTxhX
 - **Firebase**: happydoctor0 (Firestore logging active)
 - **Model**: gemini-2.5-flash (paid plan via 해빛스쿨)
+
+## Phase 10: Code Review & Improvement Plan (2026.04.02)
+
+### Review Summary
+- [x] Repo structure reviewed across `backend`, `frontend/homepage`, and `frontend/portal`
+- [x] Backend entrypoints, routes, services, and Firestore integration reviewed
+- [x] Homepage and portal entrypoints, layout, API client, and auth flow reviewed
+- [x] Deployment surfaces checked: homepage, portal, live stats API
+- [x] Verification run: homepage lint/build, portal lint/build, backend local health check
+
+### Key Findings
+- [ ] Backend follow-up/session state is still memory-based, so restarts or multi-instance deploys can lose timers, room mappings, and pending follow-up state
+- [ ] Notification delivery is split between Firestore-backed doctor notifications and memory-only F/U push helpers, leaving dead or incomplete delivery paths
+- [ ] `/api/stats` and consultation list APIs rely on collection scans / in-memory merging and need indexed, scalable query patterns
+- [ ] Portal is mostly client-rendered and functionally works, but the doctor workflow is still thin: no search, filters beyond tabs, unread emphasis, or pagination
+- [ ] Homepage is a single large client component with hard-coded content/data, which makes maintenance, SEO, accessibility, and content editing harder than necessary
+- [ ] Automated verification is incomplete: backend has no real `npm test`, and there is no CI path proving the chatbot / portal contracts end-to-end
+
+### Execution Plan
+
+#### Track A. Backend Reliability First
+- [x] Replace in-memory follow-up/session storage with durable persistence (Firestore or Redis) and introduce an explicit state model for triage, follow-up pending, reply pending, and closed flows
+- [ ] Unify doctor notification and patient follow-up delivery into one queue/dispatcher path so MessengerBotR polling, portal replies, and follow-up reminders share the same persistence guarantees
+- [x] Guard keep-alive behavior behind environment flags and separate app bootstrap from server startup so local tests and production runtime are easier to control
+
+#### Track B. Backend Data + API Hardening
+- [x] Rework `/api/stats` to use cached counters or pre-aggregated values instead of scanning the full consultations collection on every request
+- [ ] Add pagination, tighter sorting, and explicit query constraints for portal consultation APIs and doctor reply history
+- [ ] Add request validation and stronger authorization rules around doctor replies, consultation visibility, and closed-case behavior
+- [ ] Introduce a central config/env validation layer so missing keys fail fast with clear errors
+
+#### Track C. Portal Workflow Improvements
+- [ ] Move the portal toward a better server/client split: lighter shell, clearer loading states, locale-correct metadata, and stronger accessibility defaults
+- [x] Improve the doctor inbox UX with search, priority cues, unread counts, reply templates, and post-reply refresh behavior that feels instantaneous
+- [ ] Add consultation-level context blocks for follow-up history, close reason, and delivery/read state so doctors can act without piecing together multiple fields
+
+#### Track D. Homepage Architecture + Content Quality
+- [ ] Break the homepage into section components plus structured content/data files so edits do not require touching one 700-line client page
+- [x] Move stats and Q&A loading to server-side/ISR-friendly paths where possible to improve first paint, SEO, and resilience
+- [ ] Replace raw `<img>` usage with a more intentional image strategy, and improve gallery accessibility (keyboard close, focus handling, labels)
+- [ ] Tighten metadata/canonical/OG handling around the real production domain and add SEO-ready Q&A detail pages if content growth continues
+
+#### Track E. Quality Gates
+- [ ] Add backend unit/integration tests for triage routing, follow-up state transitions, portal auth, and reply delivery
+- [ ] Add smoke E2E coverage for homepage load, portal login shell, consultation list fetch, and doctor reply submission
+- [ ] Add CI to run frontend lint/build plus backend tests before deploy
+
+### Verification Notes (2026.04.02)
+- [x] `frontend/homepage`: `npm run lint`
+- [x] `frontend/homepage`: `npm run build`
+- [x] `frontend/portal`: `npm run lint`
+- [x] `frontend/portal`: `npm run build`
+- [x] `backend`: local `/` health check returned `200`
+- [x] Live stats endpoint returned `{"total":373,"doctorReplied":321}`
+
+### Recommended Order
+- [ ] 1) Backend reliability and durable state
+- [ ] 2) Portal workflow/data hardening
+- [ ] 3) Homepage architecture and SEO/accessibility
+- [ ] 4) Automated tests and CI completion
