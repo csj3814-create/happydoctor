@@ -180,3 +180,16 @@
 - [ ] 2) Portal workflow/data hardening
 - [ ] 3) Homepage architecture and SEO/accessibility
 - [ ] 4) Automated tests and CI completion
+
+## Phase 11: Homepage Design Refresh (2026.04.02)
+
+### Goal
+- [x] Review the live homepage and identify design gaps in hierarchy, visual rhythm, and image usage
+- [x] Reuse high-quality assets from `imgs/` to strengthen the homepage hero, section transitions, and CTA areas
+- [x] Improve visual polish without changing the product message or breaking the existing information structure
+
+### Execution Plan
+- [x] Sync selected `imgs/` assets into `frontend/homepage/public`
+- [x] Redesign the homepage hero and section framing around stronger art direction
+- [x] Upgrade CTA, stats, gallery, and contact blocks so the page feels more premium and cohesive
+- [x] Verify with `npm run lint` and `npm run build` in `frontend/homepage`
