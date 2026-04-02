@@ -46,3 +46,7 @@
 - **Lesson**: If the product strategy separates Korean-first branding from future global expansion, use `happydoctor.kr` as the Korean primary domain now and reserve `happydoctors.net` for a later international site, but do not run duplicate public homepages on both domains at the same time.
 - **Lesson**: For the current Happy Doctor strategy, prefer one multilingual public site under the primary domain instead of operating separate Korean and international homepages too early.
 - **Lesson**: Reserve subdomains by product surface early: homepage on the root domain, future web app on `app.*`, and doctor portal on `portal.*`.
+
+## Homepage UI
+- **Lesson**: Keep browser tab branding consistent by removing default template favicon files and explicitly wiring Happy Doctor icon assets in Next metadata/app icon files.
+- **Lesson**: In public Q&A lists, expose only a short question preview (about 50 characters) while keeping professional answers visible, to balance readability and privacy tone.

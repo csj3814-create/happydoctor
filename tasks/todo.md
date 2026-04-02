@@ -214,3 +214,19 @@
 - [ ] Define `app.happydoctor.kr` scope and initial web app shell requirements
 - [ ] Define `portal.happydoctor.kr` cutover requirements
 - [ ] Plan redirect behavior for `happydoctors.net` during the pre-international stage
+
+## Phase 13: Homepage Visual Polish + Q&A Privacy Tuning (2026.04.02)
+
+### Requested UI Adjustments
+- [x] Replace browser tab icon with Happy Doctor brand icon (remove Vercel default favicon path conflict)
+- [x] Adjust hero section so the main right visual block sits slightly lower
+- [x] Keep the hero headline and core description visually as single-line on desktop
+- [x] Move the Story section white overlay card so it does not cover the background tagline
+
+### Q&A Exposure Adjustment
+- [x] Limit public question preview length in Q&A list (apply 50-character truncation)
+- [x] Keep doctor answers fully visible in expanded view
+
+### Verification
+- [x] `frontend/homepage`: `npm run lint`
+- [x] `frontend/homepage`: `npm run build`
