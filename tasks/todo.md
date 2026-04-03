@@ -414,3 +414,9 @@
 ### Verification
 - [x] `frontend/app`: `npm run lint`
 - [x] `frontend/app`: `npm run build`
+
+## Next Session Priorities
+
+- [ ] Update patient app visual assets/screenshots so in-image copy matches the new mission-led messaging
+- [ ] Review homepage/app copy consistency around `무료 온라인 의료상담`, `의료 접근성 취약계층`, and `AI 인턴 보듬이 + 자원봉사 의료진`
+- [ ] Resume backend reliability work: unify follow-up/notification delivery and harden request validation
