@@ -345,14 +345,37 @@ async function getConsultationById(consultationId) {
 
     const repliesSnap = await db.collection('doctor_replies')
       .where('consultationId', '==', doc.id)
-      .orderBy('createdAt', 'asc')
       .get();
 
-    const replies = repliesSnap.docs.map((reply) => ({ ...reply.data(), id: reply.id }));
+    const replyTime = (value) => {
+      if (value && typeof value.toDate === 'function') {
+        return value.toDate().getTime();
+      }
+
+      if (value instanceof Date) {
+        return value.getTime();
+      }
+
+      if (typeof value === 'string') {
+        const parsed = new Date(value).getTime();
+        return Number.isNaN(parsed) ? 0 : parsed;
+      }
+
+      return 0;
+    };
+
+    const replies = repliesSnap.docs
+      .map((reply) => ({ ...reply.data(), id: reply.id }))
+      .sort((a, b) => {
+        const ta = replyTime(a.createdAt);
+        const tb = replyTime(b.createdAt);
+        return ta - tb;
+      });
+
     return { ...doc.data(), id: doc.id, doctorReplies: replies };
   } catch (error) {
     console.error('[DB GetById Error]', error);
-    return null;
+    throw error;
   }
 }
 

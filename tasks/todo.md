@@ -284,3 +284,13 @@
 ### Verification
 - [x] `frontend/portal`: `npm run lint`
 - [x] `frontend/portal`: `npm run build`
+
+## Phase 19: Portal Detail API Root Cause Fix (2026.04.03)
+
+### Goal
+- [x] Remove the backend condition that turns detail query failures into false 404 responses
+- [x] Make doctor reply lookup work without requiring an extra Firestore composite index
+- [ ] Push the backend fix through the Render deployment branch
+
+### Verification
+- [x] `backend`: require `services/dbService` and `routes/portal` without runtime errors
