@@ -18,7 +18,7 @@ while keeping:
 - Korean homepage path: `/ko`
 - English homepage path: `/en`
 - Future app: `app.happydoctor.kr`
-- Future portal: `portal.happydoctor.kr`
+- Doctor portal: `portal.happydoctor.kr`
 - Expansion reserve: `happydoctors.net` (redirect to `happydoctor.kr`)
 
 ## Pre-Cutover Checks
@@ -87,6 +87,36 @@ If product policy is "international traffic enters via `/en`":
 - [ ] `/ko` and `/en` routes return expected pages
 - [ ] API-backed homepage sections (stats, Q&A) still load correctly
 - [ ] Existing portal URL remains unaffected
+
+## Portal Cutover Checklist
+
+### Vercel Domain Setup
+
+- [ ] Add `portal.happydoctor.kr` to the `portal` project
+- [ ] Set `portal.happydoctor.kr` as the primary production domain for the portal
+- [ ] Keep `happydoctor.vercel.app` attached only if Vercel requires it for redirect behavior
+- [ ] If `www.portal.happydoctor.kr` is added, redirect it to `portal.happydoctor.kr`
+
+### Portal DNS Tasks
+
+Use the exact values shown in Vercel domain settings.
+
+- [ ] Add or update the `portal` subdomain record on `happydoctor.kr`
+- [ ] Remove conflicting legacy records for `portal.happydoctor.kr`
+- [ ] Wait for DNS propagation and confirm Vercel marks the domain as valid
+
+### Portal App Settings
+
+- [ ] Set `NEXT_PUBLIC_PORTAL_SITE_URL=https://portal.happydoctor.kr` in the Vercel portal project
+- [ ] Confirm portal metadata and canonical tags resolve to `https://portal.happydoctor.kr`
+- [ ] Confirm app-level redirect/proxy sends `happydoctor.vercel.app/*` to `portal.happydoctor.kr/*`
+
+### Portal Verification
+
+- [ ] `https://portal.happydoctor.kr` loads the doctor portal
+- [ ] `https://happydoctor.vercel.app` redirects to `https://portal.happydoctor.kr`
+- [ ] Existing authenticated portal flows still work after the host changes
+- [ ] Login, inbox, detail view, and reply submission work on the new domain
 
 ## Rollback Notes
 
