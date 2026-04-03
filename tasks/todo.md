@@ -241,3 +241,25 @@
 ### Verification
 - [x] `frontend/homepage`: `npm run lint`
 - [x] `frontend/homepage`: `npm run build`
+
+## Phase 15: Portal Detail Context + Metadata Polish (2026.04.03)
+
+### Goal
+- [x] Add a stronger consultation summary so doctors can understand status, reply state, and timeline at a glance
+- [x] Surface follow-up history directly in the patient detail view without requiring backend changes
+- [x] Tighten portal metadata for a staff-only surface (domain-ready metadata + noindex)
+
+### Verification
+- [x] `frontend/portal`: `npm run lint`
+- [x] `frontend/portal`: `npm run build`
+
+## Phase 16: Portal Inbox Prioritization Polish (2026.04.03)
+
+### Goal
+- [x] Make consultation cards easier to triage at a glance from the list view
+- [x] Surface follow-up count, close context, and reply timing directly on inbox cards
+- [x] Strengthen the top-level inbox summary so doctors can spot where attention is needed
+
+### Verification
+- [x] `frontend/portal`: `npm run lint`
+- [x] `frontend/portal`: `npm run build`
