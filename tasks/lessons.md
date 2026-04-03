@@ -58,3 +58,7 @@
 - **Lesson**: When a protected list view works but its detail route 404s in production, do not assume a single identifier bug too early. Verify the live request path and support the plausible legacy identifiers (`doc.id`, stored `id`, `userId`) before declaring the fix complete.
 - **Lesson**: Do not mask Firestore query errors as `null` in detail loaders. A missing composite index can look exactly like a 404 if the service swallows the error, so unexpected DB failures should bubble up as 500s instead.
 - **Lesson**: For small per-consultation reply histories, prefer fetching by equality filter and sorting in memory over adding a `where + orderBy` query that depends on a composite Firestore index.
+
+## Cross-Origin Deployments
+- **Lesson**: After moving a frontend to a new production domain, verify the live preflight response headers, not just the status code. An `OPTIONS 204` can still be broken if `Access-Control-Allow-Origin` still points at the old host.
+- **Lesson**: Do not model portal CORS with a single `PORTAL_ORIGIN` string once multiple live domains exist. Keep a canonical allowlist that includes the current custom domain, legacy deployment host, and local development origins.

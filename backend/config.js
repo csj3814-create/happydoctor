@@ -18,12 +18,36 @@ function getAllowedDoctorEmails() {
     .filter(Boolean);
 }
 
+function getPortalOrigins() {
+  const configured = getEnv('PORTAL_ORIGIN');
+  const defaults = [
+    'https://happydoctor.vercel.app',
+    'https://portal.happydoctor.kr',
+    'https://www.portal.happydoctor.kr',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+  ];
+
+  if (!configured) {
+    return defaults;
+  }
+
+  if (configured === '*') {
+    return '*';
+  }
+
+  return Array.from(new Set([
+    ...configured.split(',').map((origin) => origin.trim()).filter(Boolean),
+    ...defaults,
+  ]));
+}
+
 module.exports = {
   LEGACY_TOTAL,
   LEGACY_COMPLETED,
   DEFAULT_STATS,
   getAllowedDoctorEmails,
+  getPortalOrigins,
   port: getEnv('PORT', '3000'),
-  portalOrigin: getEnv('PORTAL_ORIGIN', '*'),
   renderExternalUrl: getEnv('RENDER_EXTERNAL_URL', 'https://happydoctor.onrender.com'),
 };
