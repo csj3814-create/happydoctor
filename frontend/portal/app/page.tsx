@@ -1,21 +1,38 @@
 'use client'
 
-import { useCallback, useDeferredValue, useEffect, useState } from 'react'
+import { useDeferredValue, useEffect, useState } from 'react'
 import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth'
 import Link from 'next/link'
 
 import { auth, googleProvider } from '@/lib/firebase'
 import {
   Consultation,
+  ConsultationStatus,
+  ConsultationSummary,
   DoctorStats,
-  getConsultations,
+  getConsultationPage,
+  getConsultationSummary,
   getLeaderboard,
   getMyHDT,
 } from '@/lib/api'
 
 type Tab = 'pending' | 'replied' | 'closed' | 'leaderboard'
+type InboxTab = Exclude<Tab, 'leaderboard'>
 
 const PAGE_SIZE = 12
+
+const EMPTY_SUMMARY: ConsultationSummary = {
+  pending: 0,
+  replied: 0,
+  closed: 0,
+  followUp: 0,
+}
+
+const TAB_TO_STATUS: Record<InboxTab, ConsultationStatus> = {
+  pending: 'active',
+  replied: 'replied',
+  closed: 'closed',
+}
 
 function formatElapsed(createdAt: string): string {
   const diff = Date.now() - new Date(createdAt).getTime()
@@ -39,12 +56,12 @@ function formatDateTime(value?: string): string {
 }
 
 function genderLabel(gender: string): string {
-  if (gender === 'male' || gender === 'M' || gender === '남') return '남'
-  if (gender === 'female' || gender === 'F' || gender === '여') return '여'
+  if (gender === 'male' || gender === 'M' || gender === '남성') return '남성'
+  if (gender === 'female' || gender === 'F' || gender === '여성') return '여성'
   return gender
 }
 
-function categorize(consultation: Consultation): Exclude<Tab, 'leaderboard'> {
+function categorize(consultation: Consultation): InboxTab {
   if (consultation.status === 'COMPLETED' || consultation.closedAt) return 'closed'
   if (consultation.doctorRepliedAt) return 'replied'
   return 'pending'
@@ -86,31 +103,19 @@ function statusBadge(consultation: Consultation): { label: string; className: st
   return { label: '답변 대기', className: 'bg-red-100 text-red-700' }
 }
 
-function buildSearchText(consultation: Consultation): string {
-  return [
-    consultation.userId,
-    consultation.patientData.age,
-    consultation.patientData.gender,
-    consultation.patientData.cc,
-    consultation.patientData.symptom,
-    consultation.patientData.associated,
-    consultation.closeReason,
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase()
-}
-
 export default function HomePage() {
   const [user, setUser] = useState<User | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [consultations, setConsultations] = useState<Consultation[]>([])
+  const [summary, setSummary] = useState<ConsultationSummary>(EMPTY_SUMMARY)
+  const [totalConsultations, setTotalConsultations] = useState(0)
   const [listLoading, setListLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('pending')
   const [searchQuery, setSearchQuery] = useState('')
   const deferredSearch = useDeferredValue(searchQuery)
   const [currentPage, setCurrentPage] = useState(1)
+  const [refreshKey, setRefreshKey] = useState(0)
   const [myStats, setMyStats] = useState<DoctorStats | null>(null)
   const [leaderboard, setLeaderboard] = useState<DoctorStats[]>([])
   const [boardLoading, setBoardLoading] = useState(false)
@@ -124,35 +129,102 @@ export default function HomePage() {
     return unsubscribe
   }, [])
 
-  const fetchDashboard = useCallback(async () => {
-    setListLoading(true)
-    setError(null)
-
-    try {
-      const [consultationList, stats] = await Promise.all([getConsultations(), getMyHDT()])
-      setConsultations(consultationList)
-      setMyStats(stats)
-    } catch (fetchError) {
-      setError(fetchError instanceof Error ? fetchError.message : '상담 목록을 불러오지 못했습니다.')
-    } finally {
-      setListLoading(false)
-    }
-  }, [])
-
   useEffect(() => {
     if (!user) return
-    fetchDashboard()
-  }, [fetchDashboard, user])
+
+    let cancelled = false
+
+    async function loadSummary() {
+      try {
+        const [summaryData, stats] = await Promise.all([
+          getConsultationSummary(),
+          getMyHDT(),
+        ])
+
+        if (cancelled) return
+        setSummary(summaryData)
+        setMyStats(stats)
+      } catch (fetchError) {
+        if (cancelled) return
+        setError(fetchError instanceof Error ? fetchError.message : '포털 요약을 불러오지 못했습니다.')
+      }
+    }
+
+    loadSummary()
+
+    return () => {
+      cancelled = true
+    }
+  }, [user, refreshKey])
 
   useEffect(() => {
-    if (tab !== 'leaderboard' || leaderboard.length > 0) return
+    if (!user || tab === 'leaderboard') return
 
-    setBoardLoading(true)
-    getLeaderboard()
-      .then(setLeaderboard)
-      .catch(() => undefined)
-      .finally(() => setBoardLoading(false))
-  }, [tab, leaderboard.length])
+    let cancelled = false
+    const currentTab = tab as InboxTab
+
+    async function loadConsultationPage() {
+      setListLoading(true)
+      setError(null)
+
+      try {
+        const pageData = await getConsultationPage({
+          status: TAB_TO_STATUS[currentTab],
+          search: deferredSearch,
+          offset: (currentPage - 1) * PAGE_SIZE,
+          limit: PAGE_SIZE,
+        })
+
+        if (cancelled) return
+        setConsultations(pageData.consultations)
+        setTotalConsultations(pageData.total)
+      } catch (fetchError) {
+        if (cancelled) return
+        setConsultations([])
+        setTotalConsultations(0)
+        setError(fetchError instanceof Error ? fetchError.message : '상담 목록을 불러오지 못했습니다.')
+      } finally {
+        if (!cancelled) {
+          setListLoading(false)
+        }
+      }
+    }
+
+    loadConsultationPage()
+
+    return () => {
+      cancelled = true
+    }
+  }, [user, tab, deferredSearch, currentPage, refreshKey])
+
+  useEffect(() => {
+    if (!user || tab !== 'leaderboard') return
+
+    let cancelled = false
+
+    async function loadLeaderboard() {
+      setBoardLoading(true)
+
+      try {
+        const board = await getLeaderboard()
+        if (cancelled) return
+        setLeaderboard(board)
+      } catch (fetchError) {
+        if (cancelled) return
+        setError(fetchError instanceof Error ? fetchError.message : '리더보드를 불러오지 못했습니다.')
+      } finally {
+        if (!cancelled) {
+          setBoardLoading(false)
+        }
+      }
+    }
+
+    loadLeaderboard()
+
+    return () => {
+      cancelled = true
+    }
+  }, [user, tab, refreshKey])
 
   useEffect(() => {
     setCurrentPage(1)
@@ -171,6 +243,8 @@ export default function HomePage() {
   async function handleLogout() {
     await signOut(auth)
     setConsultations([])
+    setSummary(EMPTY_SUMMARY)
+    setTotalConsultations(0)
     setMyStats(null)
     setLeaderboard([])
     setSearchQuery('')
@@ -184,29 +258,12 @@ export default function HomePage() {
   ]
 
   const counts = {
-    pending: consultations.filter((consultation) => categorize(consultation) === 'pending').length,
-    replied: consultations.filter((consultation) => categorize(consultation) === 'replied').length,
-    closed: consultations.filter((consultation) => categorize(consultation) === 'closed').length,
-  }
-  const consultationsWithFollowUp = consultations.filter((consultation) => followUpCount(consultation) > 0).length
-
-  let filteredConsultations: Consultation[] = []
-  if (tab !== 'leaderboard') {
-    const normalizedQuery = deferredSearch.trim().toLowerCase()
-
-    filteredConsultations = consultations
-      .filter((consultation) => categorize(consultation) === tab)
-      .filter((consultation) => {
-        if (!normalizedQuery) return true
-        return buildSearchText(consultation).includes(normalizedQuery)
-      })
+    pending: summary.pending,
+    replied: summary.replied,
+    closed: summary.closed,
   }
 
-  const totalPages = Math.max(1, Math.ceil(filteredConsultations.length / PAGE_SIZE))
-  const paginatedConsultations = filteredConsultations.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE,
-  )
+  const totalPages = Math.max(1, Math.ceil(totalConsultations / PAGE_SIZE))
 
   if (authLoading) {
     return (
@@ -222,7 +279,7 @@ export default function HomePage() {
         <div className="flex w-full max-w-sm flex-col items-center gap-6 rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">
           <div className="space-y-2 text-center">
             <h1 className="text-2xl font-semibold text-zinc-900">해피닥터 의사 포털</h1>
-            <p className="text-sm text-zinc-500">허용된 의료진 계정으로만 접근할 수 있습니다.</p>
+            <p className="text-sm text-zinc-500">인증된 의료진 계정으로만 접근할 수 있습니다.</p>
           </div>
 
           {error && (
@@ -267,8 +324,8 @@ export default function HomePage() {
               {user.email}
             </span>
             <button
-              onClick={() => fetchDashboard()}
-              disabled={listLoading}
+              onClick={() => setRefreshKey((value) => value + 1)}
+              disabled={listLoading || boardLoading}
               className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 transition hover:bg-zinc-50 disabled:opacity-50"
             >
               새로고침
@@ -293,22 +350,22 @@ export default function HomePage() {
         <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">미답변</p>
-            <p className="mt-2 text-2xl font-semibold text-zinc-900">{counts.pending}</p>
+            <p className="mt-2 text-2xl font-semibold text-zinc-900">{summary.pending}</p>
             <p className="mt-1 text-sm text-zinc-500">직접 회신이 필요한 상담</p>
           </div>
           <div className="rounded-2xl border border-green-200 bg-green-50/60 px-4 py-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-green-700">답변 완료</p>
-            <p className="mt-2 text-2xl font-semibold text-zinc-900">{counts.replied}</p>
+            <p className="mt-2 text-2xl font-semibold text-zinc-900">{summary.replied}</p>
             <p className="mt-1 text-sm text-zinc-500">의료진 회신이 이미 전달된 상담</p>
           </div>
           <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Follow-up</p>
-            <p className="mt-2 text-2xl font-semibold text-zinc-900">{consultationsWithFollowUp}</p>
+            <p className="mt-2 text-2xl font-semibold text-zinc-900">{summary.followUp}</p>
             <p className="mt-1 text-sm text-zinc-500">추가 문진 기록이 있는 상담</p>
           </div>
           <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-4 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">종료 상담</p>
-            <p className="mt-2 text-2xl font-semibold text-zinc-900">{counts.closed}</p>
+            <p className="mt-2 text-2xl font-semibold text-zinc-900">{summary.closed}</p>
             <p className="mt-1 text-sm text-zinc-500">종료 사유까지 확인 가능한 상담</p>
           </div>
         </section>
@@ -325,7 +382,7 @@ export default function HomePage() {
               }`}
             >
               {label}
-              {key !== 'leaderboard' && !listLoading && (
+              {key !== 'leaderboard' && (
                 <span className={`ml-1.5 text-xs ${tab === key ? 'text-blue-500' : 'text-zinc-400'}`}>
                   {counts[key as keyof typeof counts]}
                 </span>
@@ -341,7 +398,7 @@ export default function HomePage() {
                 <h2 className="text-sm font-semibold text-zinc-800">상담 검색</h2>
                 <p className="text-xs text-zinc-400">주호소, 증상, 나이, 환자 ID로 빠르게 찾을 수 있습니다.</p>
               </div>
-              <p className="text-xs text-zinc-400">검색 결과 {filteredConsultations.length}건</p>
+              <p className="text-xs text-zinc-400">검색 결과 {totalConsultations}건</p>
             </div>
             <input
               value={searchQuery}
@@ -373,15 +430,16 @@ export default function HomePage() {
                       key={doctor.email}
                       className={`flex items-center gap-4 px-5 py-3.5 ${doctor.email === user.email ? 'bg-amber-50' : ''}`}
                     >
-                      <span className={`w-7 text-center text-sm font-bold ${
-                        index === 0
-                          ? 'text-amber-500'
-                          : index === 1
-                            ? 'text-zinc-400'
-                            : index === 2
-                              ? 'text-orange-400'
-                              : 'text-zinc-400'
-                      }`}
+                      <span
+                        className={`w-7 text-center text-sm font-bold ${
+                          index === 0
+                            ? 'text-amber-500'
+                            : index === 1
+                              ? 'text-zinc-400'
+                              : index === 2
+                                ? 'text-orange-400'
+                                : 'text-zinc-400'
+                        }`}
                       >
                         {index + 1}
                       </span>
@@ -407,103 +465,99 @@ export default function HomePage() {
           <div className="flex items-center justify-center py-20">
             <p className="text-sm text-zinc-400">불러오는 중...</p>
           </div>
-        ) : filteredConsultations.length === 0 ? (
+        ) : consultations.length === 0 ? (
           <div className="flex items-center justify-center py-20">
             <p className="text-sm text-zinc-400">해당 조건의 상담이 없습니다.</p>
           </div>
         ) : (
           <>
             <ul className="flex flex-col gap-3">
-              {paginatedConsultations.map((consultation) => (
-                <li key={consultation.id}>
-                  <Link
-                    href={{
-                      pathname: `/patient/${consultation.id}`,
-                      query: { userId: consultation.userId },
-                    }}
-                    className={`block rounded-2xl border bg-white px-5 py-4 shadow-sm transition hover:shadow-md ${cardTone(consultation)}`}
-                  >
-                    {(() => {
-                      const badge = statusBadge(consultation)
-                      const followUp = followUpCount(consultation)
-                      const category = categorize(consultation)
-                      const secondaryTimestamp =
-                        category === 'replied'
-                          ? consultation.doctorRepliedAt
-                          : category === 'closed'
-                            ? consultation.closedAt || consultation.doctorRepliedAt || consultation.createdAt
-                            : consultation.createdAt
+              {consultations.map((consultation) => {
+                const badge = statusBadge(consultation)
+                const followUp = followUpCount(consultation)
+                const category = categorize(consultation)
+                const secondaryTimestamp =
+                  category === 'replied'
+                    ? consultation.doctorRepliedAt
+                    : category === 'closed'
+                      ? consultation.closedAt || consultation.doctorRepliedAt || consultation.createdAt
+                      : consultation.createdAt
 
-                      const secondaryLabel =
-                        category === 'replied'
-                          ? '최근 회신'
-                          : category === 'closed'
-                            ? '종료 시각'
-                            : '접수 시각'
+                const secondaryLabel =
+                  category === 'replied'
+                    ? '최근 회신'
+                    : category === 'closed'
+                      ? '종료 시각'
+                      : '접수 시각'
 
-                      return (
-                        <>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-sm font-semibold text-zinc-800">
-                            {consultation.patientData.age}세 / {genderLabel(consultation.patientData.gender)}
-                          </span>
-                          <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${badge.className}`}>
-                            {badge.label}
-                          </span>
-                          {followUp > 0 && (
-                            <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-                              Follow-up {followUp}건
+                return (
+                  <li key={consultation.id}>
+                    <Link
+                      href={{
+                        pathname: `/patient/${consultation.id}`,
+                        query: { userId: consultation.userId },
+                      }}
+                      className={`block rounded-2xl border bg-white px-5 py-4 shadow-sm transition hover:shadow-md ${cardTone(consultation)}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-semibold text-zinc-800">
+                              {consultation.patientData.age}세 / {genderLabel(consultation.patientData.gender)}
                             </span>
-                          )}
-                          {consultation.aiAction === 'ESCALATE' && (
-                            <span className="rounded-md bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
-                              의료진 검토
+                            <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${badge.className}`}>
+                              {badge.label}
                             </span>
+                            {followUp > 0 && (
+                              <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                                Follow-up {followUp}건
+                              </span>
+                            )}
+                            {consultation.aiAction === 'ESCALATE' && (
+                              <span className="rounded-md bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                                의료진 검토
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="truncate text-sm text-zinc-700">
+                            <span className="mr-1 font-medium text-zinc-500">주호소</span>
+                            {consultation.patientData.cc}
+                          </p>
+
+                          {consultation.patientData.symptom && (
+                            <p className="line-clamp-2 text-sm text-zinc-500">
+                              {consultation.patientData.symptom}
+                            </p>
                           )}
+
+                          {category === 'closed' && consultation.closeReason && (
+                            <p className="line-clamp-2 text-sm text-zinc-500">
+                              <span className="mr-1 font-medium text-zinc-500">종료 사유</span>
+                              {consultation.closeReason}
+                            </p>
+                          )}
+
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-400">
+                            {consultation.patientData.nrs && <span>NRS {consultation.patientData.nrs}</span>}
+                            {consultation.patientData.associated && <span>{consultation.patientData.associated}</span>}
+                            <span>{secondaryLabel} {formatDateTime(secondaryTimestamp)}</span>
+                          </div>
                         </div>
 
-                        <p className="truncate text-sm text-zinc-700">
-                          <span className="mr-1 font-medium text-zinc-500">주호소</span>
-                          {consultation.patientData.cc}
-                        </p>
-
-                        {consultation.patientData.symptom && (
-                          <p className="line-clamp-2 text-sm text-zinc-500">
-                            {consultation.patientData.symptom}
-                          </p>
-                        )}
-
-                        {category === 'closed' && consultation.closeReason && (
-                          <p className="line-clamp-2 text-sm text-zinc-500">
-                            <span className="mr-1 font-medium text-zinc-500">종료 사유</span>
-                            {consultation.closeReason}
-                          </p>
-                        )}
-
-                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-400">
-                          {consultation.patientData.nrs && <span>NRS {consultation.patientData.nrs}</span>}
-                          {consultation.patientData.associated && <span>{consultation.patientData.associated}</span>}
-                          <span>{secondaryLabel} {formatDateTime(secondaryTimestamp)}</span>
+                        <div className="shrink-0 text-right">
+                          <span className="block text-xs text-zinc-400">
+                            {formatElapsed(consultation.createdAt)}
+                          </span>
+                          <span className="mt-1 block text-[11px] text-zinc-400">
+                            {consultation.id.slice(0, 8)}
+                          </span>
                         </div>
                       </div>
-
-                      <div className="shrink-0 text-right">
-                        <span className="block text-xs text-zinc-400">
-                          {formatElapsed(consultation.createdAt)}
-                        </span>
-                        <span className="mt-1 block text-[11px] text-zinc-400">
-                          {consultation.id.slice(0, 8)}
-                        </span>
-                      </div>
-                    </div>
-                        </>
-                      )
-                    })()}
-                  </Link>
-                </li>
-              ))}
+                    </Link>
+                  </li>
+                )
+              })}
             </ul>
 
             {totalPages > 1 && (

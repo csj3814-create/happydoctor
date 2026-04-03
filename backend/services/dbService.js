@@ -279,26 +279,77 @@ async function getActiveConsultations(options = {}) {
   if (!db) return { consultations: [], total: 0 };
 
   try {
-    const [activeSnap, completedSnap] = await Promise.all([
-      db.collection('consultations')
-        .where('aiAction', '==', 'ESCALATE')
-        .where('status', '==', 'ACTIVE')
-        .get(),
-      db.collection('consultations')
-        .where('aiAction', '==', 'ESCALATE')
-        .where('status', '==', 'COMPLETED')
-        .get(),
-    ]);
-
-    const docs = [
-      ...activeSnap.docs.map((doc) => ({ ...doc.data(), id: doc.id })),
-      ...completedSnap.docs.map((doc) => ({ ...doc.data(), id: doc.id })),
-    ];
+    const docs = await getEscalatedConsultationDocs();
 
     return applyConsultationViewOptions(docs, options);
   } catch (error) {
     console.error('[DB GetActive Error]', error);
     return { consultations: [], total: 0 };
+  }
+}
+
+async function getEscalatedConsultationDocs() {
+  const [activeSnap, completedSnap] = await Promise.all([
+    db.collection('consultations')
+      .where('aiAction', '==', 'ESCALATE')
+      .where('status', '==', 'ACTIVE')
+      .get(),
+    db.collection('consultations')
+      .where('aiAction', '==', 'ESCALATE')
+      .where('status', '==', 'COMPLETED')
+      .get(),
+  ]);
+
+  return [
+    ...activeSnap.docs.map((doc) => ({ ...doc.data(), id: doc.id })),
+    ...completedSnap.docs.map((doc) => ({ ...doc.data(), id: doc.id })),
+  ];
+}
+
+async function getConsultationSummary() {
+  if (!db) {
+    return {
+      pending: 0,
+      replied: 0,
+      closed: 0,
+      followUp: 0,
+    };
+  }
+
+  try {
+    const docs = await getEscalatedConsultationDocs();
+
+    return docs.reduce((summary, doc) => {
+      const isClosed = doc.status === 'COMPLETED' || Boolean(doc.closedAt);
+      const hasReply = Boolean(doc.doctorRepliedAt);
+
+      if (isClosed) {
+        summary.closed += 1;
+      } else if (hasReply) {
+        summary.replied += 1;
+      } else {
+        summary.pending += 1;
+      }
+
+      if (Array.isArray(doc.followUpLogs) && doc.followUpLogs.length > 0) {
+        summary.followUp += 1;
+      }
+
+      return summary;
+    }, {
+      pending: 0,
+      replied: 0,
+      closed: 0,
+      followUp: 0,
+    });
+  } catch (error) {
+    console.error('[DB Consultation Summary Error]', error);
+    return {
+      pending: 0,
+      replied: 0,
+      closed: 0,
+      followUp: 0,
+    };
   }
 }
 
@@ -494,6 +545,7 @@ module.exports = {
   getPendingDoctorReply,
   markReplyAsSeen,
   getActiveConsultations,
+  getConsultationSummary,
   getConsultationById,
   awardHDT,
   getHDTLeaderboard,

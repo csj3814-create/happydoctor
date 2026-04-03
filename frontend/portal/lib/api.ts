@@ -47,12 +47,57 @@ export interface Consultation {
   doctorRepliedAt?: string;
 }
 
-export async function getConsultations(): Promise<Consultation[]> {
+export type ConsultationStatus = 'all' | 'active' | 'replied' | 'closed';
+
+export interface ConsultationQueryOptions {
+  status?: ConsultationStatus;
+  search?: string;
+  offset?: number;
+  limit?: number;
+}
+
+export interface ConsultationPage {
+  consultations: Consultation[];
+  total: number;
+}
+
+export interface ConsultationSummary {
+  pending: number;
+  replied: number;
+  closed: number;
+  followUp: number;
+}
+
+function buildPortalPath(path: string, options?: ConsultationQueryOptions): string {
+  if (!options) return `${BASE}${path}`;
+
+  const params = new URLSearchParams();
+  if (options.status && options.status !== 'all') params.set('status', options.status);
+  if (options.search?.trim()) params.set('search', options.search.trim());
+  if (typeof options.offset === 'number') params.set('offset', String(options.offset));
+  if (typeof options.limit === 'number') params.set('limit', String(options.limit));
+
+  const query = params.toString();
+  return query ? `${BASE}${path}?${query}` : `${BASE}${path}`;
+}
+
+export async function getConsultationPage(options?: ConsultationQueryOptions): Promise<ConsultationPage> {
   const headers = await authHeader();
-  const res = await fetch(`${BASE}/api/portal/consultations`, { headers });
+  const res = await fetch(buildPortalPath('/api/portal/consultations', options), { headers });
   if (!res.ok) throw new Error(await parseError(res));
-  const data = await res.json();
+  return res.json();
+}
+
+export async function getConsultations(options?: ConsultationQueryOptions): Promise<Consultation[]> {
+  const data = await getConsultationPage(options);
   return data.consultations;
+}
+
+export async function getConsultationSummary(): Promise<ConsultationSummary> {
+  const headers = await authHeader();
+  const res = await fetch(`${BASE}/api/portal/consultations/summary`, { headers });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
 }
 
 export async function getConsultation(id: string): Promise<Consultation> {
