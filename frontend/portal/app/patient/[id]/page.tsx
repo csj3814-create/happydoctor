@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { onAuthStateChanged, User } from 'firebase/auth'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { auth } from '@/lib/firebase'
-import { Consultation, FollowUpLog, getConsultation, postReply } from '@/lib/api'
+import { Consultation, FollowUpLog, getConsultation, getConsultations, postReply } from '@/lib/api'
 
 function formatDate(iso: string): string {
   const d = new Date(iso)
@@ -133,11 +133,13 @@ interface PatientPageProps {
 
 export default function PatientPage({ params }: PatientPageProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [user, setUser] = useState<User | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [consultation, setConsultation] = useState<Consultation | null>(null)
   const [fetchLoading, setFetchLoading] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
+  const [fallbackNotice, setFallbackNotice] = useState<string | null>(null)
   const [replyText, setReplyText] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -162,13 +164,64 @@ export default function PatientPage({ params }: PatientPageProps) {
 
   useEffect(() => {
     if (!user || !patientId) return
-    setFetchLoading(true)
-    setFetchError(null)
-    getConsultation(patientId)
-      .then((data) => setConsultation(data))
-      .catch((err) => setFetchError(err instanceof Error ? err.message : '상담 정보를 불러오지 못했습니다.'))
-      .finally(() => setFetchLoading(false))
-  }, [user, patientId])
+    let cancelled = false
+    const fallbackUserId = searchParams.get('userId')
+
+    async function loadConsultation() {
+      setFetchLoading(true)
+      setFetchError(null)
+      setFallbackNotice(null)
+
+      const candidateIds = Array.from(new Set([patientId, fallbackUserId].filter(Boolean))) as string[]
+
+      for (const candidateId of candidateIds) {
+        try {
+          const data = await getConsultation(candidateId)
+          if (cancelled) return
+          setConsultation(data)
+          setFetchLoading(false)
+          return
+        } catch (err) {
+          const message = err instanceof Error ? err.message : '상담 정보를 불러오지 못했습니다.'
+          if (message !== '상담을 찾을 수 없습니다.') {
+            if (cancelled) return
+            setFetchError(message)
+            setFetchLoading(false)
+            return
+          }
+        }
+      }
+
+      try {
+        const consultationList = await getConsultations()
+        if (cancelled) return
+
+        const fallback = consultationList.find((item) => item.id === patientId)
+          || (fallbackUserId ? consultationList.find((item) => item.userId === fallbackUserId) : undefined)
+          || consultationList.find((item) => item.userId === patientId)
+
+        if (!fallback) {
+          setFetchError('상담을 찾을 수 없습니다.')
+          setFetchLoading(false)
+          return
+        }
+
+        setConsultation(fallback)
+        setFallbackNotice('상세 회신 이력은 아직 불러오지 못했지만, 기본 상담 정보는 먼저 표시하고 있습니다.')
+        setFetchLoading(false)
+      } catch (err) {
+        if (cancelled) return
+        setFetchError(err instanceof Error ? err.message : '상담 정보를 불러오지 못했습니다.')
+        setFetchLoading(false)
+      }
+    }
+
+    loadConsultation()
+
+    return () => {
+      cancelled = true
+    }
+  }, [user, patientId, searchParams])
 
   const derivedState = useMemo(() => {
     if (!consultation) {
@@ -207,7 +260,7 @@ export default function PatientPage({ params }: PatientPageProps) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!patientId || !replyText.trim() || derivedState.closed) return
+    if (!patientId || !replyText.trim() || derivedState.closed || fallbackNotice) return
     setSubmitting(true)
     setSubmitError(null)
     setSubmitSuccess(false)
@@ -258,6 +311,12 @@ export default function PatientPage({ params }: PatientPageProps) {
         {fetchError && (
           <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
             {fetchError}
+          </div>
+        )}
+
+        {fallbackNotice && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            {fallbackNotice}
           </div>
         )}
 
@@ -452,6 +511,11 @@ export default function PatientPage({ params }: PatientPageProps) {
                     종료된 상담은 추가 회신을 보낼 수 없습니다.
                   </p>
                 )}
+                {!derivedState.closed && fallbackNotice && (
+                  <p className="text-xs text-zinc-500">
+                    상세 데이터 동기화가 완료되면 답변 전송을 다시 사용할 수 있습니다.
+                  </p>
+                )}
               </div>
               <form onSubmit={handleSubmit} className="flex flex-col gap-3">
                 <textarea
@@ -460,10 +524,12 @@ export default function PatientPage({ params }: PatientPageProps) {
                   placeholder={
                     derivedState.closed
                       ? '종료된 상담입니다.'
+                      : fallbackNotice
+                        ? '상세 데이터 동기화 후 답변 전송을 사용할 수 있습니다.'
                       : '환자에게 전달할 답변을 입력하세요...'
                   }
                   rows={5}
-                  disabled={submitting || derivedState.closed}
+                  disabled={submitting || derivedState.closed || Boolean(fallbackNotice)}
                   className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-800 placeholder:text-zinc-400 focus:border-blue-400 focus:bg-white focus:outline-none transition disabled:opacity-50"
                 />
 
@@ -481,7 +547,7 @@ export default function PatientPage({ params }: PatientPageProps) {
 
                 <button
                   type="submit"
-                  disabled={submitting || !replyText.trim() || derivedState.closed}
+                  disabled={submitting || !replyText.trim() || derivedState.closed || Boolean(fallbackNotice)}
                   className="self-end rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {submitting ? '전송 중...' : '환자에게 전송'}
