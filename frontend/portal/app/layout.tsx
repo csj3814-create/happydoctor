@@ -3,7 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 
-const portalUrl = process.env.NEXT_PUBLIC_PORTAL_SITE_URL || "https://happydoctor.vercel.app";
+const portalUrl = process.env.NEXT_PUBLIC_PORTAL_SITE_URL || "https://portal.happydoctor.kr";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

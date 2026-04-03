@@ -212,7 +212,7 @@
 - [x] Refactor homepage structure for multilingual routing (`/ko`, `/en`)
 - [ ] Extract homepage copy/content into structured data for localization
 - [ ] Define `app.happydoctor.kr` scope and initial web app shell requirements
-- [ ] Define `portal.happydoctor.kr` cutover requirements
+- [x] Define `portal.happydoctor.kr` cutover requirements
 - [ ] Plan redirect behavior for `happydoctors.net` during the pre-international stage
 
 ## Phase 13: Homepage Visual Polish + Q&A Privacy Tuning (2026.04.02)
@@ -294,3 +294,14 @@
 
 ### Verification
 - [x] `backend`: require `services/dbService` and `routes/portal` without runtime errors
+
+## Phase 20: Portal Domain Cutover Prep (2026.04.03)
+
+### Goal
+- [x] Set `portal.happydoctor.kr` as the portal's default canonical/runtime domain assumption
+- [x] Redirect legacy portal hosts (including the Vercel project domain) to `portal.happydoctor.kr`
+- [x] Document the Vercel and DNS steps required to complete the portal cutover safely
+
+### Verification
+- [x] `frontend/portal`: `npm run lint`
+- [x] `frontend/portal`: `npm run build`

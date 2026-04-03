@@ -238,8 +238,9 @@ Should be updated to:
 
 Should be updated to:
 
-- target `portal.happydoctor.kr` as its long-term canonical address
+- target `portal.happydoctor.kr` as its canonical production address
 - keep auth and API assumptions domain-safe
+- redirect the legacy Vercel project host (`happydoctor.vercel.app`) to `portal.happydoctor.kr`
 
 ### App / PWA
 
@@ -270,6 +271,15 @@ Should be planned as:
 1. Reserve `portal.happydoctor.kr` for doctor workflows
 2. Plan `app.happydoctor.kr` as the patient-facing web app / PWA
 3. Keep homepage, app, and portal visually related but operationally separate
+
+### Portal Cutover Notes
+
+When the portal domain cutover happens:
+
+- attach `portal.happydoctor.kr` to the Vercel portal project
+- keep `happydoctor.vercel.app` reachable only as a redirect target, not as a canonical URL
+- prefer `portal.happydoctor.kr` over any `www` variant
+- set `NEXT_PUBLIC_PORTAL_SITE_URL=https://portal.happydoctor.kr` in Vercel so metadata stays correct even if defaults change later
 
 ### Phase D. International Expansion
 
