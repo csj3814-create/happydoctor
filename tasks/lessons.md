@@ -56,3 +56,5 @@
 - **Lesson**: When serializing Firestore documents, spread `doc.data()` first and write `id: doc.id` last. Otherwise a stored `id` field can silently override the real document id and break detail routes, mutations, and links.
 - **Lesson**: For legacy compatibility, detail lookups should gracefully fall back once when an older stored identifier may have been surfaced to the client.
 - **Lesson**: When a protected list view works but its detail route 404s in production, do not assume a single identifier bug too early. Verify the live request path and support the plausible legacy identifiers (`doc.id`, stored `id`, `userId`) before declaring the fix complete.
+- **Lesson**: Do not mask Firestore query errors as `null` in detail loaders. A missing composite index can look exactly like a 404 if the service swallows the error, so unexpected DB failures should bubble up as 500s instead.
+- **Lesson**: For small per-consultation reply histories, prefer fetching by equality filter and sorting in memory over adding a `where + orderBy` query that depends on a composite Firestore index.
