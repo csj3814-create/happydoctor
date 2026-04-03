@@ -211,7 +211,7 @@
 ### Next Build Steps
 - [x] Refactor homepage structure for multilingual routing (`/ko`, `/en`)
 - [ ] Extract homepage copy/content into structured data for localization
-- [ ] Define `app.happydoctor.kr` scope and initial web app shell requirements
+- [x] Define `app.happydoctor.kr` scope and initial web app shell requirements
 - [x] Define `portal.happydoctor.kr` cutover requirements
 - [ ] Plan redirect behavior for `happydoctors.net` during the pre-international stage
 
@@ -330,3 +330,15 @@
 - [x] `backend`: require `app` and load the new portal summary route without runtime errors
 - [x] `frontend/portal`: `npm run lint`
 - [x] `frontend/portal`: `npm run build`
+
+## Phase 23: Patient Web App Shell Foundation (2026.04.03)
+
+### Goal
+- [x] Create a new `frontend/app` Next.js surface for `app.happydoctor.kr`
+- [x] Ship a mobile-first consultation web app shell with branded CTA, workflow framing, and PWA metadata
+- [x] Reuse approved Happy Doctor brand assets so the app surface feels connected to the homepage
+
+### Verification
+- [x] `frontend/app`: `npm install`
+- [x] `frontend/app`: `npm run lint`
+- [x] `frontend/app`: `npm run build`

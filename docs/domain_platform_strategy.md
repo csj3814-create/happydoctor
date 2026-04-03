@@ -250,6 +250,12 @@ Should be planned as:
 - shared design language with homepage
 - mobile-first shell suitable for installable web app behavior
 
+Current implementation status:
+
+- initial shell now lives in `frontend/app`
+- includes a branded consultation entry surface, PWA manifest, and installable web app metadata
+- keeps Kakao consultation as the immediate entry point while reserving room for future status/history features
+
 ## Execution Order
 
 ### Phase A. Domain Canonicalization
