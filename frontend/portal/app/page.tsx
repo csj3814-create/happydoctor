@@ -28,6 +28,16 @@ function formatElapsed(createdAt: string): string {
   return `${Math.floor(hours / 24)}일 전`
 }
 
+function formatDateTime(value?: string): string {
+  if (!value) return '-'
+  return new Date(value).toLocaleString('ko-KR', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 function genderLabel(gender: string): string {
   if (gender === 'male' || gender === 'M' || gender === '남') return '남'
   if (gender === 'female' || gender === 'F' || gender === '여') return '여'
@@ -38,6 +48,42 @@ function categorize(consultation: Consultation): Exclude<Tab, 'leaderboard'> {
   if (consultation.status === 'COMPLETED' || consultation.closedAt) return 'closed'
   if (consultation.doctorRepliedAt) return 'replied'
   return 'pending'
+}
+
+function followUpCount(consultation: Consultation): number {
+  return consultation.followUpLogs?.length ?? 0
+}
+
+function cardTone(consultation: Consultation): string {
+  const category = categorize(consultation)
+
+  if (category === 'closed') {
+    return 'border-zinc-200 hover:border-zinc-300'
+  }
+
+  if (category === 'replied') {
+    return 'border-green-200 bg-green-50/40 hover:border-green-300'
+  }
+
+  if (followUpCount(consultation) > 0) {
+    return 'border-amber-300 bg-amber-50/50 hover:border-amber-400'
+  }
+
+  return 'border-zinc-200 hover:border-zinc-300'
+}
+
+function statusBadge(consultation: Consultation): { label: string; className: string } {
+  const category = categorize(consultation)
+
+  if (category === 'closed') {
+    return { label: '상담 종료', className: 'bg-zinc-100 text-zinc-600' }
+  }
+
+  if (category === 'replied') {
+    return { label: '답변 완료', className: 'bg-green-100 text-green-700' }
+  }
+
+  return { label: '답변 대기', className: 'bg-red-100 text-red-700' }
 }
 
 function buildSearchText(consultation: Consultation): string {
@@ -142,6 +188,7 @@ export default function HomePage() {
     replied: consultations.filter((consultation) => categorize(consultation) === 'replied').length,
     closed: consultations.filter((consultation) => categorize(consultation) === 'closed').length,
   }
+  const consultationsWithFollowUp = consultations.filter((consultation) => followUpCount(consultation) > 0).length
 
   let filteredConsultations: Consultation[] = []
   if (tab !== 'leaderboard') {
@@ -242,6 +289,29 @@ export default function HomePage() {
             {error}
           </div>
         )}
+
+        <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">미답변</p>
+            <p className="mt-2 text-2xl font-semibold text-zinc-900">{counts.pending}</p>
+            <p className="mt-1 text-sm text-zinc-500">직접 회신이 필요한 상담</p>
+          </div>
+          <div className="rounded-2xl border border-green-200 bg-green-50/60 px-4 py-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-green-700">답변 완료</p>
+            <p className="mt-2 text-2xl font-semibold text-zinc-900">{counts.replied}</p>
+            <p className="mt-1 text-sm text-zinc-500">의료진 회신이 이미 전달된 상담</p>
+          </div>
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Follow-up</p>
+            <p className="mt-2 text-2xl font-semibold text-zinc-900">{consultationsWithFollowUp}</p>
+            <p className="mt-1 text-sm text-zinc-500">추가 문진 기록이 있는 상담</p>
+          </div>
+          <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">종료 상담</p>
+            <p className="mt-2 text-2xl font-semibold text-zinc-900">{counts.closed}</p>
+            <p className="mt-1 text-sm text-zinc-500">종료 사유까지 확인 가능한 상담</p>
+          </div>
+        </section>
 
         <div className="flex gap-1 overflow-x-auto border-b border-zinc-200">
           {consultTabs.map(({ key, label }) => (
@@ -348,27 +418,45 @@ export default function HomePage() {
                 <li key={consultation.id}>
                   <Link
                     href={`/patient/${consultation.id}`}
-                    className="block rounded-2xl border border-zinc-200 bg-white px-5 py-4 shadow-sm transition hover:border-zinc-300 hover:shadow-md"
+                    className={`block rounded-2xl border bg-white px-5 py-4 shadow-sm transition hover:shadow-md ${cardTone(consultation)}`}
                   >
+                    {(() => {
+                      const badge = statusBadge(consultation)
+                      const followUp = followUpCount(consultation)
+                      const category = categorize(consultation)
+                      const secondaryTimestamp =
+                        category === 'replied'
+                          ? consultation.doctorRepliedAt
+                          : category === 'closed'
+                            ? consultation.closedAt || consultation.doctorRepliedAt || consultation.createdAt
+                            : consultation.createdAt
+
+                      const secondaryLabel =
+                        category === 'replied'
+                          ? '최근 회신'
+                          : category === 'closed'
+                            ? '종료 시각'
+                            : '접수 시각'
+
+                      return (
+                        <>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-sm font-semibold text-zinc-800">
                             {consultation.patientData.age}세 / {genderLabel(consultation.patientData.gender)}
                           </span>
-                          {tab === 'pending' && (
-                            <span className="rounded-md bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
-                              미답변
+                          <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${badge.className}`}>
+                            {badge.label}
+                          </span>
+                          {followUp > 0 && (
+                            <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                              Follow-up {followUp}건
                             </span>
                           )}
-                          {tab === 'replied' && (
-                            <span className="rounded-md bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-                              답변 완료
-                            </span>
-                          )}
-                          {tab === 'closed' && (
-                            <span className="rounded-md bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-500">
-                              종료
+                          {consultation.aiAction === 'ESCALATE' && (
+                            <span className="rounded-md bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                              의료진 검토
                             </span>
                           )}
                         </div>
@@ -378,16 +466,38 @@ export default function HomePage() {
                           {consultation.patientData.cc}
                         </p>
 
+                        {consultation.patientData.symptom && (
+                          <p className="line-clamp-2 text-sm text-zinc-500">
+                            {consultation.patientData.symptom}
+                          </p>
+                        )}
+
+                        {category === 'closed' && consultation.closeReason && (
+                          <p className="line-clamp-2 text-sm text-zinc-500">
+                            <span className="mr-1 font-medium text-zinc-500">종료 사유</span>
+                            {consultation.closeReason}
+                          </p>
+                        )}
+
                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-400">
                           {consultation.patientData.nrs && <span>NRS {consultation.patientData.nrs}</span>}
-                          {consultation.patientData.symptom && <span>{consultation.patientData.symptom}</span>}
+                          {consultation.patientData.associated && <span>{consultation.patientData.associated}</span>}
+                          <span>{secondaryLabel} {formatDateTime(secondaryTimestamp)}</span>
                         </div>
                       </div>
 
-                      <span className="shrink-0 text-xs text-zinc-400">
-                        {formatElapsed(consultation.createdAt)}
-                      </span>
+                      <div className="shrink-0 text-right">
+                        <span className="block text-xs text-zinc-400">
+                          {formatElapsed(consultation.createdAt)}
+                        </span>
+                        <span className="mt-1 block text-[11px] text-zinc-400">
+                          {consultation.id.slice(0, 8)}
+                        </span>
+                      </div>
                     </div>
+                        </>
+                      )
+                    })()}
                   </Link>
                 </li>
               ))}

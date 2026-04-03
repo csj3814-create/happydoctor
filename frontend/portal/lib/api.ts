@@ -22,7 +22,13 @@ export interface PatientData {
 
 export interface DoctorReply {
   id: string; message: string; doctorName: string;
-  createdAt: string; seen: boolean;
+  createdAt: string; seen: boolean; seenAt?: string; doctorEmail?: string;
+}
+
+export interface FollowUpLog {
+  action?: string;
+  timestamp?: string;
+  alertMessage?: string;
 }
 
 export interface Consultation {
@@ -36,7 +42,7 @@ export interface Consultation {
   createdAt: string;
   closedAt?: string;
   closeReason?: string;
-  followUpLogs?: object[];
+  followUpLogs?: FollowUpLog[];
   doctorReplies?: DoctorReply[];
   doctorRepliedAt?: string;
 }

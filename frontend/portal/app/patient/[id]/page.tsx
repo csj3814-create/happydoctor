@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { onAuthStateChanged, User } from 'firebase/auth'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { auth } from '@/lib/firebase'
-import { getConsultation, postReply, Consultation } from '@/lib/api'
+import { Consultation, FollowUpLog, getConsultation, postReply } from '@/lib/api'
 
 function formatDate(iso: string): string {
   const d = new Date(iso)
@@ -27,9 +27,102 @@ function genderLabel(gender: string): string {
 function LabelValue({ label, value }: { label: string; value?: string | null }) {
   if (!value) return null
   return (
-    <div className="flex gap-2 text-sm">
+    <div className="flex gap-2 text-sm leading-6">
       <span className="w-24 shrink-0 font-medium text-zinc-500">{label}</span>
       <span className="text-zinc-800">{value}</span>
+    </div>
+  )
+}
+
+function statusMeta(consultation: Consultation) {
+  if (consultation.status === 'COMPLETED' || consultation.closedAt) {
+    return {
+      label: '상담 종료',
+      badgeClass: 'bg-zinc-100 text-zinc-600',
+      cardClass: 'border-zinc-200 bg-zinc-50',
+      description: consultation.closeReason || '상담이 종료된 상태입니다.',
+    }
+  }
+
+  if (consultation.doctorRepliedAt) {
+    return {
+      label: '답변 완료',
+      badgeClass: 'bg-green-100 text-green-700',
+      cardClass: 'border-green-200 bg-green-50',
+      description: '의료진 답변이 환자에게 전달된 상태입니다.',
+    }
+  }
+
+  return {
+    label: '답변 대기',
+    badgeClass: 'bg-amber-100 text-amber-700',
+    cardClass: 'border-amber-200 bg-amber-50',
+    description: '의료진 직접 회신이 필요한 상태입니다.',
+  }
+}
+
+function followUpActionLabel(action?: string): string {
+  switch (action) {
+    case 'ESCALATE':
+      return '의료진 검토 유지'
+    case 'FOLLOW_UP':
+      return '추가 문진 진행'
+    case 'AUTO_CLOSE':
+      return '자동 종료'
+    case 'COMPLETE':
+      return '상담 정리'
+    default:
+      return action || '기록'
+  }
+}
+
+function FollowUpItem({ log, index }: { log: FollowUpLog; index: number }) {
+  return (
+    <li className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-blue-600 px-2 text-xs font-semibold text-white">
+            {index + 1}
+          </span>
+          <span className="text-sm font-semibold text-zinc-800">
+            {followUpActionLabel(log.action)}
+          </span>
+        </div>
+        <span className="text-xs text-zinc-400">
+          {log.timestamp ? formatDate(log.timestamp) : '시각 정보 없음'}
+        </span>
+      </div>
+      {log.alertMessage && (
+        <pre className="mt-3 whitespace-pre-wrap break-words rounded-xl border border-zinc-200 bg-white p-3 text-sm leading-relaxed text-zinc-700">
+          {log.alertMessage}
+        </pre>
+      )}
+    </li>
+  )
+}
+
+function SummaryCard({
+  label,
+  value,
+  hint,
+  tone = 'default',
+}: {
+  label: string
+  value: string
+  hint: string
+  tone?: 'default' | 'accent'
+}) {
+  return (
+    <div
+      className={`rounded-2xl border px-4 py-4 ${
+        tone === 'accent'
+          ? 'border-blue-200 bg-blue-50'
+          : 'border-zinc-200 bg-white'
+      }`}
+    >
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">{label}</p>
+      <p className="mt-2 text-base font-semibold text-zinc-900">{value}</p>
+      <p className="mt-1 text-sm text-zinc-500">{hint}</p>
     </div>
   )
 }
@@ -50,7 +143,6 @@ export default function PatientPage({ params }: PatientPageProps) {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [patientId, setPatientId] = useState<string | null>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Resolve params (Promise in Next.js 16+)
   useEffect(() => {
@@ -78,9 +170,44 @@ export default function PatientPage({ params }: PatientPageProps) {
       .finally(() => setFetchLoading(false))
   }, [user, patientId])
 
+  const derivedState = useMemo(() => {
+    if (!consultation) {
+      return {
+        followUpLogs: [] as FollowUpLog[],
+        doctorReplies: [],
+        seenReplies: 0,
+        unseenReplies: 0,
+        closed: false,
+        status: statusMeta({
+          id: '',
+          userId: '',
+          patientData: { age: '', gender: '', cc: '', nrs: '', symptom: '', associated: '', pmhx: '' },
+          aiAction: '',
+          doctorChart: '',
+          chatbotReply: '',
+          status: 'ACTIVE',
+          createdAt: new Date().toISOString(),
+        }),
+      }
+    }
+
+    const doctorReplies = consultation.doctorReplies ?? []
+    const followUpLogs = consultation.followUpLogs ?? []
+    const seenReplies = doctorReplies.filter((reply) => reply.seen).length
+
+    return {
+      followUpLogs,
+      doctorReplies,
+      seenReplies,
+      unseenReplies: doctorReplies.length - seenReplies,
+      closed: consultation.status === 'COMPLETED' || Boolean(consultation.closedAt),
+      status: statusMeta(consultation),
+    }
+  }, [consultation])
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!patientId || !replyText.trim()) return
+    if (!patientId || !replyText.trim() || derivedState.closed) return
     setSubmitting(true)
     setSubmitError(null)
     setSubmitSuccess(false)
@@ -137,6 +264,57 @@ export default function PatientPage({ params }: PatientPageProps) {
         {consultation && (
           <>
             {/* Patient Data Card */}
+            <section className={`rounded-2xl border shadow-sm px-5 py-5 ${derivedState.status.cardClass}`}>
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">상담 요약</p>
+                    <h2 className="mt-2 text-lg font-semibold text-zinc-900">
+                      {consultation.patientData.age}세 / {genderLabel(consultation.patientData.gender)} 환자
+                    </h2>
+                    <p className="mt-1 text-sm text-zinc-600">{derivedState.status.description}</p>
+                  </div>
+                  <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${derivedState.status.badgeClass}`}>
+                    {derivedState.status.label}
+                  </span>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <SummaryCard
+                    label="접수 시각"
+                    value={formatDate(consultation.createdAt)}
+                    hint="포털에서 확인 중인 접수 기준입니다."
+                    tone="accent"
+                  />
+                  <SummaryCard
+                    label="마지막 의사 답변"
+                    value={consultation.doctorRepliedAt ? formatDate(consultation.doctorRepliedAt) : '아직 없음'}
+                    hint={consultation.doctorRepliedAt ? '가장 최근 의료진 회신 시각입니다.' : '의료진 직접 답변이 아직 없습니다.'}
+                  />
+                  <SummaryCard
+                    label="환자 확인 상태"
+                    value={
+                      derivedState.doctorReplies.length === 0
+                        ? '답변 없음'
+                        : derivedState.unseenReplies > 0
+                          ? `미확인 ${derivedState.unseenReplies}건`
+                          : '모든 답변 확인'
+                    }
+                    hint={
+                      derivedState.doctorReplies.length === 0
+                        ? '회신 후 읽음 여부가 누적됩니다.'
+                        : `읽음 ${derivedState.seenReplies}건 / 전체 ${derivedState.doctorReplies.length}건`
+                    }
+                  />
+                  <SummaryCard
+                    label="Follow-up 기록"
+                    value={derivedState.followUpLogs.length > 0 ? `${derivedState.followUpLogs.length}건` : '없음'}
+                    hint={derivedState.followUpLogs.length > 0 ? '추가 문진 및 재분석 로그입니다.' : '추가 문진 로그가 아직 없습니다.'}
+                  />
+                </div>
+              </div>
+            </section>
+
             <section className="rounded-2xl bg-white border border-zinc-200 shadow-sm px-5 py-5">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-bold text-zinc-800">환자 정보</h2>
@@ -144,11 +322,9 @@ export default function PatientPage({ params }: PatientPageProps) {
                   <span className="inline-flex items-center rounded-md bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
                     ESCALATE
                   </span>
-                  {consultation.doctorRepliedAt && (
-                    <span className="inline-flex items-center rounded-md bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-                      답변완료
-                    </span>
-                  )}
+                  <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${derivedState.status.badgeClass}`}>
+                    {derivedState.status.label}
+                  </span>
                 </div>
               </div>
               <div className="flex flex-col gap-2">
@@ -188,6 +364,33 @@ export default function PatientPage({ params }: PatientPageProps) {
               </section>
             )}
 
+            {/* Follow-up History */}
+            <section className="rounded-2xl bg-white border border-zinc-200 shadow-sm px-5 py-5">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <div>
+                  <h2 className="text-sm font-bold text-zinc-800">Follow-up 기록</h2>
+                  <p className="mt-1 text-xs text-zinc-400">추가 문진, 재분석, 알림 메시지 흐름을 한 번에 확인할 수 있습니다.</p>
+                </div>
+                <span className="inline-flex items-center rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-500">
+                  {derivedState.followUpLogs.length}건
+                </span>
+              </div>
+
+              {derivedState.followUpLogs.length === 0 ? (
+                <p className="text-sm text-zinc-400">추가 follow-up 기록이 없습니다.</p>
+              ) : (
+                <ol className="flex flex-col gap-3">
+                  {derivedState.followUpLogs.map((log, index) => (
+                    <FollowUpItem
+                      key={`${log.timestamp || 'follow-up'}-${index}`}
+                      log={log}
+                      index={index}
+                    />
+                  ))}
+                </ol>
+              )}
+            </section>
+
             {/* Doctor Reply History */}
             <section className="rounded-2xl bg-white border border-zinc-200 shadow-sm px-5 py-5">
               <h2 className="text-sm font-bold text-zinc-800 mb-4">
@@ -213,9 +416,19 @@ export default function PatientPage({ params }: PatientPageProps) {
                           {reply.doctorName}
                         </span>
                         <div className="flex items-center gap-2">
-                          {reply.seen && (
-                            <span className="text-xs text-zinc-400">읽음</span>
-                          )}
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                              reply.seen
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : 'bg-amber-50 text-amber-700'
+                            }`}
+                          >
+                            {reply.seen
+                              ? reply.seenAt
+                                ? `읽음 ${formatDate(reply.seenAt)}`
+                                : '읽음'
+                              : '미확인'}
+                          </span>
                           <span className="text-xs text-zinc-400">
                             {formatDate(reply.createdAt)}
                           </span>
@@ -232,15 +445,25 @@ export default function PatientPage({ params }: PatientPageProps) {
 
             {/* Reply Form */}
             <section className="rounded-2xl bg-white border border-zinc-200 shadow-sm px-5 py-5">
-              <h2 className="text-sm font-bold text-zinc-800 mb-4">답변 전송</h2>
+              <div className="mb-4 flex flex-col gap-1">
+                <h2 className="text-sm font-bold text-zinc-800">답변 전송</h2>
+                {derivedState.closed && (
+                  <p className="text-xs text-zinc-500">
+                    종료된 상담은 추가 회신을 보낼 수 없습니다.
+                  </p>
+                )}
+              </div>
               <form onSubmit={handleSubmit} className="flex flex-col gap-3">
                 <textarea
-                  ref={textareaRef}
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
-                  placeholder="환자에게 전달할 답변을 입력하세요..."
+                  placeholder={
+                    derivedState.closed
+                      ? '종료된 상담입니다.'
+                      : '환자에게 전달할 답변을 입력하세요...'
+                  }
                   rows={5}
-                  disabled={submitting}
+                  disabled={submitting || derivedState.closed}
                   className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-800 placeholder:text-zinc-400 focus:border-blue-400 focus:bg-white focus:outline-none transition disabled:opacity-50"
                 />
 
@@ -258,7 +481,7 @@ export default function PatientPage({ params }: PatientPageProps) {
 
                 <button
                   type="submit"
-                  disabled={submitting || !replyText.trim()}
+                  disabled={submitting || !replyText.trim() || derivedState.closed}
                   className="self-end rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {submitting ? '전송 중...' : '환자에게 전송'}
