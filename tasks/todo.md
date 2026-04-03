@@ -380,3 +380,14 @@
 - [x] `git push origin main` triggered a new automatic production deployment for the patient app project
 - [x] `app.happydoctor.kr` was reassigned to the Git-connected patient app project and returned `200 OK`
 - [x] `vercel project inspect happydoctor-app` now shows `Framework Preset: Next.js` and `Root Directory: frontend/app`
+
+## Phase 27: Patient App Entry Experience (2026.04.03)
+
+### Goal
+- [x] Turn the current app shell into a stronger mobile-first consultation entry surface
+- [x] Clarify who the app is for, how the consultation flow works, and what is available now vs next
+- [x] Improve the visual hierarchy so the first screen feels like a real product, not a placeholder
+
+### Verification
+- [x] `frontend/app`: `npm run lint`
+- [x] `frontend/app`: `npm run build`
