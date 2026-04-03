@@ -290,7 +290,7 @@
 ### Goal
 - [x] Remove the backend condition that turns detail query failures into false 404 responses
 - [x] Make doctor reply lookup work without requiring an extra Firestore composite index
-- [ ] Push the backend fix through the Render deployment branch
+- [x] Push the backend fix through the Render deployment branch
 
 ### Verification
 - [x] `backend`: require `services/dbService` and `routes/portal` without runtime errors
@@ -316,5 +316,17 @@
 
 ### Verification
 - [x] `backend`: require `app` and resolve allowed portal origins without runtime errors
+- [x] `frontend/portal`: `npm run lint`
+- [x] `frontend/portal`: `npm run build`
+
+## Phase 22: Portal Inbox Server Pagination (2026.04.03)
+
+### Goal
+- [x] Move portal inbox search/tab filtering onto the existing backend query params
+- [x] Keep summary counts visible without downloading the full consultation list into the browser
+- [x] Preserve the detail-page fallback path while reducing inbox payload size
+
+### Verification
+- [x] `backend`: require `app` and load the new portal summary route without runtime errors
 - [x] `frontend/portal`: `npm run lint`
 - [x] `frontend/portal`: `npm run build`

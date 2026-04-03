@@ -2,6 +2,7 @@ const express = require('express');
 
 const {
   getActiveConsultations,
+  getConsultationSummary,
   getConsultationById,
   saveDoctorReply,
   awardHDT,
@@ -77,6 +78,16 @@ router.get('/consultations', requireDoctorAuth, async (req, res) => {
   } catch (error) {
     console.error('[Portal List Error]', error);
     res.status(500).json({ error: '목록 조회 실패' });
+  }
+});
+
+router.get('/consultations/summary', requireDoctorAuth, async (req, res) => {
+  try {
+    const summary = await getConsultationSummary();
+    return res.json(summary);
+  } catch (error) {
+    console.error('[Portal Summary Error]', error);
+    return res.status(500).json({ error: '요약 조회 실패' });
   }
 });
 
