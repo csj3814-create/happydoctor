@@ -1,0 +1,312 @@
+import Link from 'next/link'
+import { fetchConsultationStatus, normalizeStatusToken, type PublicConsultationStatus } from '@/lib/status'
+
+export const dynamic = 'force-dynamic'
+
+type StatusPageProps = {
+  searchParams: Promise<{
+    token?: string
+  }>
+}
+
+const timeFormatter = new Intl.DateTimeFormat('ko-KR', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+})
+
+function formatDateTime(value: string | null) {
+  if (!value) return '아직 기록 없음'
+
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    return '시간 정보를 불러올 수 없습니다.'
+  }
+
+  return timeFormatter.format(parsed)
+}
+
+function getStatusCopy(status: PublicConsultationStatus) {
+  switch (status.status) {
+    case 'doctor_replied':
+      return {
+        badge: '답변 도착',
+        title: '의료진 답변이 도착했습니다',
+        body: '카카오톡에서 전달된 답변과 앱 기록을 이 화면에서 다시 확인할 수 있습니다.',
+      }
+    case 'waiting_doctor':
+      return {
+        badge: '확인 대기',
+        title: '의료진이 확인 중입니다',
+        body: '보듬이가 먼저 정리한 내용을 바탕으로 자원봉사 의료진이 순서대로 확인하고 있습니다.',
+      }
+    case 'closed':
+      return {
+        badge: '상담 종료',
+        title: '이 상담은 종료된 상태입니다',
+        body: '필요하면 카카오톡 채널에서 새 상담을 다시 시작할 수 있습니다.',
+      }
+    default:
+      return {
+        badge: '안내 전달',
+        title: '기본 안내가 먼저 전달된 상담입니다',
+        body: '현재 상담은 의료진 직접 검토 없이 기본 안내가 먼저 전달된 흐름입니다.',
+      }
+  }
+}
+
+export default async function StatusPage({ searchParams }: StatusPageProps) {
+  const resolvedSearchParams = await searchParams
+  const rawToken = resolvedSearchParams.token || ''
+  const normalizedToken = normalizeStatusToken(rawToken)
+
+  let consultation: PublicConsultationStatus | null = null
+  let fetchError: string | null = null
+
+  if (rawToken && !normalizedToken) {
+    fetchError = '상태 확인 링크 또는 코드를 다시 확인해 주세요.'
+  } else if (normalizedToken) {
+    try {
+      consultation = await fetchConsultationStatus(normalizedToken)
+      if (!consultation) {
+        fetchError = '상담 상태를 찾지 못했습니다. 카카오톡에서 받은 최신 링크를 다시 열어 주세요.'
+      }
+    } catch {
+      fetchError = '지금은 상태를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'
+    }
+  }
+
+  const statusCopy = consultation ? getStatusCopy(consultation) : null
+  const latestReply =
+    consultation && consultation.doctorReplies.length > 0
+      ? consultation.doctorReplies[consultation.doctorReplies.length - 1]
+      : null
+
+  return (
+    <main className="min-h-screen bg-[linear-gradient(180deg,#eef8ff_0%,#ffffff_32%,#f7fbff_100%)]">
+      <div className="mx-auto flex min-h-screen max-w-4xl flex-col px-5 py-6 sm:px-8">
+        <header className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="display-face text-xs font-semibold uppercase tracking-[0.24em] text-[var(--blue)]">
+              Consultation Status
+            </p>
+            <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--ink)] sm:text-4xl">
+              상담 진행 상태 확인
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted)]">
+              카카오톡에서 받은 상태 확인 링크 또는 코드를 열면, 현재 상담 단계와 답변 도착 여부를 다시 확인할 수
+              있습니다.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/"
+              className="rounded-full border border-[var(--line)] bg-white px-5 py-2.5 text-sm font-semibold text-[var(--ink)] shadow-[0_10px_24px_rgba(8,34,55,0.06)] transition hover:bg-[var(--soft-blue)]"
+            >
+              앱 홈으로
+            </Link>
+            <a
+              href="https://pf.kakao.com/_PxaTxhX"
+              className="rounded-full bg-[var(--signal)] px-5 py-2.5 text-sm font-semibold text-[#493500] shadow-[0_14px_24px_rgba(255,223,87,0.28)] transition hover:translate-y-[-1px]"
+            >
+              카카오톡 상담 열기
+            </a>
+          </div>
+        </header>
+
+        <section className="mt-8 rounded-[2rem] border border-[var(--line)] bg-white/88 p-5 shadow-[0_24px_60px_rgba(8,34,55,0.08)] sm:p-7">
+          <form action="/status" className="grid gap-3 lg:grid-cols-[1fr_auto]">
+            <label className="block">
+              <span className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
+                Status Link
+              </span>
+              <input
+                type="text"
+                name="token"
+                defaultValue={rawToken}
+                placeholder="카카오톡에서 받은 상태 확인 링크 또는 코드"
+                className="mt-3 w-full rounded-[1.2rem] border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--blue)] focus:bg-white"
+              />
+            </label>
+            <button
+              type="submit"
+              className="self-end rounded-[1.2rem] bg-[var(--navy)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#123c67]"
+            >
+              상태 확인
+            </button>
+          </form>
+          <p className="mt-3 text-xs leading-6 text-[var(--muted)]">
+            링크 전체를 붙여넣어도 되고, 마지막에 보이는 코드만 입력해도 됩니다.
+          </p>
+        </section>
+
+        {fetchError ? (
+          <section className="mt-6 rounded-[1.8rem] border border-[#ffd2c5] bg-[#fff6f2] p-5 text-sm leading-7 text-[#9b5031]">
+            {fetchError}
+          </section>
+        ) : null}
+
+        {!consultation && !fetchError ? (
+          <section className="mt-6 rounded-[2rem] border border-dashed border-[var(--line)] bg-white/72 p-6 text-sm leading-7 text-[var(--muted)]">
+            카카오톡 상담을 시작하면 해피닥터가 상태 확인용 링크를 함께 보내드립니다. 그 링크를 열면 이 화면에서
+            진행 상태를 계속 볼 수 있습니다.
+          </section>
+        ) : null}
+
+        {consultation && statusCopy ? (
+          <section className="mt-6 space-y-5">
+            <div className="rounded-[2rem] bg-[var(--navy)] p-6 text-white shadow-[0_24px_60px_rgba(7,28,49,0.18)]">
+              <p className="display-face text-xs font-semibold uppercase tracking-[0.24em] text-white/66">
+                {statusCopy.badge}
+              </p>
+              <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em]">{statusCopy.title}</h2>
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-white/82">{statusCopy.body}</p>
+
+              <div className="mt-6 grid gap-4 md:grid-cols-3">
+                <div className="rounded-[1.5rem] bg-white/10 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/60">접수 시각</p>
+                  <p className="mt-2 text-base font-semibold">{formatDateTime(consultation.createdAt)}</p>
+                </div>
+                <div className="rounded-[1.5rem] bg-white/10 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/60">주요 증상</p>
+                  <p className="mt-2 text-base font-semibold">
+                    {consultation.chiefComplaint || '증상 정보 준비 중'}
+                  </p>
+                </div>
+                <div className="rounded-[1.5rem] bg-white/10 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/60">추가 문진</p>
+                  <p className="mt-2 text-base font-semibold">{consultation.followUpCount}회 기록</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-5 lg:grid-cols-[1.08fr_0.92fr]">
+              <div className="space-y-5">
+                <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
+                  <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
+                    Current Step
+                  </p>
+                  <div className="mt-4 space-y-4">
+                    <div className="rounded-[1.4rem] bg-[var(--surface)] p-4">
+                      <p className="text-sm font-semibold text-[var(--ink)]">현재 단계</p>
+                      <p className="mt-2 text-sm leading-7 text-[var(--muted)]">{statusCopy.body}</p>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="rounded-[1.4rem] border border-[var(--line)] p-4">
+                        <p className="text-sm font-semibold text-[var(--ink)]">마지막 답변 도착</p>
+                        <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
+                          {consultation.doctorRepliedAt
+                            ? formatDateTime(consultation.doctorRepliedAt)
+                            : consultation.requiresDoctorReview
+                              ? '아직 의료진 답변 전입니다.'
+                              : '현재 상담은 기본 안내 중심으로 진행 중입니다.'}
+                        </p>
+                      </div>
+                      <div className="rounded-[1.4rem] border border-[var(--line)] p-4">
+                        <p className="text-sm font-semibold text-[var(--ink)]">최근 추가 문진</p>
+                        <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
+                          {consultation.latestFollowUpAt
+                            ? formatDateTime(consultation.latestFollowUpAt)
+                            : '아직 추가 문진 기록이 없습니다.'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
+                  <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
+                    Doctor Replies
+                  </p>
+                  {consultation.doctorReplies.length > 0 ? (
+                    <div className="mt-4 space-y-4">
+                      {consultation.doctorReplies.map((reply) => (
+                        <article
+                          key={reply.id}
+                          className="rounded-[1.4rem] border border-[var(--line)] bg-[var(--surface)] p-4"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm font-semibold text-[var(--ink)]">{reply.doctorName}</p>
+                            <p className="text-xs text-[var(--muted)]">{formatDateTime(reply.createdAt)}</p>
+                          </div>
+                          <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--ink)]">
+                            {reply.message}
+                          </p>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-4 rounded-[1.4rem] bg-[var(--surface)] p-4 text-sm leading-7 text-[var(--muted)]">
+                      아직 의료진 답변이 도착하지 않았습니다. 카카오톡 채널과 이 화면에서 같은 흐름으로 확인하실 수
+                      있습니다.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-5">
+                <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
+                  <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
+                    Guidance
+                  </p>
+                  <ul className="mt-4 space-y-3 text-sm leading-7 text-[var(--muted)]">
+                    <li className="flex gap-3">
+                      <span className="mt-2 h-2 w-2 rounded-full bg-[var(--blue)]" />
+                      <span>응급이 의심되면 이 화면보다 119 또는 가까운 응급실 이용이 우선입니다.</span>
+                    </li>
+                    <li className="flex gap-3">
+                      <span className="mt-2 h-2 w-2 rounded-full bg-[var(--blue)]" />
+                      <span>답변은 카카오톡 채널에서도 전달되며, 앱 링크는 같은 상담 상태를 다시 여는 용도입니다.</span>
+                    </li>
+                    <li className="flex gap-3">
+                      <span className="mt-2 h-2 w-2 rounded-full bg-[var(--blue)]" />
+                      <span>새 증상이 생기거나 상태가 달라지면 기존 상담을 기다리지 말고 새 상담을 다시 시작해 주세요.</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
+                  <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
+                    Snapshot
+                  </p>
+                  <div className="mt-4 space-y-4">
+                    <div className="rounded-[1.4rem] bg-[var(--surface)] p-4">
+                      <p className="text-sm font-semibold text-[var(--ink)]">의료진 답변 개수</p>
+                      <p className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-[var(--navy)]">
+                        {consultation.doctorReplies.length}건
+                      </p>
+                    </div>
+                    <div className="rounded-[1.4rem] bg-[var(--surface)] p-4">
+                      <p className="text-sm font-semibold text-[var(--ink)]">상담 종료 시각</p>
+                      <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
+                        {consultation.closedAt ? formatDateTime(consultation.closedAt) : '아직 종료되지 않았습니다.'}
+                      </p>
+                    </div>
+                    <div className="rounded-[1.4rem] bg-[var(--surface)] p-4">
+                      <p className="text-sm font-semibold text-[var(--ink)]">종료 사유</p>
+                      <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
+                        {consultation.closeReason || '아직 기록되지 않았습니다.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {latestReply ? (
+                  <div className="rounded-[1.8rem] bg-[linear-gradient(145deg,#0c4f88_0%,#1f77bf_100%)] p-5 text-white shadow-[0_24px_60px_rgba(12,79,136,0.24)]">
+                    <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-white/64">
+                      Latest Reply
+                    </p>
+                    <h3 className="mt-3 text-2xl font-semibold tracking-[-0.04em]">가장 최근 답변이 도착해 있습니다</h3>
+                    <p className="mt-4 text-sm leading-7 text-white/82">
+                      {latestReply.message}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </section>
+        ) : null}
+      </div>
+    </main>
+  )
+}
