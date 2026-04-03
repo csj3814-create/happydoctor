@@ -19,7 +19,7 @@ const spaceGrotesk = Space_Grotesk({
 export const metadata: Metadata = {
   metadataBase: new URL('https://app.happydoctor.kr'),
   title: '해피닥터 앱 | Happy Doctor',
-  description: '카카오톡 상담을 시작하고 앱에서 진행 상태와 답변 도착 여부를 다시 확인하는 해피닥터 환자용 웹앱입니다.',
+  description: '의료 접근성 취약계층을 위한 무료 온라인 의료상담 해피닥터 앱입니다. 카카오톡으로 상담을 시작하고 앱에서 같은 상담 흐름을 다시 확인할 수 있습니다.',
   applicationName: '해피닥터 앱',
   manifest: '/manifest.webmanifest',
   alternates: {
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: '해피닥터 앱 | Happy Doctor',
-    description: '카카오톡 상담 시작 후 진행 상태와 답변 도착 여부를 다시 확인할 수 있는 해피닥터 환자용 웹앱입니다.',
+    description: '의료 접근성 취약계층을 위한 무료 온라인 의료상담 해피닥터 앱. 카카오톡으로 상담을 시작하고 앱에서 같은 상담 흐름을 다시 확인할 수 있습니다.',
     type: 'website',
     url: '/',
     images: [
@@ -42,7 +42,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: '해피닥터 앱 | Happy Doctor',
-    description: '카카오톡 상담 시작 후 진행 상태와 답변 도착 여부를 다시 확인할 수 있는 해피닥터 환자용 웹앱입니다.',
+    description: '의료 접근성 취약계층을 위한 무료 온라인 의료상담 해피닥터 앱. 카카오톡으로 상담을 시작하고 앱에서 같은 상담 흐름을 다시 확인할 수 있습니다.',
     images: ['/app-screenshot.png'],
   },
   appleWebApp: {

@@ -403,3 +403,14 @@
 - [x] `backend`: require `app` and `routes/public` without runtime errors
 - [x] `frontend/app`: `npm run lint`
 - [x] `frontend/app`: `npm run build`
+
+## Phase 29: Patient App Mission Copy Reframing (2026.04.03)
+
+### Goal
+- [x] Rewrite the patient app so it reads first as Happy Doctor's mission-led online medical consultation service
+- [x] Reduce any wording that makes the app sound like a pre-visit questionnaire or triage-only utility
+- [x] Keep the new status-check feature, but subordinate it to the service identity and care mission
+
+### Verification
+- [x] `frontend/app`: `npm run lint`
+- [x] `frontend/app`: `npm run build`
