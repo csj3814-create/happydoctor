@@ -49,5 +49,6 @@ module.exports = {
   getAllowedDoctorEmails,
   getPortalOrigins,
   port: getEnv('PORT', '3000'),
+  appSiteUrl: getEnv('APP_SITE_URL', 'https://app.happydoctor.kr'),
   renderExternalUrl: getEnv('RENDER_EXTERNAL_URL', 'https://happydoctor.onrender.com'),
 };

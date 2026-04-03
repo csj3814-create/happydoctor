@@ -4,6 +4,46 @@ const { analyzeAndRouteTriage, analyzeFollowUp } = require('../services/llmServi
 const { enqueueDoctorNotification } = require('../services/notifyService');
 const followUpService = require('../services/followUpService');
 const dbService = require('../services/dbService');
+const { appSiteUrl } = require('../config');
+
+function buildStatusLinkText(trackingToken) {
+    if (!trackingToken) return '';
+
+    const normalizedBaseUrl = appSiteUrl.replace(/\/$/, '');
+    const statusUrl = `${normalizedBaseUrl}/status?token=${encodeURIComponent(trackingToken)}`;
+
+    return `\n\n앱에서 진행 상태 확인하기\n${statusUrl}`;
+}
+
+async function logConsultationAndGetStatusLink(userId, patientData, analysisResult) {
+    try {
+        const saved = await dbService.logConsultation(userId, patientData, analysisResult);
+        return buildStatusLinkText(saved?.trackingToken);
+    } catch (error) {
+        console.error('[Status Link Logging Error]', error);
+        return '';
+    }
+}
+
+async function getLatestStatusLinkForUser(userId) {
+    try {
+        const latest = await dbService.getLatestConsultationTracking(userId);
+        return buildStatusLinkText(latest?.trackingToken);
+    } catch (error) {
+        console.error('[Status Link Lookup Error]', error);
+        return '';
+    }
+}
+
+async function getStatusLinkForConsultation(consultationId) {
+    try {
+        const consultation = await dbService.getConsultationTrackingById(consultationId);
+        return buildStatusLinkText(consultation?.trackingToken);
+    } catch (error) {
+        console.error('[Status Link Consultation Lookup Error]', error);
+        return '';
+    }
+}
 
 /**
  * 카카오 i 오픈빌더 Webhook Endpoint
@@ -202,7 +242,7 @@ async function processTriageSync(userId, patientData) {
             finalResponseText = analysisResult.replyToPatient +
                 "\n\n🩺 차트를 담당 전문의 선생님께\n보고드렸습니다.\n진료 틈틈이 확인 후 이곳으로\n직접 답변드릴 예정입니다.\n잠시만 대기해 주세요.\n(힘드시면 지체 없이 119!)";
         }
-        dbService.logConsultation(userId, patientData, analysisResult).catch(err => console.error("DB Log Error:", err));
+        finalResponseText += await logConsultationAndGetStatusLink(userId, patientData, analysisResult);
         return {
             version: "2.0",
             template: {
@@ -240,7 +280,7 @@ async function processTriageAsync(callbackUrl, userId, patientData) {
                 "\n\n🩺 차트를 담당 전문의 선생님께\n보고드렸습니다.\n진료 틈틈이 확인 후 이곳으로\n직접 답변드릴 예정입니다.\n잠시만 대기해 주세요.\n(힘드시면 지체 없이 119!)";
         }
 
-        dbService.logConsultation(userId, patientData, analysisResult).catch(err => console.error("DB Log Error:", err));
+        finalResponseText += await logConsultationAndGetStatusLink(userId, patientData, analysisResult);
 
         // 콜백 URL로 실제 분석 결과 전송
         if (callbackUrl) {
@@ -334,6 +374,7 @@ router.post('/fu-reply', async (req, res) => {
 
         // [추가] 4. F/U 내역에 대한 상태 점검 기록을 추후 홈페이지 조회를 위해 DB에 병합
         dbService.logFollowUp(userId, fuAnalysis).catch(err => console.error("DB F/U Log Error:", err));
+        finalResponseText += await getLatestStatusLinkForUser(userId);
 
         return res.status(200).json({
             version: "2.0",
@@ -424,7 +465,8 @@ router.post('/close-consultation', async (req, res) => {
         };
         const personalMsg = closeMessages[reason] || '상담이 종결되었습니다.\n문의사항이 있으면 언제든 다시 찾아주세요.';
 
-        const finalText = `🙏 보듬입니다.\n${personalMsg}\n\n환자분의 건강을 응원합니다! 😊\n\n🏥 해피닥터 행복한 의사는\n의료 취약계층을 위해 의사들이\n자원봉사로 운영하는 비영리단체입니다.\n도움이 되셨다면 응원 부탁드려요! 💛`;
+        const statusLinkText = await getLatestStatusLinkForUser(userId);
+        const finalText = `🙏 보듬입니다.\n${personalMsg}\n\n환자분의 건강을 응원합니다! 😊\n\n🏥 해피닥터 행복한 의사는\n의료 취약계층을 위해 의사들이\n자원봉사로 운영하는 비영리단체입니다.\n도움이 되셨다면 응원 부탁드려요! 💛${statusLinkText}`;
 
         return res.status(200).json({
             version: "2.0",
@@ -459,10 +501,11 @@ router.post('/check-doctor-reply', async (req, res) => {
             if (pending.doctorEmail) {
                 await dbService.awardHDT(pending.doctorEmail, pending.doctorName, dbService.HDT_SEEN, 'seen');
             }
+            const statusLinkText = await getStatusLinkForConsultation(pending.consultationId);
             const replyText =
                 `💬 담당 의사 선생님의 답변이 도착했습니다!\n\n` +
                 `👨‍⚕️ ${pending.doctorName}\n\n` +
-                `${pending.message}`;
+                `${pending.message}${statusLinkText}`;
 
             return res.status(200).json({
                 version: "2.0",
@@ -477,10 +520,11 @@ router.post('/check-doctor-reply', async (req, res) => {
         }
 
         // 대기 중인 답변 없음 → 일반 환영 메시지
+        const statusLinkText = await getLatestStatusLinkForUser(userId);
         return res.status(200).json({
             version: "2.0",
             template: {
-                outputs: [{ simpleText: { text: "안녕하세요! 해피닥터 보듬입니다. 😊\n무엇을 도와드릴까요?" } }],
+                outputs: [{ simpleText: { text: `안녕하세요! 해피닥터 보듬입니다. 😊\n무엇을 도와드릴까요?${statusLinkText}` } }],
                 quickReplies: [
                     { label: "예진상담", action: "message", messageText: "예진상담" }
                 ]

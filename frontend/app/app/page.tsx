@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import Image from 'next/image'
 
 const trustSignals = [
@@ -49,7 +50,7 @@ const processSteps = [
   {
     step: '04',
     title: '답변과 다음 안내를 같은 흐름 안에서 받습니다',
-    body: '지금은 카카오톡 상담이 중심이고, 이후에는 이 앱에서 진행 상태와 알림도 더 쉽게 확인하게 확장합니다.',
+    body: '카카오톡 상담이 중심이지만, 이제 이 앱에서도 상담 진행 상태와 답변 도착 여부를 다시 확인할 수 있습니다.',
   },
 ]
 
@@ -57,11 +58,12 @@ const availableNow = [
   '카카오톡 채널로 즉시 상담 시작',
   'AI 인턴 보듬이 기반 질문 정리 흐름',
   '필요 시 의료진 직접 검토 연결',
+  '상태 확인 링크로 진행 상태 다시 열기',
 ]
 
 const availableNext = [
-  '상담 진행 상태와 답변 도착 확인',
   '읽음 여부와 후속 안내 정리',
+  '홈 화면 설치 후 더 가벼운 재방문 흐름',
   '다국어 안내와 앱 내부 도움말 확장',
 ]
 
@@ -152,8 +154,8 @@ export default function AppHomePage() {
               </h2>
               <p className="reveal-2 mt-6 max-w-lg text-lg leading-8 text-[var(--muted)]">
                 해피닥터 앱은 병원과 응급실 사이에서 방향이 필요한 분들을 위한 모바일 상담 진입면입니다.
-                지금은 카카오톡 상담으로 바로 이어지고, 다음 단계에서는 진행 상태와 답변 도착까지 더 쉽게
-                보여주게 확장합니다.
+                카카오톡 상담으로 바로 이어지고, 상담 후에는 이 앱에서 진행 상태와 답변 도착 여부를 다시 확인할 수
+                있습니다.
               </p>
 
               <div className="reveal-2 mt-8 flex flex-wrap gap-3">
@@ -163,12 +165,12 @@ export default function AppHomePage() {
                 >
                   카카오톡으로 상담 시작
                 </a>
-                <a
-                  href="#faq"
+                <Link
+                  href="/status"
                   className="rounded-full border border-[var(--line)] bg-white/82 px-6 py-3 text-sm font-semibold text-[var(--ink)] transition hover:bg-white"
                 >
-                  이용 안내 보기
-                </a>
+                  상태 확인하기
+                </Link>
               </div>
 
               <p className="reveal-2 mt-6 text-xs leading-6 text-[var(--muted)]">
@@ -246,12 +248,54 @@ export default function AppHomePage() {
                     <p className="display-face text-xs font-semibold uppercase tracking-[0.22em] text-white/58">
                       Next
                     </p>
-                    <p className="mt-2 text-base font-semibold text-white">상태 확인과 알림 흐름 확장</p>
+                    <p className="mt-2 text-base font-semibold text-white">재방문과 후속 안내 흐름 확장</p>
                     <p className="mt-2 text-sm leading-6">
-                      답변 도착, 읽음 여부, 진행 상태를 이 앱 안에서 더 자연스럽게 확인하는 방향으로 확장합니다.
+                      지금은 상태 확인을 먼저 붙였고, 다음으로는 읽음 여부와 후속 안내를 더 자연스럽게 보강합니다.
                     </p>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white">
+        <div className="mx-auto max-w-6xl px-5 py-8 sm:px-8 sm:py-10">
+          <div className="grid gap-6 rounded-[2rem] border border-[var(--line)] bg-[linear-gradient(145deg,#f8fbff_0%,#edf6fb_100%)] p-6 shadow-[0_24px_60px_rgba(8,34,55,0.08)] lg:grid-cols-[0.84fr_1.16fr] lg:p-8">
+            <div>
+              <p className="display-face text-sm font-semibold uppercase tracking-[0.24em] text-[var(--blue)]">
+                Status Check
+              </p>
+              <h3 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-[var(--ink)]">
+                상담 후에도
+                <br />
+                진행 상태를 다시 확인하세요
+              </h3>
+              <p className="mt-4 max-w-md text-sm leading-7 text-[var(--muted)]">
+                카카오톡에서 받은 상태 확인 링크를 다시 열거나, 코드만 붙여넣어도 현재 단계와 답변 도착 여부를 볼 수
+                있습니다.
+              </p>
+            </div>
+
+            <div className="rounded-[1.7rem] bg-white p-5 shadow-[0_18px_40px_rgba(8,34,55,0.08)]">
+              <form action="/status" className="grid gap-3 sm:grid-cols-[1fr_auto]">
+                <input
+                  type="text"
+                  name="token"
+                  placeholder="카카오톡에서 받은 상태 확인 링크 또는 코드"
+                  className="w-full rounded-[1.1rem] border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--blue)] focus:bg-white"
+                />
+                <button
+                  type="submit"
+                  className="rounded-[1.1rem] bg-[var(--navy)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#123c67]"
+                >
+                  상태 확인
+                </button>
+              </form>
+              <div className="mt-4 grid gap-3 text-sm leading-7 text-[var(--muted)] sm:grid-cols-2">
+                <p>상담 직후 받은 링크를 그대로 열면 가장 빠르게 확인할 수 있습니다.</p>
+                <p>앱이 설치되어 있지 않아도 괜찮고, 카카오톡 상담 흐름과 같은 상담을 다시 여는 용도입니다.</p>
               </div>
             </div>
           </div>

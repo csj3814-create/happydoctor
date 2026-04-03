@@ -391,3 +391,15 @@
 ### Verification
 - [x] `frontend/app`: `npm run lint`
 - [x] `frontend/app`: `npm run build`
+
+## Phase 28: Patient App Consultation Status Tracking (2026.04.03)
+
+### Goal
+- [x] Issue a patient-safe public tracking token when a consultation is logged
+- [x] Add a public backend status lookup endpoint that only exposes patient-facing consultation state
+- [x] Add an app status page and homepage entry flow so users can reopen their consultation progress from Kakao
+
+### Verification
+- [x] `backend`: require `app` and `routes/public` without runtime errors
+- [x] `frontend/app`: `npm run lint`
+- [x] `frontend/app`: `npm run build`

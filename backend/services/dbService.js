@@ -1,4 +1,5 @@
 const admin = require('firebase-admin');
+const crypto = require('crypto');
 
 const PUBLIC_STATS_PATH = ['system', 'public_stats'];
 const FOLLOW_UP_SESSIONS = 'follow_up_sessions';
@@ -23,6 +24,88 @@ try {
 function getPublicStatsRef() {
   if (!db) return null;
   return db.collection(PUBLIC_STATS_PATH[0]).doc(PUBLIC_STATS_PATH[1]);
+}
+
+function createTrackingToken() {
+  return crypto.randomBytes(24).toString('hex');
+}
+
+function getTimestampMs(value) {
+  if (value && typeof value.toDate === 'function') {
+    return value.toDate().getTime();
+  }
+
+  if (value instanceof Date) {
+    return value.getTime();
+  }
+
+  if (typeof value === 'string') {
+    const parsed = new Date(value).getTime();
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+
+  return 0;
+}
+
+function toIsoString(value) {
+  if (value && typeof value.toDate === 'function') {
+    return value.toDate().toISOString();
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  return null;
+}
+
+function mapDoctorReplyForPatient(reply) {
+  return {
+    id: reply.id,
+    doctorName: reply.doctorName || '해피닥터 의료진',
+    message: reply.message || '',
+    createdAt: toIsoString(reply.createdAt),
+    seen: Boolean(reply.seen),
+    seenAt: toIsoString(reply.seenAt),
+  };
+}
+
+function buildPublicConsultationStatus(consultation, replies) {
+  const isClosed = consultation.status === 'COMPLETED' || Boolean(consultation.closedAt);
+  const hasDoctorReply = replies.length > 0 || Boolean(consultation.doctorRepliedAt);
+  const requiresDoctorReview = consultation.aiAction === 'ESCALATE';
+
+  let stage = 'guidance_delivered';
+  if (isClosed) {
+    stage = 'closed';
+  } else if (hasDoctorReply) {
+    stage = 'doctor_replied';
+  } else if (requiresDoctorReview) {
+    stage = 'waiting_doctor';
+  }
+
+  const followUpLogs = Array.isArray(consultation.followUpLogs) ? consultation.followUpLogs : [];
+  const latestFollowUp = followUpLogs
+    .slice()
+    .sort((a, b) => getTimestampMs(b.timestamp) - getTimestampMs(a.timestamp))[0];
+
+  return {
+    consultationId: consultation.id,
+    status: stage,
+    chiefComplaint: consultation.patientData?.cc || null,
+    createdAt: toIsoString(consultation.createdAt),
+    doctorRepliedAt: toIsoString(consultation.doctorRepliedAt),
+    closedAt: toIsoString(consultation.closedAt),
+    closeReason: consultation.closeReason || null,
+    requiresDoctorReview,
+    followUpCount: followUpLogs.length,
+    latestFollowUpAt: toIsoString(latestFollowUp?.timestamp),
+    doctorReplies: replies.map(mapDoctorReplyForPatient),
+  };
 }
 
 async function updatePublicStats(patch) {
@@ -84,6 +167,7 @@ async function logConsultation(userId, patientData, analysisResult) {
 
   try {
     const docRef = db.collection('consultations').doc();
+    const publicTrackingToken = createTrackingToken();
 
     await docRef.set({
       userId,
@@ -94,12 +178,17 @@ async function logConsultation(userId, patientData, analysisResult) {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       status: 'ACTIVE',
       followUpLogs: [],
+      publicTrackingToken,
+      publicTrackingIssuedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
     await updatePublicStats({ consultationCount: 1 });
 
     console.log(`[DB Logged] Consultation saved. Doc ID: ${docRef.id}`);
-    return docRef.id;
+    return {
+      consultationId: docRef.id,
+      trackingToken: publicTrackingToken,
+    };
   } catch (error) {
     console.error('[DB Logging Error]', error);
     return null;
@@ -398,34 +487,89 @@ async function getConsultationById(consultationId) {
       .where('consultationId', '==', doc.id)
       .get();
 
-    const replyTime = (value) => {
-      if (value && typeof value.toDate === 'function') {
-        return value.toDate().getTime();
-      }
-
-      if (value instanceof Date) {
-        return value.getTime();
-      }
-
-      if (typeof value === 'string') {
-        const parsed = new Date(value).getTime();
-        return Number.isNaN(parsed) ? 0 : parsed;
-      }
-
-      return 0;
-    };
-
     const replies = repliesSnap.docs
       .map((reply) => ({ ...reply.data(), id: reply.id }))
       .sort((a, b) => {
-        const ta = replyTime(a.createdAt);
-        const tb = replyTime(b.createdAt);
+        const ta = getTimestampMs(a.createdAt);
+        const tb = getTimestampMs(b.createdAt);
         return ta - tb;
       });
 
     return { ...doc.data(), id: doc.id, doctorReplies: replies };
   } catch (error) {
     console.error('[DB GetById Error]', error);
+    throw error;
+  }
+}
+
+async function getLatestConsultationTracking(userId) {
+  if (!db || !userId) return null;
+
+  try {
+    const snapshot = await db.collection('consultations')
+      .where('userId', '==', userId)
+      .orderBy('createdAt', 'desc')
+      .limit(1)
+      .get();
+
+    if (snapshot.empty) return null;
+
+    const doc = snapshot.docs[0];
+    const data = doc.data() || {};
+
+    return {
+      consultationId: doc.id,
+      trackingToken: data.publicTrackingToken || null,
+    };
+  } catch (error) {
+    console.error('[DB LatestTracking Error]', error);
+    return null;
+  }
+}
+
+async function getConsultationTrackingById(consultationId) {
+  if (!db || !consultationId) return null;
+
+  try {
+    const snapshot = await db.collection('consultations').doc(consultationId).get();
+    if (!snapshot.exists) return null;
+
+    const data = snapshot.data() || {};
+    return {
+      consultationId: snapshot.id,
+      trackingToken: data.publicTrackingToken || null,
+    };
+  } catch (error) {
+    console.error('[DB ConsultationTrackingById Error]', error);
+    return null;
+  }
+}
+
+async function getPublicConsultationStatusByToken(trackingToken) {
+  if (!db || !trackingToken) return null;
+
+  try {
+    const consultationSnapshot = await db.collection('consultations')
+      .where('publicTrackingToken', '==', trackingToken)
+      .limit(1)
+      .get();
+
+    if (consultationSnapshot.empty) return null;
+
+    const consultationDoc = consultationSnapshot.docs[0];
+    const consultation = { ...consultationDoc.data(), id: consultationDoc.id };
+
+    const repliesSnapshot = await db.collection('doctor_replies')
+      .where('consultationId', '==', consultationDoc.id)
+      .get();
+
+    const replies = repliesSnapshot.docs
+      .map((reply) => ({ ...reply.data(), id: reply.id }))
+      .sort((a, b) => getTimestampMs(a.createdAt) - getTimestampMs(b.createdAt));
+
+    return buildPublicConsultationStatus(consultation, replies);
+  } catch (error) {
+    console.error('[DB PublicStatus Error]', error);
     throw error;
   }
 }
@@ -547,6 +691,9 @@ module.exports = {
   getActiveConsultations,
   getConsultationSummary,
   getConsultationById,
+  getConsultationTrackingById,
+  getLatestConsultationTracking,
+  getPublicConsultationStatusByToken,
   awardHDT,
   getHDTLeaderboard,
   getDoctorStats,

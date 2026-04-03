@@ -5,6 +5,7 @@ const rateLimit = require('express-rate-limit');
 const kakaoWebhookRoute = require('./routes/kakaoWebhook');
 const messengerBotRoute = require('./routes/messengerBot');
 const portalRoute = require('./routes/portal');
+const publicRoute = require('./routes/public');
 const dbService = require('./services/dbService');
 const { DEFAULT_STATS, LEGACY_TOTAL, LEGACY_COMPLETED, getPortalOrigins } = require('./config');
 
@@ -74,6 +75,7 @@ function createApp() {
   app.use('/api/kakao', kakaoWebhookRoute);
   app.use('/api/messengerbot', messengerBotRoute);
   app.use('/api/portal', portalRoute);
+  app.use('/api/public', publicRoute);
 
   app.use('/api/stats', cors({ origin: '*', methods: ['GET', 'OPTIONS'] }));
   app.get('/api/stats', async (req, res) => {
