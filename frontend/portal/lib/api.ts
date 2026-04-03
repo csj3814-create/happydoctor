@@ -1,6 +1,6 @@
 import { auth } from './firebase';
 
-const BASE = process.env.NEXT_PUBLIC_API_URL || 'https://happydoctor.onrender.com';
+const BASE = process.env.NEXT_PUBLIC_PORTAL_API_BASE || '';
 
 async function authHeader() {
   const user = auth.currentUser;
