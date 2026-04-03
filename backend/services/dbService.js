@@ -317,9 +317,31 @@ async function getConsultationById(consultationId) {
         .limit(1)
         .get();
 
-      if (legacySnapshot.empty) return null;
-      doc = legacySnapshot.docs[0];
+      if (!legacySnapshot.empty) {
+        doc = legacySnapshot.docs[0];
+      }
     }
+
+    // Additional compatibility: if an older client surfaced a user-level
+    // identifier instead of the consultation document id, resolve the most
+    // recent matching consultation rather than failing with a 404.
+    if (!doc.exists) {
+      const userScopedSnapshot = await db.collection('consultations')
+        .where('userId', '==', consultationId)
+        .get();
+
+      if (!userScopedSnapshot.empty) {
+        const sortedDocs = userScopedSnapshot.docs.sort((a, b) => {
+          const ta = a.data().createdAt?.toMillis?.() ?? 0;
+          const tb = b.data().createdAt?.toMillis?.() ?? 0;
+          return tb - ta;
+        });
+
+        doc = sortedDocs[0];
+      }
+    }
+
+    if (!doc.exists) return null;
 
     const repliesSnap = await db.collection('doctor_replies')
       .where('consultationId', '==', doc.id)
