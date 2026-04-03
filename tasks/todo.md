@@ -342,3 +342,28 @@
 - [x] `frontend/app`: `npm install`
 - [x] `frontend/app`: `npm run lint`
 - [x] `frontend/app`: `npm run build`
+
+## Phase 24: Patient App Vercel Deployment (2026.04.03)
+
+### Goal
+- [x] Create or link a Vercel project for `frontend/app`
+- [x] Deploy the patient web app shell and capture the live preview/production URL
+- [x] Document the exact `app.happydoctor.kr` domain connection step
+
+### Verification
+- [x] `npx vercel whoami`
+- [x] `npx vercel deploy --prod` returned `https://app.happydoctor.kr`
+
+## Phase 25: Patient App Deployment Routing Fix (2026.04.03)
+
+### Goal
+- [x] Make Vercel recognize `frontend/app` as a real Next.js project instead of a generic `Other` deployment
+- [x] Redeploy the patient app so `happydoctor-app.vercel.app` and `app.happydoctor.kr` resolve to the built `/` route
+- [x] Verify the custom domain serves the mobile app shell, not a Vercel `NOT_FOUND` page
+
+### Verification
+- [x] `frontend/app`: `npm run lint`
+- [x] `frontend/app`: `npm run build`
+- [x] `npx vercel deploy --prod` produced `https://app.happydoctor.kr`
+- [x] `curl -I https://app.happydoctor.kr` returned `200 OK`
+- [x] `curl -I https://happydoctor-app.vercel.app` returned `200 OK`

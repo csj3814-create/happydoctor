@@ -63,3 +63,7 @@
 - **Lesson**: After moving a frontend to a new production domain, verify the live preflight response headers, not just the status code. An `OPTIONS 204` can still be broken if `Access-Control-Allow-Origin` still points at the old host.
 - **Lesson**: Do not model portal CORS with a single `PORTAL_ORIGIN` string once multiple live domains exist. Keep a canonical allowlist that includes the current custom domain, legacy deployment host, and local development origins.
 - **Lesson**: For staff portals that always talk to one backend, prefer same-origin rewrites/proxying from the frontend deployment over direct browser calls to the backend. It makes domain cutovers much less fragile.
+
+## Vercel Project Setup
+- **Lesson**: When creating a new Vercel sub-app from the CLI, do not rely on the project default staying correct. If Vercel shows `Framework Preset: Other`, a Next.js app can build successfully yet still serve `NOT_FOUND` on its production aliases.
+- **Lesson**: For standalone Next.js surfaces like `frontend/app`, commit a local `vercel.json` with `"framework": "nextjs"` so the deployment metadata and live routing stay correct even before dashboard settings are cleaned up.
