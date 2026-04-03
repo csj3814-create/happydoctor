@@ -55,3 +55,4 @@
 ## Firestore API Serialization
 - **Lesson**: When serializing Firestore documents, spread `doc.data()` first and write `id: doc.id` last. Otherwise a stored `id` field can silently override the real document id and break detail routes, mutations, and links.
 - **Lesson**: For legacy compatibility, detail lookups should gracefully fall back once when an older stored identifier may have been surfaced to the client.
+- **Lesson**: When a protected list view works but its detail route 404s in production, do not assume a single identifier bug too early. Verify the live request path and support the plausible legacy identifiers (`doc.id`, stored `id`, `userId`) before declaring the fix complete.
