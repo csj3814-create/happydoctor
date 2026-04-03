@@ -62,3 +62,4 @@
 ## Cross-Origin Deployments
 - **Lesson**: After moving a frontend to a new production domain, verify the live preflight response headers, not just the status code. An `OPTIONS 204` can still be broken if `Access-Control-Allow-Origin` still points at the old host.
 - **Lesson**: Do not model portal CORS with a single `PORTAL_ORIGIN` string once multiple live domains exist. Keep a canonical allowlist that includes the current custom domain, legacy deployment host, and local development origins.
+- **Lesson**: For staff portals that always talk to one backend, prefer same-origin rewrites/proxying from the frontend deployment over direct browser calls to the backend. It makes domain cutovers much less fragile.
