@@ -305,3 +305,13 @@
 ### Verification
 - [x] `frontend/portal`: `npm run lint`
 - [x] `frontend/portal`: `npm run build`
+
+## Phase 21: Portal Domain CORS Alignment (2026.04.03)
+
+### Goal
+- [x] Allow both the legacy Vercel portal host and `portal.happydoctor.kr` at the backend CORS layer
+- [x] Stop relying on a single `PORTAL_ORIGIN` string for portal API access
+- [x] Push the backend CORS fix through the Render deployment branch
+
+### Verification
+- [x] `backend`: require `app` and resolve allowed portal origins without runtime errors

@@ -6,7 +6,7 @@ const kakaoWebhookRoute = require('./routes/kakaoWebhook');
 const messengerBotRoute = require('./routes/messengerBot');
 const portalRoute = require('./routes/portal');
 const dbService = require('./services/dbService');
-const { DEFAULT_STATS, LEGACY_TOTAL, LEGACY_COMPLETED, portalOrigin } = require('./config');
+const { DEFAULT_STATS, LEGACY_TOTAL, LEGACY_COMPLETED, getPortalOrigins } = require('./config');
 
 function createStatsResponse(publicStats) {
   const consultationCount = publicStats?.consultationCount ?? 0;
@@ -20,12 +20,30 @@ function createStatsResponse(publicStats) {
 
 function createApp() {
   const app = express();
+  const portalOrigins = getPortalOrigins();
 
-  app.use('/api/portal', cors({
-    origin: portalOrigin,
+  const portalCors = cors({
+    origin(origin, callback) {
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (portalOrigins === '*') {
+        return callback(null, true);
+      }
+
+      if (portalOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      console.warn(`[Portal CORS] Blocked origin: ${origin}`);
+      return callback(null, false);
+    },
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-  }));
+  });
+
+  app.use('/api/portal', portalCors);
 
   app.use('/api/', (req, res, next) => {
     if (req.path.startsWith('/portal')) return next();
