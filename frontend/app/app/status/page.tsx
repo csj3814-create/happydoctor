@@ -31,13 +31,13 @@ function getStatusCopy(status: PublicConsultationStatus) {
       return {
         badge: '답변 도착',
         title: '의료진 답변이 도착했습니다',
-        body: '카카오톡에서 전달된 답변과 앱 기록을 이 화면에서 다시 확인할 수 있습니다.',
+        body: '자원봉사 의료진이 남긴 답변이 도착했습니다. 카카오톡에서 전달된 내용과 같은 상담 흐름을 이 화면에서 다시 확인할 수 있습니다.',
       }
     case 'waiting_doctor':
       return {
         badge: '확인 대기',
         title: '의료진이 확인 중입니다',
-        body: '보듬이가 먼저 정리한 내용을 바탕으로 자원봉사 의료진이 순서대로 확인하고 있습니다.',
+        body: '보듬이가 먼저 정리한 내용을 바탕으로 자원봉사 의료진이 온라인 상담 흐름 안에서 순서대로 확인하고 있습니다.',
       }
     case 'closed':
       return {
@@ -47,9 +47,9 @@ function getStatusCopy(status: PublicConsultationStatus) {
       }
     default:
       return {
-        badge: '안내 전달',
-        title: '기본 안내가 먼저 전달된 상담입니다',
-        body: '현재 상담은 의료진 직접 검토 없이 기본 안내가 먼저 전달된 흐름입니다.',
+        badge: '상담 진행 중',
+        title: '상담 안내가 먼저 전달된 상태입니다',
+        body: '현재 상담은 기본 안내가 먼저 전달된 상태이며, 필요 시 같은 흐름 안에서 추가 답변이나 후속 안내가 이어질 수 있습니다.',
       }
   }
 }
@@ -87,14 +87,14 @@ export default async function StatusPage({ searchParams }: StatusPageProps) {
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="display-face text-xs font-semibold uppercase tracking-[0.24em] text-[var(--blue)]">
-              Consultation Status
+              Happy Doctor Status
             </p>
             <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--ink)] sm:text-4xl">
-              상담 진행 상태 확인
+              온라인 의료상담 진행 상태 확인
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted)]">
-              카카오톡에서 받은 상태 확인 링크 또는 코드를 열면, 현재 상담 단계와 답변 도착 여부를 다시 확인할 수
-              있습니다.
+              카카오톡에서 받은 상태 확인 링크 또는 코드를 열면, 현재 상담 단계와 의료진 답변 도착 여부를 다시
+              확인할 수 있습니다.
             </p>
           </div>
 
@@ -148,8 +148,8 @@ export default async function StatusPage({ searchParams }: StatusPageProps) {
 
         {!consultation && !fetchError ? (
           <section className="mt-6 rounded-[2rem] border border-dashed border-[var(--line)] bg-white/72 p-6 text-sm leading-7 text-[var(--muted)]">
-            카카오톡 상담을 시작하면 해피닥터가 상태 확인용 링크를 함께 보내드립니다. 그 링크를 열면 이 화면에서
-            진행 상태를 계속 볼 수 있습니다.
+            해피닥터 상담이 시작되면 상태 확인용 링크를 함께 보내드립니다. 그 링크를 열면 의료 접근성 취약계층을 위한
+            무료 온라인 의료상담 흐름을 이 화면에서 계속 확인할 수 있습니다.
           </section>
         ) : null}
 
@@ -184,7 +184,7 @@ export default async function StatusPage({ searchParams }: StatusPageProps) {
               <div className="space-y-5">
                 <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
                   <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
-                    Current Step
+                    상담 단계
                   </p>
                   <div className="mt-4 space-y-4">
                     <div className="rounded-[1.4rem] bg-[var(--surface)] p-4">
@@ -216,7 +216,7 @@ export default async function StatusPage({ searchParams }: StatusPageProps) {
 
                 <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
                   <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
-                    Doctor Replies
+                    의료진 답변
                   </p>
                   {consultation.doctorReplies.length > 0 ? (
                     <div className="mt-4 space-y-4">
@@ -237,8 +237,8 @@ export default async function StatusPage({ searchParams }: StatusPageProps) {
                     </div>
                   ) : (
                     <p className="mt-4 rounded-[1.4rem] bg-[var(--surface)] p-4 text-sm leading-7 text-[var(--muted)]">
-                      아직 의료진 답변이 도착하지 않았습니다. 카카오톡 채널과 이 화면에서 같은 흐름으로 확인하실 수
-                      있습니다.
+                      아직 의료진 답변이 도착하지 않았습니다. 카카오톡 채널과 이 화면에서 같은 무료 온라인 의료상담
+                      흐름을 이어서 확인하실 수 있습니다.
                     </p>
                   )}
                 </div>
@@ -247,7 +247,7 @@ export default async function StatusPage({ searchParams }: StatusPageProps) {
               <div className="space-y-5">
                 <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
                   <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
-                    Guidance
+                    안내
                   </p>
                   <ul className="mt-4 space-y-3 text-sm leading-7 text-[var(--muted)]">
                     <li className="flex gap-3">
@@ -260,14 +260,18 @@ export default async function StatusPage({ searchParams }: StatusPageProps) {
                     </li>
                     <li className="flex gap-3">
                       <span className="mt-2 h-2 w-2 rounded-full bg-[var(--blue)]" />
-                      <span>새 증상이 생기거나 상태가 달라지면 기존 상담을 기다리지 말고 새 상담을 다시 시작해 주세요.</span>
+                      <span>새 증상이 생기거나 상태가 달라지면 기존 상담을 기다리기보다 새 상담을 다시 시작해 주세요.</span>
+                    </li>
+                    <li className="flex gap-3">
+                      <span className="mt-2 h-2 w-2 rounded-full bg-[var(--blue)]" />
+                      <span>해피닥터는 의료 접근성 취약계층을 위한 무료 온라인 의료상담 서비스입니다.</span>
                     </li>
                   </ul>
                 </div>
 
                 <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
                   <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
-                    Snapshot
+                    상담 기록
                   </p>
                   <div className="mt-4 space-y-4">
                     <div className="rounded-[1.4rem] bg-[var(--surface)] p-4">
@@ -294,9 +298,9 @@ export default async function StatusPage({ searchParams }: StatusPageProps) {
                 {latestReply ? (
                   <div className="rounded-[1.8rem] bg-[linear-gradient(145deg,#0c4f88_0%,#1f77bf_100%)] p-5 text-white shadow-[0_24px_60px_rgba(12,79,136,0.24)]">
                     <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-white/64">
-                      Latest Reply
+                      최근 답변
                     </p>
-                    <h3 className="mt-3 text-2xl font-semibold tracking-[-0.04em]">가장 최근 답변이 도착해 있습니다</h3>
+                    <h3 className="mt-3 text-2xl font-semibold tracking-[-0.04em]">같은 상담 흐름 안에서 최근 답변을 확인하세요</h3>
                     <p className="mt-4 text-sm leading-7 text-white/82">
                       {latestReply.message}
                     </p>

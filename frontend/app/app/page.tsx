@@ -3,62 +3,62 @@ import Image from 'next/image'
 
 const trustSignals = [
   {
-    label: '무료 온라인 상담',
-    value: '비용보다 방향이 먼저 필요한 분들을 위한 진입면',
+    label: '의료 접근성 취약계층 중심',
+    value: '이주민, 농어촌 주민, 고령층, 다문화가정처럼 의료가 더 멀게 느껴지는 분들과 함께합니다.',
   },
   {
-    label: '카카오톡에서 바로 시작',
-    value: '새로운 가입 절차 없이 지금 익숙한 채널로 연결',
+    label: '무료 온라인 의료상담',
+    value: '비용과 거리 때문에 망설이는 순간, 온라인으로 먼저 도움에 닿도록 돕습니다.',
   },
   {
     label: 'AI 인턴 보듬이 + 의료진',
-    value: '보듬이가 먼저 정리하고 필요하면 의료진이 이어서 확인',
+    value: '보듬이가 내용을 정리하고 자원봉사 의료진이 직접 확인해 답변합니다.',
   },
 ]
 
 const careGroups = [
   {
-    title: '병원에 가기 전, 먼저 물어볼 곳이 필요한 분',
-    body: '증상이 심한지, 어디부터 가야 하는지, 어떤 말을 먼저 정리해야 하는지 막막한 순간의 첫 질문 창구를 만듭니다.',
+    title: '병원에 가기 전, 먼저 설명할 곳이 필요한 분',
+    body: '갑자기 아픈데 어디로 가야 할지, 무엇을 먼저 말해야 할지 막막한 순간에 온라인으로 먼저 묻고 정리할 수 있습니다.',
   },
   {
-    title: '설명과 접수 과정이 부담스러운 분',
-    body: '긴 문장을 한 번에 잘 말하지 못해도 괜찮습니다. 보듬이가 핵심을 다시 정리해 의료진이 읽기 쉬운 형태로 이어 줍니다.',
+    title: '언어, 거리, 경제적 이유로 의료가 더 멀게 느껴지는 분',
+    body: '이주민, 외국인, 농어촌 주민, 고령층처럼 의료 접근에 장벽이 큰 분들에게 낮은 진입장벽을 만드는 것이 해피닥터의 목적입니다.',
   },
   {
-    title: '의료 접근이 더 어려운 분',
-    body: '이주민, 외국인, 농어촌 주민, 고령층처럼 설명 창구가 더 멀게 느껴지는 분들에게 낮은 진입장벽을 목표로 합니다.',
+    title: '혼자 견디기보다 누군가와 먼저 상의가 필요한 분',
+    body: '당장 병원 방문이 어렵더라도 자원봉사 의료진과 연결된 온라인 상담 흐름 안에서 다음 방향을 함께 생각할 수 있습니다.',
   },
 ]
 
 const processSteps = [
   {
     step: '01',
-    title: '카카오톡으로 지금 불편한 점을 보냅니다',
-    body: '복통, 발열, 어지러움처럼 현재 증상과 걱정을 평소 말하듯 적어도 됩니다.',
+    title: '카카오톡으로 걱정과 증상을 편하게 보냅니다',
+    body: '복통, 발열, 어지러움처럼 지금 불편한 점을 평소 말하듯 보내면 상담이 시작됩니다.',
   },
   {
     step: '02',
-    title: 'AI 인턴 보듬이가 먼저 핵심을 정리합니다',
-    body: '길게 적은 내용에서 주호소와 흐름을 정리해 다음 단계가 더 가볍게 이어지도록 돕습니다.',
+    title: 'AI 인턴 보듬이가 설명 부담을 줄이도록 정리합니다',
+    body: '긴 설명을 한 번에 하지 못해도 괜찮습니다. 보듬이가 핵심을 정리해 의료진이 읽기 쉬운 흐름으로 돕습니다.',
   },
   {
     step: '03',
-    title: '필요하면 자원봉사 의료진이 이어서 봅니다',
-    body: '즉시 안내가 필요한 경우에는 의료진이 내용을 직접 읽고 답변과 다음 행동 방향을 전합니다.',
+    title: '필요하면 자원봉사 의료진이 직접 답변합니다',
+    body: '의료진 확인이 필요한 상담은 자원봉사 의료진이 직접 읽고 답변과 다음 행동 방향을 전합니다.',
   },
   {
     step: '04',
-    title: '답변과 다음 안내를 같은 흐름 안에서 받습니다',
-    body: '카카오톡 상담이 중심이지만, 이제 이 앱에서도 상담 진행 상태와 답변 도착 여부를 다시 확인할 수 있습니다.',
+    title: '앱과 카카오톡에서 같은 상담 흐름을 이어 확인합니다',
+    body: '상담은 카카오톡에서 이어지고, 앱에서는 같은 상담의 진행 상태와 답변 도착 여부를 다시 확인할 수 있습니다.',
   },
 ]
 
 const availableNow = [
-  '카카오톡 채널로 즉시 상담 시작',
-  'AI 인턴 보듬이 기반 질문 정리 흐름',
-  '필요 시 의료진 직접 검토 연결',
-  '상태 확인 링크로 진행 상태 다시 열기',
+  '카카오톡 채널에서 무료 온라인 의료상담 시작',
+  '의료 접근성 취약계층 중심 안내와 연결',
+  'AI 인턴 보듬이와 자원봉사 의료진 협업',
+  '상태 확인 링크로 같은 상담 흐름 다시 열기',
 ]
 
 const availableNext = [
@@ -77,7 +77,7 @@ const faqItems = [
   {
     question: '앱을 꼭 설치해야 하나요?',
     answer:
-      '아니요. 현재 해피닥터 앱은 상담 시작을 더 쉽게 안내하는 모바일 진입면입니다. 실제 상담은 카카오톡 채널에서 바로 시작할 수 있습니다.',
+      '아니요. 해피닥터 앱은 무료 온라인 의료상담을 더 쉽게 이어주는 웹앱입니다. 지금 상담 시작은 카카오톡에서, 상태 확인은 앱에서 다시 열 수 있습니다.',
   },
   {
     question: '비용이 드나요?',
@@ -146,16 +146,15 @@ export default function AppHomePage() {
                 Patient Web App
               </p>
               <h2 className="reveal-1 mt-4 text-5xl font-semibold leading-[1.02] tracking-[-0.05em] text-[var(--ink)] md:text-7xl">
-                아픈 순간,
+                의료가 멀게 느껴질 때,
                 <br />
-                어디로 물어봐야 할지
+                먼저 닿는
                 <br />
-                막막할 때
+                온라인 의료상담
               </h2>
               <p className="reveal-2 mt-6 max-w-lg text-lg leading-8 text-[var(--muted)]">
-                해피닥터 앱은 병원과 응급실 사이에서 방향이 필요한 분들을 위한 모바일 상담 진입면입니다.
-                카카오톡 상담으로 바로 이어지고, 상담 후에는 이 앱에서 진행 상태와 답변 도착 여부를 다시 확인할 수
-                있습니다.
+                해피닥터 앱은 의료 접근성 취약계층을 위한 무료 온라인 의료상담 서비스입니다. AI 인턴 보듬이와
+                자원봉사 의료진이 함께 움직이며, 병원에 가기 전 막막한 순간 더 빨리 도움에 닿도록 돕습니다.
               </p>
 
               <div className="reveal-2 mt-8 flex flex-wrap gap-3">
@@ -174,8 +173,8 @@ export default function AppHomePage() {
               </div>
 
               <p className="reveal-2 mt-6 text-xs leading-6 text-[var(--muted)]">
-                응급 증상은 이 앱보다 119 또는 응급실이 우선입니다. 해피닥터는 응급실 앞 단계에서 방향을 묻고
-                정리하는 데 초점을 둡니다.
+                응급 증상은 119 또는 응급실이 우선입니다. 해피닥터는 응급을 대신하는 서비스가 아니라, 의료가 더 멀게
+                느껴지는 분들이 온라인으로 먼저 도움을 청할 수 있게 돕는 상담 서비스입니다.
               </p>
 
               <div className="reveal-2 mt-10 grid gap-4 border-y border-[var(--line)] py-6 sm:grid-cols-3">
@@ -208,7 +207,7 @@ export default function AppHomePage() {
                             Happy Doctor
                           </p>
                           <p className="mt-1 text-sm font-semibold text-[var(--ink)]">
-                            상담 흐름이 더 가볍게 이어지도록
+                            도움이 필요한 곳에 먼저 닿도록
                           </p>
                         </div>
                         <Image
@@ -239,9 +238,9 @@ export default function AppHomePage() {
                     <p className="display-face text-xs font-semibold uppercase tracking-[0.22em] text-white/58">
                       Now
                     </p>
-                    <p className="mt-2 text-base font-semibold text-white">카카오톡 채널로 즉시 진입</p>
+                    <p className="mt-2 text-base font-semibold text-white">무료 온라인 의료상담을 지금 시작</p>
                     <p className="mt-2 text-sm leading-6">
-                      지금은 가장 익숙한 채널에서 상담을 시작하고, 앱은 흐름을 더 명확하게 안내하는 역할을 합니다.
+                      지금은 가장 익숙한 카카오톡 채널에서 상담을 시작하고, 앱은 같은 상담 흐름을 다시 확인하는 역할을 합니다.
                     </p>
                   </div>
                   <div>
@@ -268,13 +267,13 @@ export default function AppHomePage() {
                 Status Check
               </p>
               <h3 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-[var(--ink)]">
-                상담 후에도
+                상담이 시작된 뒤에도
                 <br />
-                진행 상태를 다시 확인하세요
+                같은 흐름을 다시 확인하세요
               </h3>
               <p className="mt-4 max-w-md text-sm leading-7 text-[var(--muted)]">
-                카카오톡에서 받은 상태 확인 링크를 다시 열거나, 코드만 붙여넣어도 현재 단계와 답변 도착 여부를 볼 수
-                있습니다.
+                카카오톡에서 받은 상태 확인 링크를 다시 열거나 코드만 붙여넣어도, 현재 상담 단계와 의료진 답변 도착
+                여부를 이어서 확인할 수 있습니다.
               </p>
             </div>
 
@@ -294,8 +293,8 @@ export default function AppHomePage() {
                 </button>
               </form>
               <div className="mt-4 grid gap-3 text-sm leading-7 text-[var(--muted)] sm:grid-cols-2">
-                <p>상담 직후 받은 링크를 그대로 열면 가장 빠르게 확인할 수 있습니다.</p>
-                <p>앱이 설치되어 있지 않아도 괜찮고, 카카오톡 상담 흐름과 같은 상담을 다시 여는 용도입니다.</p>
+                <p>상담 직후 받은 링크를 그대로 열면 가장 빠르게 같은 상담 기록으로 돌아올 수 있습니다.</p>
+                <p>앱이 설치되어 있지 않아도 괜찮고, 카카오톡에서 이어진 무료 온라인 의료상담 흐름을 다시 여는 용도입니다.</p>
               </div>
             </div>
           </div>
@@ -310,13 +309,12 @@ export default function AppHomePage() {
                 Who It Serves
               </p>
               <h3 className="mt-4 text-4xl font-semibold tracking-[-0.04em] text-[var(--ink)]">
-                이 앱은
+                해피닥터는
                 <br />
-                누구를 향해 있나요
+                누구를 위해 움직이나요
               </h3>
               <p className="mt-4 text-base leading-7 text-[var(--muted)]">
-                해피닥터 앱은 병원 앱을 하나 더 만드는 것이 아니라, 설명 창구가 멀게 느껴지는 분들에게 첫 질문의
-                문턱을 낮추는 데 목적이 있습니다.
+                해피닥터는 의료를 더 쉽게 쓰는 사람보다, 의료가 멀게 느껴지는 사람에게 먼저 닿는 것을 기준으로 움직입니다.
               </p>
             </div>
 
@@ -370,8 +368,8 @@ export default function AppHomePage() {
                     제비처럼, 필요한 곳에 닿는 의료
                   </h3>
                   <p className="max-w-md text-sm leading-7 text-white/78">
-                    앱은 조용한 첫 화면이어야 하지만, 해피닥터가 왜 존재하는지는 분명해야 합니다. 이 화면은 빠른
-                    진입과 신뢰 형성 두 가지를 함께 담당합니다.
+                    해피닥터는 질문을 분류하는 도구가 아니라, 의료가 더 멀게 느껴지는 사람에게 먼저 닿는 상담 창구여야
+                    합니다. 이 화면은 그 정체성과 실제 진입 흐름을 함께 보여줍니다.
                   </p>
                 </div>
 
@@ -475,8 +473,8 @@ export default function AppHomePage() {
                   카카오톡에서 시작합니다
                 </h3>
                 <p className="mt-4 text-sm leading-7 text-white/78">
-                  해피닥터 앱은 아직 첫 번째 공개 단계입니다. 하지만 필요한 분들이 더 빨리 질문에 닿도록 만드는
-                  핵심 흐름은 이미 시작되어 있습니다.
+                  해피닥터 앱은 의료 접근성 취약계층을 위한 무료 온라인 의료상담을 더 쉽게 이어가기 위한 첫 공개
+                  단계입니다. 상담은 지금 카카오톡에서 바로 시작할 수 있습니다.
                 </p>
 
                 <div className="mt-6 flex flex-wrap gap-3">
