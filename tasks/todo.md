@@ -273,3 +273,14 @@
 
 ### Verification
 - [x] `backend`: require `services/dbService` and `routes/portal` without runtime errors
+
+## Phase 18: Portal Detail Frontend Fallback Hardening (2026.04.03)
+
+### Goal
+- [x] Keep the portal detail page usable even when the primary detail id lookup misses
+- [x] Pass a stable secondary identifier from the inbox to the detail page
+- [x] Fall back to inbox/list data so doctors can still read a consultation while backend detail recovery catches up
+
+### Verification
+- [x] `frontend/portal`: `npm run lint`
+- [x] `frontend/portal`: `npm run build`

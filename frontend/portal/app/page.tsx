@@ -417,7 +417,10 @@ export default function HomePage() {
               {paginatedConsultations.map((consultation) => (
                 <li key={consultation.id}>
                   <Link
-                    href={`/patient/${consultation.id}`}
+                    href={{
+                      pathname: `/patient/${consultation.id}`,
+                      query: { userId: consultation.userId },
+                    }}
                     className={`block rounded-2xl border bg-white px-5 py-4 shadow-sm transition hover:shadow-md ${cardTone(consultation)}`}
                   >
                     {(() => {
