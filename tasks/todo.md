@@ -263,3 +263,13 @@
 ### Verification
 - [x] `frontend/portal`: `npm run lint`
 - [x] `frontend/portal`: `npm run build`
+
+## Phase 17: Portal Detail 404 Fix (2026.04.03)
+
+### Goal
+- [x] Fix the case where a consultation is visible in the inbox but detail lookup returns 404
+- [x] Ensure Firestore's real document id always wins over any stored `id` field in document data
+- [x] Preserve compatibility for any legacy links that may still point at a stored consultation id
+
+### Verification
+- [x] `backend`: require `services/dbService` and `routes/portal` without runtime errors

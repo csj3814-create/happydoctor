@@ -291,8 +291,8 @@ async function getActiveConsultations(options = {}) {
     ]);
 
     const docs = [
-      ...activeSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-      ...completedSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+      ...activeSnap.docs.map((doc) => ({ ...doc.data(), id: doc.id })),
+      ...completedSnap.docs.map((doc) => ({ ...doc.data(), id: doc.id })),
     ];
 
     return applyConsultationViewOptions(docs, options);
@@ -306,16 +306,28 @@ async function getConsultationById(consultationId) {
   if (!db) return null;
 
   try {
-    const doc = await db.collection('consultations').doc(consultationId).get();
-    if (!doc.exists) return null;
+    let doc = await db.collection('consultations').doc(consultationId).get();
+
+    // Legacy compatibility: some historical records may have stored their own
+    // `id` field, and older serialization paths could surface that instead of
+    // the Firestore document id. Fall back once so old links still resolve.
+    if (!doc.exists) {
+      const legacySnapshot = await db.collection('consultations')
+        .where('id', '==', consultationId)
+        .limit(1)
+        .get();
+
+      if (legacySnapshot.empty) return null;
+      doc = legacySnapshot.docs[0];
+    }
 
     const repliesSnap = await db.collection('doctor_replies')
-      .where('consultationId', '==', consultationId)
+      .where('consultationId', '==', doc.id)
       .orderBy('createdAt', 'asc')
       .get();
 
-    const replies = repliesSnap.docs.map((reply) => ({ id: reply.id, ...reply.data() }));
-    return { id: doc.id, ...doc.data(), doctorReplies: replies };
+    const replies = repliesSnap.docs.map((reply) => ({ ...reply.data(), id: reply.id }));
+    return { ...doc.data(), id: doc.id, doctorReplies: replies };
   } catch (error) {
     console.error('[DB GetById Error]', error);
     return null;
@@ -367,7 +379,7 @@ async function getHDTLeaderboard() {
       .limit(20)
       .get();
 
-    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    return snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
   } catch (error) {
     console.error('[HDT Leaderboard Error]', error);
     return [];
@@ -379,7 +391,7 @@ async function getDoctorStats(email) {
 
   try {
     const snapshot = await db.collection('doctor_stats').doc(email).get();
-    return snapshot.exists ? { id: snapshot.id, ...snapshot.data() } : null;
+    return snapshot.exists ? { ...snapshot.data(), id: snapshot.id } : null;
   } catch (error) {
     console.error('[HDT Stats Error]', error);
     return null;
@@ -410,7 +422,7 @@ async function getFollowUpSession(userId) {
 
   const snapshot = await ref.get();
   if (!snapshot.exists) return null;
-  return { id: snapshot.id, ...snapshot.data() };
+  return { ...snapshot.data(), id: snapshot.id };
 }
 
 async function deleteFollowUpSession(userId) {
@@ -426,7 +438,7 @@ async function getScheduledFollowUpSessions() {
     .where('status', '==', 'scheduled')
     .get();
 
-  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  return snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
 }
 
 module.exports = {

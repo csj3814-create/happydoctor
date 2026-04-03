@@ -51,3 +51,7 @@
 - **Lesson**: Keep browser tab branding consistent by removing default template favicon files and explicitly wiring Happy Doctor icon assets in Next metadata/app icon files.
 - **Lesson**: In public Q&A lists, expose only a short question preview (about 50 characters) while keeping professional answers visible, to balance readability and privacy tone.
 - **Lesson**: Favicon readability depends on optical fill, not file size; use a tightly cropped icon variant for tab/browser contexts.
+
+## Firestore API Serialization
+- **Lesson**: When serializing Firestore documents, spread `doc.data()` first and write `id: doc.id` last. Otherwise a stored `id` field can silently override the real document id and break detail routes, mutations, and links.
+- **Lesson**: For legacy compatibility, detail lookups should gracefully fall back once when an older stored identifier may have been surfaced to the client.
