@@ -257,6 +257,7 @@ Current implementation status:
 - keeps Kakao consultation as the immediate entry point while reserving room for future status/history features
 - pins the Vercel framework at the app surface so `app.happydoctor.kr` deploys as a real Next.js app
 - Vercel project `happydoctor-app` is now linked and live at `https://app.happydoctor.kr`
+- production deploys for the app surface are now triggered automatically from GitHub `main`
 
 ## Execution Order
 

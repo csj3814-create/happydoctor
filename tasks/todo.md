@@ -371,6 +371,12 @@
 ## Phase 26: Patient App Git Auto-Deploy Setup (2026.04.03)
 
 ### Goal
-- [ ] Connect `happydoctor-app` to the GitHub repository so pushes create deployments automatically
-- [ ] Keep `app.happydoctor.kr` attached to the patient app project while enabling branch-based deploys
-- [ ] Verify the project tracks the intended repo/branch and no longer depends on manual-only deploys
+- [x] Connect `happydoctor-app` to the GitHub repository so pushes create deployments automatically
+- [x] Keep `app.happydoctor.kr` attached to the patient app project while enabling branch-based deploys
+- [x] Verify the project tracks the intended repo/branch and no longer depends on manual-only deploys
+
+### Verification
+- [x] Created a Git-connected Vercel project with `rootDirectory = frontend/app`
+- [x] `git push origin main` triggered a new automatic production deployment for the patient app project
+- [x] `app.happydoctor.kr` was reassigned to the Git-connected patient app project and returned `200 OK`
+- [x] `vercel project inspect happydoctor-app` now shows `Framework Preset: Next.js` and `Root Directory: frontend/app`

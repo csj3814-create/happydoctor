@@ -67,3 +67,4 @@
 ## Vercel Project Setup
 - **Lesson**: When creating a new Vercel sub-app from the CLI, do not rely on the project default staying correct. If Vercel shows `Framework Preset: Other`, a Next.js app can build successfully yet still serve `NOT_FOUND` on its production aliases.
 - **Lesson**: For standalone Next.js surfaces like `frontend/app`, commit a local `vercel.json` with `"framework": "nextjs"` so the deployment metadata and live routing stay correct even before dashboard settings are cleaned up.
+- **Lesson**: If a manually created Vercel project needs Git auto-deploy later, the clean path is often to create a fresh Git-connected project with the correct `rootDirectory`, verify auto-build on push, and then swap the custom domain over. Updating the old manual project in place is not reliably supported by the API.
