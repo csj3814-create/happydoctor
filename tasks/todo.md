@@ -367,3 +367,10 @@
 - [x] `npx vercel deploy --prod` produced `https://app.happydoctor.kr`
 - [x] `curl -I https://app.happydoctor.kr` returned `200 OK`
 - [x] `curl -I https://happydoctor-app.vercel.app` returned `200 OK`
+
+## Phase 26: Patient App Git Auto-Deploy Setup (2026.04.03)
+
+### Goal
+- [ ] Connect `happydoctor-app` to the GitHub repository so pushes create deployments automatically
+- [ ] Keep `app.happydoctor.kr` attached to the patient app project while enabling branch-based deploys
+- [ ] Verify the project tracks the intended repo/branch and no longer depends on manual-only deploys
