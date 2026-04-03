@@ -107,7 +107,7 @@ router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
     }
 
     const replyId = await saveDoctorReply(
-      req.params.id,
+      consultation.id,
       consultation.userId,
       message.trim(),
       req.doctor.name,
