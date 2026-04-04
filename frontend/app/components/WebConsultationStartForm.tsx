@@ -270,7 +270,8 @@ export default function WebConsultationStartForm({
           <div className="mt-5 flex flex-wrap gap-3">
             <a
               href={result.statusUrl}
-              className="rounded-[1.2rem] bg-[var(--navy)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#123c67]"
+              className="rounded-[1.2rem] bg-[var(--navy)] px-5 py-3 text-sm font-semibold text-white visited:text-white transition hover:bg-[#123c67]"
+              style={{ color: '#ffffff' }}
             >
               상태 확인 화면 열기
             </a>

@@ -93,10 +93,6 @@ export default async function StartPage({ searchParams }: StartPageProps) {
                 <br />
                 3. 필요하면 자원봉사 의료진이 확인하고, 상태 화면에 답변이 이어집니다.
               </p>
-              <p>
-                카카오톡이 더 익숙하다면 언제든 카카오 채널로 이동해 이어서 상담할 수 있습니다. 웹 시작과 카카오 시작은
-                서로 경쟁하는 경로가 아니라, 접근성을 넓히기 위한 두 가지 진입 방식입니다.
-              </p>
             </div>
           </div>
         </section>
