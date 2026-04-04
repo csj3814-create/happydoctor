@@ -489,10 +489,23 @@
 - [x] 임시 로컬 포트에서 `POST /api/kakao/triage-complete`에 잘못된 non-object payload를 보내 `200` + 재시작 안내 응답 확인
 - [x] `git diff -- backend/routes/kakaoWebhook.js` 검토로 카카오 환자 문구, 안전 fallback, 공용 quick-reply helper 범위만 바뀐 것 확인
 
+## 단계 36: 한국어 표면용 이미지 자산 정리 (2026.04.04)
+
+### 목표
+- [x] 한국어 표면에서 직접 보이는 영어 오버레이 문구를 한국어 기준으로 다시 만든다.
+- [x] 홈페이지 공유 이미지, 앱 공유 이미지, 채팅 미리보기 이미지가 새 언어 원칙을 따르도록 맞춘다.
+- [x] 같은 작업을 반복할 수 있도록 자산 재생성 스크립트를 남긴다.
+
+### 검증
+- [x] `python scripts/refresh_korean_surface_assets.py`
+- [x] `frontend/homepage/public/design/brand-og.png`, `frontend/homepage/public/design/chat-preview.png`, `frontend/app/public/app-screenshot.png` 시각 확인
+- [x] `frontend/homepage`: `npm run build`
+- [x] `frontend/app`: `npm run build`
+
 ## 다음 세션 우선순위
 
 - [ ] Render 라이브 백엔드가 `835675a`에서 더 최신 카카오 문구 커밋 `924bc07`으로 올라갔는지 확인하고, 실제 카카오 흐름 메시지 1~2개를 점검한다.
 - [ ] 라이브 Kakao webhook 로그를 보고 follow-up/status 경로에 더 부드러운 safe-fallback 문구가 필요한지 판단한다.
-- [ ] `imgs/`의 남은 디자인 원본 자산과 현재 공유 이미지를 검토해, 한글 기본 원칙에 맞지 않는 영어 오버레이가 있으면 한국어 표면용 자산부터 다시 만든다.
+- [ ] `imgs/`의 남은 디자인 원본 자산 중 아직 영어 중심이거나 언어 혼합이 어색한 항목이 있는지 검토하고, 꼭 필요한 것만 추가로 한국어 버전으로 정리한다.
 - [ ] `app.happydoctor.kr`를 계속 상담 진입/상태 확인 표면으로 둘지, 더 넓은 환자 웹앱으로 확장할지 다음 제품 단계를 결정한다.
 - [ ] Kakao 전용 공유 이미지가 일반 OG 이미지와 분리돼야 하는지 검토한다.
