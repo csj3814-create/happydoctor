@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { peekDoctorNotification, confirmDoctorNotifications, dequeueFUPush, registerRoom } = require('../services/notifyService');
 
+const PORTAL_OPEN_IN_BROWSER_URL = 'https://portal.happydoctor.kr/open-browser?next=%2F';
+
 // API Key 검사 미들웨어
 function checkApiKey(req, res, next) {
     const apiKey = req.headers['x-api-key'];
@@ -49,12 +51,13 @@ router.post('/', checkApiKey, async (req, res) => {
                 const portalGuide =
                     "\n\n━━━━━━━━━━━━━━━\n" +
                     "💻 해피닥터 포털에서 답변해주세요!\n" +
-                    "👉 https://happydoctor.vercel.app\n\n" +
+                    "👉 " + PORTAL_OPEN_IN_BROWSER_URL + "\n\n" +
                     "[사용법]\n" +
-                    "1. Google 계정으로 로그인\n" +
-                    "2. 미답변 탭에서 환자 차트 확인\n" +
-                    "3. 답변 입력 → '환자에게 전송' 클릭\n" +
-                    "※ 답변은 환자가 다음 메시지를 보낼 때 자동 전달됩니다.";
+                    "1. 링크를 눌러 기본 브라우저에서 열기\n" +
+                    "2. Google 계정으로 로그인\n" +
+                    "3. 미답변 탭에서 환자 차트 확인\n" +
+                    "4. 답변 입력 → '환자에게 전송' 클릭\n" +
+                    "※ 카카오톡 안에서 안 열리면 우측 상단 메뉴의 브라우저 열기를 사용해 주세요.";
                 return res.status(200).json({ reply: charts.map(c => c.message).join('\n\n---\n\n') + portalGuide });
             } else {
                 return res.status(200).json({ reply: "✅ 대기 중인 신규 예진 차트가 없습니다." });
@@ -80,12 +83,13 @@ router.get('/poll', checkApiKey, async (req, res) => {
         const portalGuide =
             "\n\n━━━━━━━━━━━━━━━\n" +
             "💻 해피닥터 포털에서 답변해주세요!\n" +
-            "👉 https://happydoctor.vercel.app\n\n" +
+            "👉 " + PORTAL_OPEN_IN_BROWSER_URL + "\n\n" +
             "[사용법]\n" +
-            "1. Google 계정으로 로그인\n" +
-            "2. 미답변 탭에서 환자 차트 확인\n" +
-            "3. 답변 입력 → '환자에게 전송' 클릭\n" +
-            "※ 답변은 환자가 다음 메시지를 보낼 때 자동 전달됩니다.";
+            "1. 링크를 눌러 기본 브라우저에서 열기\n" +
+            "2. Google 계정으로 로그인\n" +
+            "3. 미답변 탭에서 환자 차트 확인\n" +
+            "4. 답변 입력 → '환자에게 전송' 클릭\n" +
+            "※ 카카오톡 안에서 안 열리면 우측 상단 메뉴의 브라우저 열기를 사용해 주세요.";
         return res.status(200).json({
             hasNew: true,
             reply: chart.message + portalGuide
