@@ -597,3 +597,14 @@
 - [ ] `node -e "require('./backend/routes/public'); require('./backend/routes/portal'); require('./backend/routes/messengerBot'); console.log('phase43-ok');"`
 - [ ] `https://app.happydoctor.kr/status?...`에서 의료진 답변 후 종료 버튼이 보이는지 확인
 - [ ] `https://happydoctor.onrender.com/api/version`으로 Render 최신 리비전 반영 확인
+
+## 단계 44: 환자 앱 홈 문구 압축 + CTA 대비 정리 (2026.04.05)
+
+### 목표
+- [x] `app.happydoctor.kr` 첫 화면에서 같은 설명이 여러 번 반복되지 않도록 내용을 줄인다.
+- [x] 앱 홈을 `무엇인지`, `누구를 위한지`, `어떻게 시작하는지` 중심으로만 다시 구성한다.
+- [x] 상단 `웹으로 상담 시작`, 하단 `웹으로 상담 시작`, `카카오톡 채널 열기` 버튼 텍스트 색을 배경 대비에 맞게 명시적으로 고정한다.
+
+### 검증
+- [x] `frontend/app`: `npm run lint`
+- [x] `frontend/app`: `npm run build`
