@@ -14,6 +14,7 @@ type StatusPageProps = {
 const timeFormatter = new Intl.DateTimeFormat('ko-KR', {
   dateStyle: 'medium',
   timeStyle: 'short',
+  timeZone: 'Asia/Seoul',
 })
 
 function formatDateTime(value: string | null) {
