@@ -1,7 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const { analyzeAndRouteTriage, analyzeFollowUp } = require('../services/llmService');
-const { enqueueDoctorNotification } = require('../services/notifyService');
+const {
+    enqueueDoctorNotification,
+    clearPatientChannelPushes,
+} = require('../services/notifyService');
 const followUpService = require('../services/followUpService');
 const dbService = require('../services/dbService');
 const { appSiteUrl } = require('../config');
@@ -518,6 +521,7 @@ router.post('/close-consultation', async (req, res) => {
 
         // 1) F/U 타이머 및 대기 데이터 삭제
         await followUpService.cancelFollowUp(userId);
+        await clearPatientChannelPushes(userId, 'doctor_reply');
 
         // 2) DB 상태 업데이트
         dbService.closeConsultation(userId, reason).catch(err => console.error('DB Close Error:', err));
@@ -576,7 +580,8 @@ router.post('/check-doctor-reply', async (req, res) => {
             const replyText =
                 `의료진 답변이 도착했습니다.\n\n` +
                 `👨‍⚕️ ${pending.doctorName}\n\n` +
-                `${pending.message}${statusLinkText}`;
+                `${pending.message}${statusLinkText}\n\n` +
+                `도움이 충분했다면 이 채널에 상담종료라고 보내 상담을 마무리해 주세요.`;
 
             return res.status(200).json({
                 version: "2.0",

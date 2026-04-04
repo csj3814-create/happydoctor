@@ -643,36 +643,73 @@ async function getConsultationTrackingById(consultationId) {
   }
 }
 
+async function resolvePublicConsultationDocByLookup(trackingLookup) {
+  if (!db || !trackingLookup) return null;
+
+  const normalizedLookup = trackingLookup.toString().trim();
+  if (!normalizedLookup) return null;
+
+  const candidateQueries = [];
+  const trackingCode = normalizeTrackingCode(normalizedLookup);
+
+  if (trackingCode) {
+    candidateQueries.push(['publicTrackingCode', trackingCode]);
+  }
+
+  candidateQueries.push(['publicTrackingToken', normalizedLookup]);
+
+  for (const [field, value] of candidateQueries) {
+    const consultationSnapshot = await db.collection('consultations')
+      .where(field, '==', value)
+      .limit(1)
+      .get();
+
+    if (!consultationSnapshot.empty) {
+      return consultationSnapshot.docs[0];
+    }
+  }
+
+  return null;
+}
+
+async function markUnseenDoctorRepliesAsSeen(consultationId) {
+  if (!db || !consultationId) return 0;
+
+  const repliesSnapshot = await db.collection('doctor_replies')
+    .where('consultationId', '==', consultationId)
+    .get();
+
+  const unseenReplies = repliesSnapshot.docs.filter((replyDoc) => !replyDoc.data().seen);
+  if (unseenReplies.length === 0) return 0;
+
+  const batch = db.batch();
+  const seenAt = admin.firestore.FieldValue.serverTimestamp();
+
+  unseenReplies.forEach((replyDoc) => {
+    batch.update(replyDoc.ref, {
+      seen: true,
+      seenAt,
+    });
+  });
+
+  await batch.commit();
+
+  await Promise.all(
+    unseenReplies.map(async (replyDoc) => {
+      const reply = replyDoc.data() || {};
+      if (!reply.doctorEmail) return;
+      await awardHDT(reply.doctorEmail, reply.doctorName, HDT_SEEN, 'seen');
+    }),
+  );
+
+  return unseenReplies.length;
+}
+
 async function getPublicConsultationStatusByLookup(trackingLookup) {
   if (!db || !trackingLookup) return null;
 
   try {
-    const normalizedLookup = trackingLookup.toString().trim();
-    if (!normalizedLookup) return null;
-
-    const candidateQueries = [];
-    const trackingCode = normalizeTrackingCode(normalizedLookup);
-
-    if (trackingCode) {
-      candidateQueries.push(['publicTrackingCode', trackingCode]);
-    }
-
-    candidateQueries.push(['publicTrackingToken', normalizedLookup]);
-
-    let consultationDoc = null;
-
-    for (const [field, value] of candidateQueries) {
-      const consultationSnapshot = await db.collection('consultations')
-        .where(field, '==', value)
-        .limit(1)
-        .get();
-
-      if (!consultationSnapshot.empty) {
-        consultationDoc = consultationSnapshot.docs[0];
-        break;
-      }
-    }
-
+    const consultationDoc = await resolvePublicConsultationDocByLookup(trackingLookup);
     if (!consultationDoc) return null;
 
     const consultationData = consultationDoc.data() || {};
@@ -695,6 +732,39 @@ async function getPublicConsultationStatusByLookup(trackingLookup) {
     return buildPublicConsultationStatus(consultation, replies);
   } catch (error) {
     console.error('[DB PublicStatus Error]', error);
+    throw error;
+  }
+}
+
+async function closePublicConsultationByLookup(trackingLookup, reason) {
+  if (!db || !trackingLookup) return null;
+
+  try {
+    const consultationDoc = await resolvePublicConsultationDocByLookup(trackingLookup);
+    if (!consultationDoc) return null;
+
+    const consultationData = consultationDoc.data() || {};
+    const wasCompleted =
+      consultationData.status === 'COMPLETED' || Boolean(consultationData.closedAt);
+
+    if (!wasCompleted) {
+      await consultationDoc.ref.update({
+        status: 'COMPLETED',
+        closedAt: admin.firestore.FieldValue.serverTimestamp(),
+        closeReason: reason || '환자가 상태 화면에서 상담 종료를 선택함',
+      });
+      await updatePublicStats({ completedCount: 1 });
+    }
+
+    await markUnseenDoctorRepliesAsSeen(consultationDoc.id);
+
+    return {
+      consultationId: consultationDoc.id,
+      userId: consultationData.userId || null,
+      alreadyClosed: wasCompleted,
+    };
+  } catch (error) {
+    console.error('[DB PublicClose Error]', error);
     throw error;
   }
 }
@@ -820,6 +890,7 @@ module.exports = {
   getLatestConsultationTracking,
   getPublicConsultationStatusByLookup,
   getPublicConsultationStatusByToken: getPublicConsultationStatusByLookup,
+  closePublicConsultationByLookup,
   awardHDT,
   getHDTLeaderboard,
   getDoctorStats,

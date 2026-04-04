@@ -583,3 +583,17 @@
 - [ ] `imgs/`의 남은 디자인 원본 자산 중 아직 영어 중심이거나 언어 혼합이 어색한 항목이 있는지 검토하고, 꼭 필요한 것만 추가로 한국어 버전으로 정리한다.
 - [ ] `app.happydoctor.kr`를 계속 상담 진입/상태 확인 중심으로 둘지, 이후 재방문/후속 안내까지 확장할지 다음 제품 단계를 결정한다.
 - [ ] Kakao 전용 공유 이미지가 일반 OG 이미지와 분리돼야 하는지 검토한다.
+
+## 단계 43: 상태 화면 종료 + 카카오 답변 전달 강화 (2026.04.05)
+
+### 목표
+- [x] 상태 확인 화면에서 환자가 의료진 답변을 본 뒤 바로 상담 종료를 선택할 수 있게 한다.
+- [x] 상태 화면의 `새 상담 시작` 버튼과 종료 CTA를 흰 글씨로 고정해 작은 화면에서도 대비가 무너지지 않게 한다.
+- [x] 의료진 답변 저장 시 환자 카카오 채널로 답변과 종료 안내를 함께 보낼 수 있는 대기 큐를 만든다.
+- [x] MessengerBotR 기준 5분 주기로 환자 답변 알림을 확인해 채널에 전달하는 경로를 추가한다.
+
+### 검증
+- [ ] `frontend/app`: `npm run build`
+- [ ] `node -e "require('./backend/routes/public'); require('./backend/routes/portal'); require('./backend/routes/messengerBot'); console.log('phase43-ok');"`
+- [ ] `https://app.happydoctor.kr/status?...`에서 의료진 답변 후 종료 버튼이 보이는지 확인
+- [ ] `https://happydoctor.onrender.com/api/version`으로 Render 최신 리비전 반영 확인

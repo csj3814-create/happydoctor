@@ -1,6 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { peekDoctorNotification, confirmDoctorNotifications, dequeueFUPush, registerRoom } = require('../services/notifyService');
+const {
+    peekDoctorNotification,
+    confirmDoctorNotifications,
+    dequeueFUPush,
+    dequeuePatientChannelPush,
+    registerRoom,
+} = require('../services/notifyService');
 
 const PORTAL_OPEN_IN_BROWSER_URL = 'https://portal.happydoctor.kr/open-browser?next=%2F';
 
@@ -110,7 +116,27 @@ router.get('/fu-push-poll', checkApiKey, async (req, res) => {
             hasNew: true,
             roomName: fuItem.roomName,
             message: fuItem.message,
-            userId: fuItem.userId
+            userId: fuItem.userId,
+            type: fuItem.type || 'follow_up',
+        });
+    }
+    res.status(200).json({ hasNew: false });
+});
+
+/**
+ * 환자 채널 푸시 폴링 엔드포인트
+ * 의료진 답변 도착 등 환자에게 먼저 알려야 하는 메시지를
+ * MessengerBotR이 5분 주기로 가져가 1:1 채널에 전달한다.
+ */
+router.get('/patient-push-poll', checkApiKey, async (req, res) => {
+    const item = await dequeuePatientChannelPush();
+    if (item) {
+        return res.status(200).json({
+            hasNew: true,
+            roomName: item.roomName,
+            message: item.message,
+            userId: item.userId,
+            type: item.type || 'general',
         });
     }
     res.status(200).json({ hasNew: false });

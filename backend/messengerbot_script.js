@@ -40,9 +40,41 @@ const PATIENT_ROOM = "행복한의사";
 // ※ MessengerBotR은 오픈채팅방 이름("해피닥터 AI 인턴 보듬 실험방") 대신
 //    "최석재"를 room 식별자로 사용합니다. (오픈채팅 특성상 고정값)
 const EXPERIMENT_ROOM = "최석재";
+const PATIENT_PUSH_POLL_INTERVAL_MS = 5 * 60 * 1000;
+
+function postJson(path, payload) {
+    return org.jsoup.Jsoup.connect(SERVER_URL + path)
+        .header("Content-Type", "application/json")
+        .header("x-api-key", API_KEY)
+        .requestBody(JSON.stringify(payload))
+        .ignoreContentType(true)
+        .ignoreHttpErrors(true)
+        .method(org.jsoup.Connection.Method.POST)
+        .execute();
+}
+
+function registerPatientRoom(userId, roomName) {
+    try {
+        postJson("/api/messengerbot/register-room", {
+            userId: userId,
+            roomName: roomName
+        });
+    } catch (e) {
+        // 등록 실패는 무시하고 다음 메시지에서 다시 시도
+    }
+}
+
+function isPatientConversation(room, isGroupChat) {
+    if (isGroupChat) return false;
+    return room === PATIENT_ROOM || room.indexOf("행복한 의사") !== -1 || room.indexOf("행복한의사") !== -1;
+}
 
 // ===== 메시지 수신 핸들러 =====
 function response(room, msg, sender, isGroupChat, replier, imageDB, packageName) {
+
+    if (isPatientConversation(room, isGroupChat) && sender) {
+        registerPatientRoom(sender, room);
+    }
 
     // [디버그] 실제 room 식별자 확인용 — 작동 확인 후 삭제 가능
     if (msg.trim() === "~방이름") {
@@ -153,6 +185,7 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
 
 // ===== 의료진 차트 폴링 (10초마다) =====
 var doctorPollTimer = null;
+var patientPushPollTimer = null;
 
 function startDoctorPolling() {
     if (doctorPollTimer) return;
@@ -185,5 +218,36 @@ function startDoctorPolling() {
     doctorPollTimer.start();
 }
 
+function startPatientPushPolling() {
+    if (patientPushPollTimer) return;
+
+    patientPushPollTimer = java.lang.Thread(new java.lang.Runnable({
+        run: function() {
+            while (true) {
+                try {
+                    var pollRes = org.jsoup.Jsoup.connect(SERVER_URL + "/api/messengerbot/patient-push-poll")
+                        .header("x-api-key", API_KEY)
+                        .ignoreContentType(true)
+                        .method(org.jsoup.Connection.Method.GET)
+                        .execute()
+                        .body();
+
+                    var data = JSON.parse(pollRes);
+                    if (data.hasNew && data.roomName && data.message) {
+                        Api.replyRoom(data.roomName, data.message);
+                    }
+                } catch (e) {
+                    // 폴링 실패는 무시
+                }
+
+                java.lang.Thread.sleep(PATIENT_PUSH_POLL_INTERVAL_MS);
+            }
+        }
+    }));
+    patientPushPollTimer.setDaemon(true);
+    patientPushPollTimer.start();
+}
+
 // 봇 시작 시 폴링 시작
 startDoctorPolling();
+startPatientPushPolling();
