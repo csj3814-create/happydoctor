@@ -25,25 +25,6 @@ const QUESTION_PREVIEW_LIMIT = 50
 
 const HERO_BADGES = ['무료 온라인 의료상담', '의료 접근성 취약계층 중심', 'AI 인턴 보듬이 + 자원봉사 의료진']
 
-const HERO_POINTS = [
-  {
-    title: '의료 접근성 취약계층 중심',
-    desc: '노숙인, 이주민, 농아인, 다문화가정처럼 의료 접근성이 더 낮은 분들부터 먼저 돕습니다.',
-  },
-  {
-    title: '웹과 카카오톡 두 경로',
-    desc: '익숙한 채널이 카카오톡이 아니어도 괜찮습니다. 홈페이지와 웹앱에서도 온라인 의료상담을 바로 시작할 수 있습니다.',
-  },
-  {
-    title: 'AI 인턴 보듬이 + 자원봉사 의료진',
-    desc: '보듬이가 먼저 정리하고, 필요한 경우 자원봉사 의료진이 직접 확인해 다음 방향을 더 빠르게 전합니다.',
-  },
-  {
-    title: '봉사와 기술의 결합',
-    desc: '의료봉사의 진심과 디지털 접근성을 함께 살려, 의료가 멀게 느껴지는 분들에게 먼저 닿는 구조를 만듭니다.',
-  },
-]
-
 const FEATURE_CARDS = [
   {
     icon: '🩺',
@@ -187,12 +168,14 @@ function CTAButton({
 }: {
   href: string
   children: React.ReactNode
-  variant?: 'primary' | 'secondary'
+  variant?: 'primary' | 'secondary' | 'signal'
 }) {
   const className =
     variant === 'primary'
-      ? 'inline-flex items-center justify-center rounded-full bg-[#FEE500] px-6 py-3 text-sm font-bold text-[#2C1B00] shadow-lg shadow-black/15 transition hover:-translate-y-0.5'
-      : 'inline-flex items-center justify-center rounded-full border border-white/25 bg-white/8 px-6 py-3 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/14'
+      ? 'inline-flex items-center justify-center rounded-full bg-[#0B3E70] px-6 py-3 text-sm font-bold text-white shadow-lg shadow-black/15 transition hover:-translate-y-0.5'
+      : variant === 'signal'
+        ? 'inline-flex items-center justify-center rounded-full bg-[#FEE500] px-6 py-3 text-sm font-bold text-[#2C1B00] shadow-lg shadow-black/15 transition hover:-translate-y-0.5'
+        : 'inline-flex items-center justify-center rounded-full border border-white/25 bg-white/8 px-6 py-3 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/14'
 
   return (
     <a href={href} target="_blank" rel="noopener noreferrer" className={className}>
@@ -238,8 +221,8 @@ function Hero({ stats }: { stats: Stats | null }) {
           </a>
         </div>
 
-        <div className="grid items-center gap-10 lg:grid-cols-[1.08fr_0.92fr]">
-          <div className="max-w-2xl">
+        <div className="grid items-center gap-8 lg:grid-cols-[1.08fr_0.92fr] lg:gap-10">
+          <div className="order-2 max-w-2xl lg:order-1">
             <div className="mb-4 flex flex-wrap gap-2">
               {HERO_BADGES.map((badge) => (
                 <span
@@ -254,31 +237,25 @@ function Hero({ stats }: { stats: Stats | null }) {
             <h1 className="text-4xl font-bold leading-tight md:text-5xl md:leading-[1.08] xl:whitespace-nowrap">
               제비처럼, 필요한 곳에 닿는 의료
             </h1>
-            <p className="mt-6 text-sm leading-7 text-white/78 md:text-base md:leading-8 xl:whitespace-nowrap">
-              행복한 의사는 의료 접근성 취약계층을 위한 무료 온라인 의료상담 서비스입니다. AI 인턴 보듬이와 자원봉사 의료진이 함께 움직이며, 더 빨리 더 쉽게 도움에 닿도록 돕습니다.
+            <p className="mt-5 max-w-xl text-sm leading-7 text-white/78 md:text-base md:leading-8">
+              의료 접근성 취약계층이 웹과 카카오톡에서 먼저 도움을 청할 수 있도록, AI 인턴 보듬이와 자원봉사 의료진이 함께 움직이는 무료 온라인 의료상담입니다.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <CTAButton href={WEB_START_URL}>웹으로 상담 시작</CTAButton>
-              <CTAButton href={KAKAO_CHAT_URL} variant="secondary">
+              <CTAButton href={KAKAO_CHAT_URL} variant="signal">
                 카카오톡으로 상담하기
               </CTAButton>
               <CTAButton href={VOLUNTEER_URL} variant="secondary">
                 의료진 참여 문의
               </CTAButton>
             </div>
-
-            <div className="mt-10 grid gap-3 sm:grid-cols-2">
-              {HERO_POINTS.map((point) => (
-                <div key={point.title} className="glass-card rounded-3xl p-5">
-                  <p className="text-sm font-semibold text-white">{point.title}</p>
-                  <p className="mt-2 text-sm leading-6 text-white/68">{point.desc}</p>
-                </div>
-              ))}
-            </div>
+            <p className="mt-5 max-w-xl text-xs leading-6 text-white/62 md:text-sm">
+              설명은 간단하게, 연결은 빠르게. 먼저 상황을 남기면 같은 흐름 안에서 답변과 상태 확인까지 이어집니다.
+            </p>
           </div>
 
-          <div className="relative lg:translate-y-8">
+          <div className="order-1 relative mx-auto w-full max-w-[33rem] lg:order-2 lg:translate-y-8">
             <div className="mesh-panel overflow-hidden rounded-[2rem] border border-white/14 p-3 shadow-[0_40px_90px_rgba(3,15,30,0.35)]">
               <div className="relative aspect-[16/11] overflow-hidden rounded-[1.5rem]">
                 <Image
@@ -292,7 +269,7 @@ function Hero({ stats }: { stats: Stats | null }) {
               </div>
             </div>
 
-            <div className="lift-card absolute -bottom-6 left-3 right-14 rounded-[1.75rem] bg-white p-4 text-slate-900 shadow-2xl shadow-slate-950/25 md:left-8 md:right-auto md:w-[320px]">
+            <div className="lift-card absolute -bottom-5 left-3 right-14 rounded-[1.75rem] bg-white p-4 text-slate-900 shadow-2xl shadow-slate-950/25 md:left-8 md:right-auto md:w-[320px]">
               <div className="flex items-center gap-3">
                 <div className="relative h-14 w-14 overflow-hidden rounded-2xl bg-sky-50">
                   <Image src="/design/chatbot-badge.png" alt="보듬이 챗봇 아이콘" fill sizes="56px" className="object-cover" />
@@ -351,16 +328,14 @@ function StorySection() {
           <SectionHeading
             eyebrow="Mission"
             title="왜 행복한 의사인가요?"
-            desc="동화 속 제비가 보석과 온기를 필요한 이웃에게 전했듯, 행복한 의사는 의료진의 손길이 필요한 곳에 닿도록 움직입니다."
+            desc="동화 속 제비가 필요한 곳에 먼저 닿았듯, 행복한 의사는 의료가 멀게 느껴지는 사람 곁으로 먼저 가는 온라인 상담 창구를 지향합니다."
           />
           <div className="mt-8 space-y-4 text-sm leading-7 text-slate-600 md:text-base">
             <p>
               코로나19 시기를 지나며 무의촌 거주자, 경제적으로 어려운 분들, 언어소통에 어려움을 겪는 농아인과
-              다문화가정이 의료 혜택에서 쉽게 소외된다는 사실이 더 선명하게 드러났습니다.
-            </p>
-            <p>
-              행복한 의사는 자원봉사 의료진의 재능기부와 디지털 접근성을 결합해,
-              <strong className="text-slate-900"> 완전 무료</strong>로 전문 의료상담을 제공합니다.
+              다문화가정이 의료에서 더 쉽게 멀어진다는 사실이 선명해졌습니다. 행복한 의사는 자원봉사 의료진의
+              재능기부와 디지털 접근성을 결합해, 병원에 가기 전 먼저 설명하고 방향을 잡을 수 있는
+              <strong className="text-slate-900"> 무료 온라인 의료상담</strong>을 운영합니다.
             </p>
           </div>
 

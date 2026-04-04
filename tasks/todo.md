@@ -608,3 +608,14 @@
 ### 검증
 - [x] `frontend/app`: `npm run lint`
 - [x] `frontend/app`: `npm run build`
+
+## 단계 45: 홈페이지 히어로 재배치 + CTA 역할 복원 (2026.04.05)
+
+### 목표
+- [x] `happydoctor.kr` 첫 화면에서 모바일 기준 이미지가 텍스트보다 먼저 보이도록 히어로 순서를 재배치한다.
+- [x] 홈페이지 히어로에서 반복 설명용 카드 밀도를 줄이고, 핵심 소개와 행동 버튼만 먼저 보이게 정리한다.
+- [x] `카카오톡으로 상담하기` CTA는 카카오 노랑으로, `웹으로 상담 시작`은 해피닥터 기본 진입 CTA 톤으로 역할을 다시 분명히 한다.
+
+### 검증
+- [x] `frontend/homepage`: `npm run lint`
+- [x] `frontend/homepage`: `npm run build`
