@@ -574,7 +574,7 @@
 ### 검증
 - [x] `frontend/app`: `npm run build`
 - [x] `node -e "require('./backend/services/dbService'); require('./backend/routes/public'); require('./backend/routes/kakaoWebhook'); console.log('status-code-ok');"`
-- [ ] 라이브 `app.happydoctor.kr/status`와 `app.happydoctor.kr/start` 문구가 간결하게 정리됐는지 확인한다.
+- [x] 라이브 `app.happydoctor.kr/status`와 `app.happydoctor.kr/start` 문구가 간결하게 정리됐는지 확인한다.
 
 ## 다음 세션 우선순위
 
