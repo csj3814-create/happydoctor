@@ -5,12 +5,15 @@ const {
   getConsultationSummary,
   getConsultationById,
   saveDoctorReply,
+  getConsultationTrackingById,
   awardHDT,
   getHDTLeaderboard,
   getDoctorStats,
   HDT_REPLY,
   getAdmin,
 } = require('../services/dbService');
+const { enqueuePatientChannelPush } = require('../services/notifyService');
+const { appSiteUrl } = require('../config');
 const { getAllowedDoctorEmails } = require('../config');
 
 const router = express.Router();
@@ -82,6 +85,39 @@ function serializeTimestamps(value) {
   );
 }
 
+function buildPatientStatusUrl(trackingInfo) {
+  const trackingCode = trackingInfo?.trackingCode || '';
+  const trackingToken = trackingInfo?.trackingToken || '';
+  if (!trackingCode && !trackingToken) return '';
+
+  const queryKey = trackingCode ? 'code' : 'token';
+  const queryValue = trackingCode || trackingToken;
+  return `${appSiteUrl.replace(/\/$/, '')}/status?${queryKey}=${encodeURIComponent(queryValue)}`;
+}
+
+function buildPatientReplyPushMessage({
+  doctorName,
+  message,
+  statusUrl,
+  trackingCode,
+}) {
+  return [
+    '의료진 답변이 도착했습니다.',
+    '',
+    `👨‍⚕️ ${doctorName || '해피닥터 의료진'}`,
+    '',
+    message,
+    '',
+    statusUrl ? `상태 확인: ${statusUrl}` : null,
+    trackingCode ? `직접 입력 코드: ${trackingCode}` : null,
+    '',
+    '도움이 충분했다면 이 채널에 상담종료라고 보내 상담을 마무리해 주세요.',
+    '추가로 설명이 필요하면 상태 확인 화면이나 채널에서 다시 이어서 말씀하셔도 됩니다.',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
 router.get('/consultations', requireDoctorAuth, async (req, res) => {
   try {
     const listQuery = parseListQuery(req.query);
@@ -139,6 +175,19 @@ router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
       message,
       req.doctor.name,
       req.doctor.email,
+    );
+
+    const trackingInfo = await getConsultationTrackingById(consultation.id);
+    const statusUrl = buildPatientStatusUrl(trackingInfo);
+    await enqueuePatientChannelPush(
+      consultation.userId,
+      buildPatientReplyPushMessage({
+        doctorName: req.doctor.name,
+        message,
+        statusUrl,
+        trackingCode: trackingInfo?.trackingCode || null,
+      }),
+      'doctor_reply',
     );
 
     await awardHDT(req.doctor.email, req.doctor.name, HDT_REPLY, 'reply');

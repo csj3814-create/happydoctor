@@ -3,6 +3,7 @@ const { getDb, getAdmin } = require('./dbService');
 
 const DOCTOR_NOTIFICATIONS = 'doctor_notifications';
 const FOLLOW_UP_PUSHES = 'follow_up_pushes';
+const PATIENT_CHANNEL_PUSHES = 'patient_channel_pushes';
 const MESSENGER_ROOMS = 'messenger_rooms';
 
 function getCollection(name) {
@@ -86,9 +87,13 @@ async function confirmDoctorNotifications() {
 }
 
 async function enqueueFUPush(userId, message) {
+  return enqueuePatientChannelPush(userId, message, 'follow_up');
+}
+
+async function enqueuePatientChannelPush(userId, message, type = 'general') {
   const db = getDb();
   if (!db) {
-    console.warn('[F/U Push] Firestore unavailable, skipping enqueue.');
+    console.warn('[Patient Push] Firestore unavailable, skipping enqueue.');
     return false;
   }
 
@@ -96,25 +101,30 @@ async function enqueueFUPush(userId, message) {
   const roomName = roomSnapshot.exists ? roomSnapshot.data().roomName : null;
 
   if (!roomName) {
-    console.warn(`[F/U Push] No registered room found for ${userId}.`);
+    console.warn(`[Patient Push] No registered room found for ${userId}.`);
     return false;
   }
 
-  await db.collection(FOLLOW_UP_PUSHES).add({
+  await db.collection(PATIENT_CHANNEL_PUSHES).add({
     id: randomUUID(),
     userId,
     roomName,
     message,
+    type,
     status: 'pending',
     createdAt: getAdmin().firestore.FieldValue.serverTimestamp(),
   });
 
-  console.log(`[F/U Push Enqueued] ${userId} -> ${roomName}`);
+  console.log(`[Patient Push Enqueued] ${userId} -> ${roomName} (${type})`);
   return true;
 }
 
 async function dequeueFUPush() {
-  const collection = getCollection(FOLLOW_UP_PUSHES);
+  return dequeuePatientChannelPush();
+}
+
+async function dequeuePatientChannelPush() {
+  const collection = getCollection(PATIENT_CHANNEL_PUSHES);
   if (!collection) return null;
 
   const snapshot = await collection
@@ -131,6 +141,36 @@ async function dequeueFUPush() {
   });
 
   return doc.data();
+}
+
+async function clearPatientChannelPushes(userId, type = null) {
+  const collection = getCollection(PATIENT_CHANNEL_PUSHES);
+  if (!collection || !userId) return 0;
+
+  const snapshot = await collection
+    .where('userId', '==', userId)
+    .get();
+
+  const docs = snapshot.docs.filter((doc) => {
+    const data = doc.data() || {};
+    if (data.status !== 'pending') return false;
+    if (type && data.type !== type) return false;
+    return true;
+  });
+
+  if (docs.length === 0) return 0;
+
+  const batch = getDb().batch();
+  const now = getAdmin().firestore.FieldValue.serverTimestamp();
+  docs.forEach((doc) => {
+    batch.update(doc.ref, {
+      status: 'cancelled',
+      cancelledAt: now,
+    });
+  });
+  await batch.commit();
+
+  return docs.length;
 }
 
 async function registerRoom(userId, roomName) {
@@ -169,18 +209,19 @@ async function getQueueStatus() {
   }
 
   const doctorCollection = db.collection(DOCTOR_NOTIFICATIONS);
-  const followUpCollection = db.collection(FOLLOW_UP_PUSHES);
+  const patientPushCollection = db.collection(PATIENT_CHANNEL_PUSHES);
   const roomsCollection = db.collection(MESSENGER_ROOMS);
 
-  const [pendingCount, fuPushPending, registeredRooms] = await Promise.all([
+  const [pendingCount, patientPushPending, registeredRooms] = await Promise.all([
     countDocuments(doctorCollection.where('status', '==', 'pending')),
-    countDocuments(followUpCollection.where('status', '==', 'pending')),
+    countDocuments(patientPushCollection.where('status', '==', 'pending')),
     countDocuments(roomsCollection),
   ]);
 
   return {
     pendingCount,
-    fuPushPending,
+    fuPushPending: patientPushPending,
+    patientPushPending,
     registeredRooms,
   };
 }
@@ -191,6 +232,9 @@ module.exports = {
   confirmDoctorNotifications,
   enqueueFUPush,
   dequeueFUPush,
+  enqueuePatientChannelPush,
+  dequeuePatientChannelPush,
+  clearPatientChannelPushes,
   registerRoom,
   getRoomName,
   getQueueStatus,

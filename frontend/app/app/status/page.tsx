@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import StatusCloseActions from '@/components/StatusCloseActions'
 import { fetchConsultationStatus, normalizeStatusLookup, type PublicConsultationStatus } from '@/lib/status'
 
 export const dynamic = 'force-dynamic'
@@ -100,6 +101,9 @@ export default async function StatusPage({ searchParams }: StatusPageProps) {
     consultation && consultation.doctorReplies.length > 0
       ? consultation.doctorReplies[consultation.doctorReplies.length - 1]
       : null
+  const canCloseConsultation = consultation
+    ? consultation.status === 'doctor_replied' && !consultation.closedAt
+    : false
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#eef8ff_0%,#ffffff_32%,#f7fbff_100%)]">
@@ -126,7 +130,8 @@ export default async function StatusPage({ searchParams }: StatusPageProps) {
             </Link>
             <Link
               href="/start"
-              className="rounded-full bg-[var(--navy)] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_14px_24px_rgba(18,60,103,0.22)] transition hover:translate-y-[-1px]"
+              className="rounded-full bg-[var(--navy)] px-5 py-2.5 text-sm font-semibold text-white visited:text-white shadow-[0_14px_24px_rgba(18,60,103,0.22)] transition hover:translate-y-[-1px]"
+              style={{ color: '#ffffff' }}
             >
               새 상담 시작
             </Link>
@@ -229,6 +234,14 @@ export default async function StatusPage({ searchParams }: StatusPageProps) {
               </div>
 
               <div className="space-y-5">
+                {normalizedLookup ? (
+                  <StatusCloseActions
+                    lookup={normalizedLookup}
+                    canClose={canCloseConsultation}
+                    isClosed={consultation.status === 'closed'}
+                  />
+                ) : null}
+
                 {(consultation.closedAt || consultation.closeReason) && (
                   <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
                     <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">

@@ -4,8 +4,12 @@ const { randomUUID } = require('crypto');
 const router = express.Router();
 
 const dbService = require('../services/dbService');
+const followUpService = require('../services/followUpService');
 const { analyzeAndRouteTriage } = require('../services/llmService');
-const { enqueueDoctorNotification } = require('../services/notifyService');
+const {
+  enqueueDoctorNotification,
+  clearPatientChannelPushes,
+} = require('../services/notifyService');
 const { appSiteUrl } = require('../config');
 
 function isPlainObject(value) {
@@ -153,6 +157,37 @@ router.get('/consultations/status/:lookup', async (req, res) => {
   } catch (error) {
     console.error('[Public Consultation Status Error]', error);
     return res.status(500).json({ error: '상담 상태를 불러오지 못했습니다.' });
+  }
+});
+
+router.post('/consultations/status/:lookup/close', async (req, res) => {
+  try {
+    const lookup = (req.params.lookup || '').toString().trim();
+    const reason = sanitizeSingleLine(req.body?.reason, 120) || '환자가 상태 화면에서 상담 종료를 선택함';
+
+    if (!lookup) {
+      return res.status(404).json({ error: '상담 상태를 찾을 수 없습니다.' });
+    }
+
+    const closed = await dbService.closePublicConsultationByLookup(lookup, reason);
+    if (!closed) {
+      return res.status(404).json({ error: '상담 상태를 찾을 수 없습니다.' });
+    }
+
+    if (closed.userId) {
+      await followUpService.cancelFollowUp(closed.userId);
+      await clearPatientChannelPushes(closed.userId, 'doctor_reply');
+    }
+
+    const consultation = await dbService.getPublicConsultationStatusByLookup(lookup);
+    res.set('Cache-Control', 'no-store');
+    return res.json({
+      ok: true,
+      consultation,
+    });
+  } catch (error) {
+    console.error('[Public Consultation Close Error]', error);
+    return res.status(500).json({ error: '상담을 종료하지 못했습니다. 잠시 후 다시 시도해 주세요.' });
   }
 });
 
