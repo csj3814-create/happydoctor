@@ -14,6 +14,21 @@ const {
 const { getAllowedDoctorEmails } = require('../config');
 
 const router = express.Router();
+const ALLOWED_LIST_STATUS = new Set(['all', 'active', 'replied', 'closed']);
+
+function parseListQuery(query = {}) {
+  const status = (query.status || 'all').toString().trim().toLowerCase();
+  const search = typeof query.search === 'string' ? query.search.trim() : '';
+  const offset = Number.parseInt(query.offset, 10);
+  const limit = Number.parseInt(query.limit, 10);
+
+  return {
+    status: ALLOWED_LIST_STATUS.has(status) ? status : 'all',
+    search,
+    offset: Number.isFinite(offset) ? Math.max(0, offset) : 0,
+    limit: Number.isFinite(limit) ? Math.max(1, Math.min(100, limit)) : 50,
+  };
+}
 
 async function requireDoctorAuth(req, res, next) {
   const auth = req.headers.authorization;
@@ -21,10 +36,15 @@ async function requireDoctorAuth(req, res, next) {
     return res.status(401).json({ error: '인증 토큰이 없습니다.' });
   }
 
+  const admin = getAdmin();
+  if (!admin) {
+    return res.status(503).json({ error: '인증 서비스가 아직 준비되지 않았습니다.' });
+  }
+
   const idToken = auth.slice(7);
 
   try {
-    const decoded = await getAdmin().auth().verifyIdToken(idToken);
+    const decoded = await admin.auth().verifyIdToken(idToken);
     const email = (decoded.email || '').toLowerCase();
     const allowedEmails = getAllowedDoctorEmails();
 
@@ -64,20 +84,16 @@ function serializeTimestamps(value) {
 
 router.get('/consultations', requireDoctorAuth, async (req, res) => {
   try {
-    const { consultations, total } = await getActiveConsultations({
-      status: req.query.status,
-      search: req.query.search,
-      offset: req.query.offset,
-      limit: req.query.limit,
-    });
+    const listQuery = parseListQuery(req.query);
+    const { consultations, total } = await getActiveConsultations(listQuery);
 
-    res.json({
+    return res.json({
       consultations: consultations.map(serializeTimestamps),
       total,
     });
   } catch (error) {
     console.error('[Portal List Error]', error);
-    res.status(500).json({ error: '목록 조회 실패' });
+    return res.status(500).json({ error: '목록 조회 실패' });
   }
 });
 
@@ -106,8 +122,8 @@ router.get('/consultations/:id', requireDoctorAuth, async (req, res) => {
 });
 
 router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
-  const { message } = req.body;
-  if (!message || !message.trim()) {
+  const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+  if (!message) {
     return res.status(400).json({ error: '답변 내용을 입력해 주세요.' });
   }
 
@@ -120,7 +136,7 @@ router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
     const replyId = await saveDoctorReply(
       consultation.id,
       consultation.userId,
-      message.trim(),
+      message,
       req.doctor.name,
       req.doctor.email,
     );

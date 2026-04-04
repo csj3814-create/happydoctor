@@ -42,12 +42,35 @@ function getPortalOrigins() {
   ]));
 }
 
+function getRuntimeRevision() {
+  const candidates = [
+    ['RENDER_GIT_COMMIT', getEnv('RENDER_GIT_COMMIT')],
+    ['VERCEL_GIT_COMMIT_SHA', getEnv('VERCEL_GIT_COMMIT_SHA')],
+    ['GIT_COMMIT', getEnv('GIT_COMMIT')],
+  ];
+
+  const match = candidates.find(([, value]) => value);
+  if (!match) {
+    return {
+      revision: 'unknown',
+      source: 'unavailable',
+    };
+  }
+
+  const [source, revision] = match;
+  return {
+    revision,
+    source,
+  };
+}
+
 module.exports = {
   LEGACY_TOTAL,
   LEGACY_COMPLETED,
   DEFAULT_STATS,
   getAllowedDoctorEmails,
   getPortalOrigins,
+  getRuntimeRevision,
   port: getEnv('PORT', '3000'),
   appSiteUrl: getEnv('APP_SITE_URL', 'https://app.happydoctor.kr'),
   renderExternalUrl: getEnv('RENDER_EXTERNAL_URL', 'https://happydoctor.onrender.com'),

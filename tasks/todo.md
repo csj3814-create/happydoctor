@@ -451,8 +451,21 @@
 - [x] `node -e "require('./backend/services/notifyService'); require('./backend/services/followUpService'); require('./backend/routes/messengerBot'); console.log('services-ok');"`
 - [x] `git grep -n "memorySessions\|fuPushQueue\|roomMapping" -- backend` returned no matches
 
+## Phase 33: Backend Health Checks & Request Validation (2026.04.04)
+
+### Goal
+- [x] Add a lightweight backend health/version response that makes Render rollout checks easier and less ambiguous
+- [x] Harden Kakao webhook handlers against malformed request bodies instead of assuming nested payload shape
+- [x] Normalize portal list/reply request parsing so invalid query/body input degrades predictably
+
+### Verification
+- [x] `node -e "require('./backend/routes/portal'); require('./backend/routes/kakaoWebhook'); console.log('routes-ok');"`
+- [x] Started `createApp()` on an ephemeral local port and fetched `/healthz` and `/api/version` successfully
+- [x] `git diff -- backend/app.js backend/config.js backend/routes/portal.js backend/routes/kakaoWebhook.js` reviewed to confirm only health/version + validation changes landed
+
 ## Next Session Priorities
 
-- [ ] Resume backend reliability work: harden request validation and inspect whether Render should expose a lightweight health/version endpoint for safer rollout checks
+- [ ] Check the live Render deployment for `/healthz` and `/api/version`, then decide whether to surface a tiny revision label in internal tooling
+- [ ] Review Kakao webhook responses for malformed payloads in production logs and decide whether any endpoints should return `200` safe-fallback instead of `400`
 - [ ] Decide whether to regenerate shared design-source PNG assets in `imgs/` to match the new app identity, or keep the app primarily HTML-driven
 - [ ] Review whether OG/share images should be regenerated so social previews match the updated mission-led wording

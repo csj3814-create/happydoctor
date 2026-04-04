@@ -7,7 +7,7 @@ const messengerBotRoute = require('./routes/messengerBot');
 const portalRoute = require('./routes/portal');
 const publicRoute = require('./routes/public');
 const dbService = require('./services/dbService');
-const { DEFAULT_STATS, LEGACY_TOTAL, LEGACY_COMPLETED, getPortalOrigins } = require('./config');
+const { DEFAULT_STATS, LEGACY_TOTAL, LEGACY_COMPLETED, getPortalOrigins, getRuntimeRevision } = require('./config');
 
 function createStatsResponse(publicStats) {
   const consultationCount = publicStats?.consultationCount ?? 0;
@@ -16,6 +16,19 @@ function createStatsResponse(publicStats) {
   return {
     total: LEGACY_TOTAL + consultationCount,
     doctorReplied: LEGACY_COMPLETED + completedCount,
+  };
+}
+
+function createRuntimeResponse() {
+  const { revision, source } = getRuntimeRevision();
+
+  return {
+    ok: true,
+    service: 'happydoctor-backend',
+    revision,
+    revisionSource: source,
+    timestamp: new Date().toISOString(),
+    dbConfigured: Boolean(dbService.getDb()),
   };
 }
 
@@ -91,6 +104,16 @@ function createApp() {
       console.error('[Stats Error]', error);
       return res.json(DEFAULT_STATS);
     }
+  });
+
+  app.get('/healthz', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    return res.status(200).json(createRuntimeResponse());
+  });
+
+  app.get('/api/version', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    return res.status(200).json(createRuntimeResponse());
   });
 
   app.get('/', (req, res) => {
