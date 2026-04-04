@@ -354,145 +354,145 @@
 - [x] `npx vercel whoami`
 - [x] `npx vercel deploy --prod` returned `https://app.happydoctor.kr`
 
-## Phase 25: Patient App Deployment Routing Fix (2026.04.03)
+## 단계 25: 환자 앱 배포 라우팅 수정 (2026.04.03)
 
-### Goal
-- [x] Make Vercel recognize `frontend/app` as a real Next.js project instead of a generic `Other` deployment
-- [x] Redeploy the patient app so `happydoctor-app.vercel.app` and `app.happydoctor.kr` resolve to the built `/` route
-- [x] Verify the custom domain serves the mobile app shell, not a Vercel `NOT_FOUND` page
+### 목표
+- [x] Vercel이 `frontend/app`을 일반 `Other` 배포가 아니라 실제 Next.js 프로젝트로 인식하게 만든다.
+- [x] `happydoctor-app.vercel.app`와 `app.happydoctor.kr`가 모두 빌드된 `/` 경로를 가리키도록 재배포한다.
+- [x] 커스텀 도메인이 Vercel `NOT_FOUND` 페이지가 아니라 실제 모바일 앱 셸을 서빙하는지 확인한다.
 
-### Verification
+### 검증
 - [x] `frontend/app`: `npm run lint`
 - [x] `frontend/app`: `npm run build`
-- [x] `npx vercel deploy --prod` produced `https://app.happydoctor.kr`
-- [x] `curl -I https://app.happydoctor.kr` returned `200 OK`
-- [x] `curl -I https://happydoctor-app.vercel.app` returned `200 OK`
+- [x] `npx vercel deploy --prod`로 `https://app.happydoctor.kr` 배포 확인
+- [x] `curl -I https://app.happydoctor.kr`가 `200 OK` 반환
+- [x] `curl -I https://happydoctor-app.vercel.app`가 `200 OK` 반환
 
-## Phase 26: Patient App Git Auto-Deploy Setup (2026.04.03)
+## 단계 26: 환자 앱 Git 자동 배포 설정 (2026.04.03)
 
-### Goal
-- [x] Connect `happydoctor-app` to the GitHub repository so pushes create deployments automatically
-- [x] Keep `app.happydoctor.kr` attached to the patient app project while enabling branch-based deploys
-- [x] Verify the project tracks the intended repo/branch and no longer depends on manual-only deploys
+### 목표
+- [x] `happydoctor-app`을 GitHub 저장소에 연결해 push만으로 배포가 생성되게 만든다.
+- [x] `app.happydoctor.kr` 도메인을 유지한 채 브랜치 기반 배포를 가능하게 한다.
+- [x] 프로젝트가 의도한 저장소/브랜치를 추적하고 더 이상 수동 배포에만 의존하지 않는지 확인한다.
 
-### Verification
-- [x] Created a Git-connected Vercel project with `rootDirectory = frontend/app`
-- [x] `git push origin main` triggered a new automatic production deployment for the patient app project
-- [x] `app.happydoctor.kr` was reassigned to the Git-connected patient app project and returned `200 OK`
-- [x] `vercel project inspect happydoctor-app` now shows `Framework Preset: Next.js` and `Root Directory: frontend/app`
+### 검증
+- [x] `rootDirectory = frontend/app`인 Git 연동 Vercel 프로젝트 생성
+- [x] `git push origin main`으로 자동 프로덕션 배포 생성 확인
+- [x] `app.happydoctor.kr`를 Git 연동 프로젝트에 재연결하고 `200 OK` 확인
+- [x] `vercel project inspect happydoctor-app`에서 `Framework Preset: Next.js`, `Root Directory: frontend/app` 확인
 
-## Phase 27: Patient App Entry Experience (2026.04.03)
+## 단계 27: 환자 앱 첫 진입 경험 정리 (2026.04.03)
 
-### Goal
-- [x] Turn the current app shell into a stronger mobile-first consultation entry surface
-- [x] Clarify who the app is for, how the consultation flow works, and what is available now vs next
-- [x] Improve the visual hierarchy so the first screen feels like a real product, not a placeholder
+### 목표
+- [x] 현재 앱 셸을 더 강한 모바일 우선 상담 진입 표면으로 바꾼다.
+- [x] 누구를 위한 앱인지, 상담 흐름이 어떤지, 지금 가능한 것과 다음 단계가 무엇인지 분명히 한다.
+- [x] 첫 화면이 placeholder가 아니라 실제 제품처럼 느껴지도록 시각적 위계를 개선한다.
 
-### Verification
-- [x] `frontend/app`: `npm run lint`
-- [x] `frontend/app`: `npm run build`
-
-## Phase 28: Patient App Consultation Status Tracking (2026.04.03)
-
-### Goal
-- [x] Issue a patient-safe public tracking token when a consultation is logged
-- [x] Add a public backend status lookup endpoint that only exposes patient-facing consultation state
-- [x] Add an app status page and homepage entry flow so users can reopen their consultation progress from Kakao
-
-### Verification
-- [x] `backend`: require `app` and `routes/public` without runtime errors
+### 검증
 - [x] `frontend/app`: `npm run lint`
 - [x] `frontend/app`: `npm run build`
 
-## Phase 29: Patient App Mission Copy Reframing (2026.04.03)
+## 단계 28: 환자 앱 상담 상태 추적 추가 (2026.04.03)
 
-### Goal
-- [x] Rewrite the patient app so it reads first as Happy Doctor's mission-led online medical consultation service
-- [x] Reduce any wording that makes the app sound like a pre-visit questionnaire or triage-only utility
-- [x] Keep the new status-check feature, but subordinate it to the service identity and care mission
+### 목표
+- [x] 상담이 기록될 때 환자에게 안전한 공개 추적 토큰을 발급한다.
+- [x] 환자용 상담 상태만 노출하는 공개 백엔드 조회 엔드포인트를 추가한다.
+- [x] 사용자가 카카오에서 받았던 상담 진행 상태를 앱에서 다시 확인할 수 있도록 상태 페이지와 진입 흐름을 만든다.
 
-### Verification
+### 검증
+- [x] `backend`에서 `app`과 `routes/public` require 시 런타임 오류 없음
 - [x] `frontend/app`: `npm run lint`
 - [x] `frontend/app`: `npm run build`
 
-## Phase 30: Patient App Mission-Led Visual Reframing (2026.04.04)
+## 단계 29: 환자 앱 미션 중심 카피 재정렬 (2026.04.03)
 
-### Goal
-- [x] Reduce reliance on static screenshot/banner images that can freeze outdated product framing inside the app landing page
-- [x] Make the hero phone mockup explain Happy Doctor as a mission-led online medical consultation service for medically underserved groups
-- [x] Replace the lower brand panel's image-heavy treatment with live HTML/CSS messaging that reinforces the service identity
+### 목표
+- [x] 환자 앱이 해피닥터의 미션 중심 온라인 의료상담 서비스로 먼저 읽히도록 문구를 다시 쓴다.
+- [x] 사전 문진 앱이나 단순 triage 도구처럼 보이는 표현을 줄인다.
+- [x] 새 상태 확인 기능은 유지하되, 서비스 정체성과 돌봄 미션 아래에 두도록 정리한다.
 
-### Verification
+### 검증
 - [x] `frontend/app`: `npm run lint`
 - [x] `frontend/app`: `npm run build`
 
-## Phase 31: Homepage/App Core Copy Alignment (2026.04.04)
+## 단계 30: 환자 앱 미션 중심 비주얼 재정렬 (2026.04.04)
 
-### Goal
-- [x] Align homepage and patient app wording around `무료 온라인 의료상담`, `의료 접근성 취약계층`, and `AI 인턴 보듬이 + 자원봉사 의료진`
-- [x] Remove homepage wording that still sounds more like triage tooling or an overly clinical product surface
-- [x] Keep the same mission across homepage and app while preserving each surface's role
+### 목표
+- [x] 앱 랜딩 화면에서 오래된 제품 프레이밍을 고정시킬 수 있는 정적 스크린샷/배너 의존도를 줄인다.
+- [x] 히어로 폰 목업이 해피닥터를 의료 접근성 취약계층을 위한 미션 중심 온라인 의료상담 서비스로 설명하게 만든다.
+- [x] 하단 브랜드 패널을 이미지 위주가 아니라 정체성을 강화하는 HTML/CSS 메시지 중심으로 교체한다.
 
-### Verification
+### 검증
+- [x] `frontend/app`: `npm run lint`
+- [x] `frontend/app`: `npm run build`
+
+## 단계 31: 홈페이지/앱 핵심 카피 정렬 (2026.04.04)
+
+### 목표
+- [x] 홈페이지와 환자 앱 문구를 `무료 온라인 의료상담`, `의료 접근성 취약계층`, `AI 인턴 보듬이 + 자원봉사 의료진` 축으로 맞춘다.
+- [x] 홈페이지에 남아 있는 triage 도구 느낌 또는 과하게 임상적인 제품 톤을 줄인다.
+- [x] 두 표면의 역할은 다르게 유지하되, 같은 미션을 말하도록 정리한다.
+
+### 검증
 - [x] `frontend/homepage`: `npm run lint`
 - [x] `frontend/homepage`: `npm run build`
 - [x] `frontend/app`: `npm run lint`
 - [x] `frontend/app`: `npm run build`
 
-## Phase 32: Backend Follow-Up Delivery Hardening (2026.04.04)
+## 단계 32: 백엔드 Follow-Up 전달 상태 안정화 (2026.04.04)
 
-### Goal
-- [x] Remove in-memory follow-up session caching so Firestore remains the single source of truth for pending follow-up state
-- [x] Move MessengerBot room registration and F/U push queue storage off process memory and into Firestore-backed collections
-- [x] Keep the existing MessengerBot endpoints compatible while making restart behavior less fragile
+### 목표
+- [x] in-memory follow-up 세션 캐시를 제거해 Firestore가 단일 진실원으로 남게 한다.
+- [x] MessengerBot room 등록과 F/U push queue 저장을 프로세스 메모리 밖 Firestore 컬렉션으로 옮긴다.
+- [x] 기존 MessengerBot 엔드포인트 호환성을 유지하면서 재시작 시 동작이 덜 취약해지게 만든다.
 
-### Verification
+### 검증
 - [x] `node -e "const { createApp } = require('./backend/app'); createApp(); console.log('app-ok');"`
 - [x] `node -e "require('./backend/services/notifyService'); require('./backend/services/followUpService'); require('./backend/routes/messengerBot'); console.log('services-ok');"`
-- [x] `git grep -n "memorySessions\|fuPushQueue\|roomMapping" -- backend` returned no matches
+- [x] `git grep -n "memorySessions\|fuPushQueue\|roomMapping" -- backend` 결과가 없음
 
-## Phase 33: Backend Health Checks & Request Validation (2026.04.04)
+## 단계 33: 백엔드 Health Check 및 요청 검증 추가 (2026.04.04)
 
-### Goal
-- [x] Add a lightweight backend health/version response that makes Render rollout checks easier and less ambiguous
-- [x] Harden Kakao webhook handlers against malformed request bodies instead of assuming nested payload shape
-- [x] Normalize portal list/reply request parsing so invalid query/body input degrades predictably
+### 목표
+- [x] Render 배포 확인이 쉬워지도록 가벼운 backend health/version 응답을 추가한다.
+- [x] Kakao webhook 핸들러가 중첩 payload 구조를 무조건 가정하지 않도록 방어 로직을 넣는다.
+- [x] 포털 목록/답변 요청 파싱을 정규화해 잘못된 query/body 입력이 더 예측 가능하게 흐르도록 만든다.
 
-### Verification
+### 검증
 - [x] `node -e "require('./backend/routes/portal'); require('./backend/routes/kakaoWebhook'); console.log('routes-ok');"`
-- [x] Started `createApp()` on an ephemeral local port and fetched `/healthz` and `/api/version` successfully
-- [x] `git diff -- backend/app.js backend/config.js backend/routes/portal.js backend/routes/kakaoWebhook.js` reviewed to confirm only health/version + validation changes landed
+- [x] 임시 로컬 포트에서 `createApp()`을 띄우고 `/healthz`, `/api/version` 응답 확인
+- [x] `git diff -- backend/app.js backend/config.js backend/routes/portal.js backend/routes/kakaoWebhook.js` 검토로 health/version + validation 범위만 반영된 것 확인
 
-## Phase 34: Homepage/App Share Image Alignment (2026.04.04)
+## 단계 34: 홈페이지/앱 공유 이미지 정렬 (2026.04.04)
 
-### Goal
-- [x] Replace the old generic app preview image so social cards no longer make Happy Doctor look like a simple chat utility or pre-visit questionnaire
-- [x] Align homepage and app share images with the current mission-led identity using the design-source OG artwork as the base
-- [x] Update homepage/app metadata copy so Open Graph and Twitter descriptions match the current service framing
+### 목표
+- [x] 기존의 일반적인 앱 미리보기 이미지를 교체해 해피닥터가 단순 채팅 도구나 사전 문진 앱처럼 보이지 않게 한다.
+- [x] 디자인 원본 OG 아트워크를 기반으로 홈페이지와 앱 공유 이미지를 현재의 미션 중심 정체성에 맞춘다.
+- [x] 홈페이지/앱 메타데이터 카피도 현재 서비스 프레이밍에 맞게 정리한다.
 
-### Verification
+### 검증
 - [x] `frontend/homepage`: `npm run lint`
 - [x] `frontend/homepage`: `npm run build`
 - [x] `frontend/app`: `npm run lint`
 - [x] `frontend/app`: `npm run build`
-- [x] Confirmed refreshed share assets exist at `frontend/homepage/public/design/brand-og.png` and `frontend/app/public/app-screenshot.png`
+- [x] `frontend/homepage/public/design/brand-og.png`, `frontend/app/public/app-screenshot.png` 갱신 확인
 
-## Phase 35: Kakao Consultation Copy & Safe Fallback Tone (2026.04.04)
+## 단계 35: 카카오 상담 문구 및 안전 fallback 정리 (2026.04.04)
 
-### Goal
-- [x] Rewrite patient-facing Kakao consultation messages so they sound like Happy Doctor's mission-led online medical consultation service, not a cold bot or generic triage utility
-- [x] Standardize quick-reply labels around `상담 시작` and `상담 종료` so the flow feels more intentional and less tool-driven
-- [x] Convert malformed Kakao payload handling into a safe `200` fallback that guides the user back into consultation instead of dropping a hard error response
+### 목표
+- [x] 환자에게 보이는 카카오 상담 메시지가 차가운 봇/일반 triage 도구가 아니라 해피닥터의 미션 중심 온라인 의료상담처럼 들리도록 다시 쓴다.
+- [x] `상담 시작`, `상담 종료` 퀵리플라이 라벨을 일관되게 맞춰 흐름이 더 의도적으로 느껴지게 한다.
+- [x] 잘못된 카카오 payload 처리 시 하드 에러를 떨어뜨리지 않고, 상담으로 되돌려 보내는 `200` 안전 fallback을 제공한다.
 
-### Verification
+### 검증
 - [x] `node -e "require('./backend/routes/kakaoWebhook'); console.log('kakao-copy-ok');"`
-- [x] Started `createApp()` on an ephemeral local port and confirmed `POST /api/kakao/triage-complete` with an invalid non-object payload returns `200` plus a safe restart message/quick reply
-- [x] `git diff -- backend/routes/kakaoWebhook.js` reviewed to confirm the change stayed limited to Kakao-facing copy, safe fallback behavior, and shared quick-reply helpers
+- [x] 임시 로컬 포트에서 `POST /api/kakao/triage-complete`에 잘못된 non-object payload를 보내 `200` + 재시작 안내 응답 확인
+- [x] `git diff -- backend/routes/kakaoWebhook.js` 검토로 카카오 환자 문구, 안전 fallback, 공용 quick-reply helper 범위만 바뀐 것 확인
 
-## Next Session Priorities
+## 다음 세션 우선순위
 
-- [ ] Confirm the live Render backend has advanced from `835675a` to the newer Kakao-copy commit `924bc07`, then spot-check one or two real Kakao flow messages
-- [ ] Review live Kakao webhook logs after the new copy ships and decide whether any follow-up/status paths still need softer safe-fallback wording
-- [ ] Decide whether to regenerate the remaining design-source PNG assets in `imgs/` to match the updated mission-led wording, or keep most surfaces HTML-driven
-- [ ] Decide the next product phase for `app.happydoctor.kr`: keep it as a consultation entry/status surface or expand it into a broader patient web app
-- [ ] Review whether Kakao-specific share images should be split from general OG images, now that homepage/app previews are aligned
+- [ ] Render 라이브 백엔드가 `835675a`에서 더 최신 카카오 문구 커밋 `924bc07`으로 올라갔는지 확인하고, 실제 카카오 흐름 메시지 1~2개를 점검한다.
+- [ ] 라이브 Kakao webhook 로그를 보고 follow-up/status 경로에 더 부드러운 safe-fallback 문구가 필요한지 판단한다.
+- [ ] `imgs/`의 남은 디자인 원본 자산을 현재 미션 중심 문구에 맞게 다시 만들지, 지금처럼 HTML 중심 표면으로 유지할지 결정한다.
+- [ ] `app.happydoctor.kr`를 계속 상담 진입/상태 확인 표면으로 둘지, 더 넓은 환자 웹앱으로 확장할지 다음 제품 단계를 결정한다.
+- [ ] Kakao 전용 공유 이미지가 일반 OG 이미지와 분리돼야 하는지 검토한다.
