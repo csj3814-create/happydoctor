@@ -415,8 +415,19 @@
 - [x] `frontend/app`: `npm run lint`
 - [x] `frontend/app`: `npm run build`
 
+## Phase 30: Patient App Mission-Led Visual Reframing (2026.04.04)
+
+### Goal
+- [x] Reduce reliance on static screenshot/banner images that can freeze outdated product framing inside the app landing page
+- [x] Make the hero phone mockup explain Happy Doctor as a mission-led online medical consultation service for medically underserved groups
+- [x] Replace the lower brand panel's image-heavy treatment with live HTML/CSS messaging that reinforces the service identity
+
+### Verification
+- [x] `frontend/app`: `npm run lint`
+- [x] `frontend/app`: `npm run build`
+
 ## Next Session Priorities
 
-- [ ] Update patient app visual assets/screenshots so in-image copy matches the new mission-led messaging
 - [ ] Review homepage/app copy consistency around `무료 온라인 의료상담`, `의료 접근성 취약계층`, and `AI 인턴 보듬이 + 자원봉사 의료진`
 - [ ] Resume backend reliability work: unify follow-up/notification delivery and harden request validation
+- [ ] Decide whether to regenerate shared design-source PNG assets in `imgs/` to match the new app identity, or keep the app primarily HTML-driven
