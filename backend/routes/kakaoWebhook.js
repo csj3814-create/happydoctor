@@ -45,22 +45,18 @@ async function getStatusLinkForConsultation(consultationId) {
     }
 }
 
-function createKakaoErrorResponse(text) {
-    return {
-        version: "2.0",
-        template: {
-            outputs: [{ simpleText: { text } }]
-        }
-    };
-}
-
 function isPlainObject(value) {
     return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function getValidatedKakaoPayload(req, res) {
     if (!isPlainObject(req.body)) {
-        res.status(400).json(createKakaoErrorResponse('잘못된 요청 형식입니다.'));
+        res.status(200).json(
+            createKakaoTextResponse(
+                "요청을 다시 확인하지 못했어요. 아래 버튼으로 상담을 다시 시작해 주세요.",
+                [START_CONSULTATION_QUICK_REPLY],
+            ),
+        );
         return null;
     }
 
@@ -89,6 +85,24 @@ function getKakaoContexts(payload) {
     return Array.isArray(payload?.contexts) ? payload.contexts : [];
 }
 
+const START_CONSULTATION_QUICK_REPLY = { label: "상담 시작", action: "message", messageText: "예진상담" };
+const END_CONSULTATION_QUICK_REPLY = { label: "상담 종료", action: "message", messageText: "상담종료" };
+
+function createKakaoTextResponse(text, quickReplies = []) {
+    const template = {
+        outputs: [{ simpleText: { text } }]
+    };
+
+    if (quickReplies.length > 0) {
+        template.quickReplies = quickReplies;
+    }
+
+    return {
+        version: "2.0",
+        template
+    };
+}
+
 /**
  * 카카오 i 오픈빌더 Webhook Endpoint
  * 
@@ -112,15 +126,12 @@ router.post('/triage-complete', async (req, res) => {
         const cancelPhrases = ['다음에', '나중에', '그만', '중단', '끝낼게', '종료'];
         const normalized = utterance.replace(/\s+/g, '');
         if (cancelPhrases.some(kw => normalized.includes(kw))) {
-            return res.status(200).json({
-                version: "2.0",
-                template: {
-                    outputs: [{ simpleText: { text: "알겠습니다. 필요하실 때 언제든 다시 찾아주세요. 건강 잘 챙기세요! 😊" } }],
-                    quickReplies: [
-                        { label: "예진상담", action: "message", messageText: "예진상담" }
-                    ]
-                }
-            });
+            return res.status(200).json(
+                createKakaoTextResponse(
+                    "알겠습니다. 지금은 여기서 멈출게요.\n필요하실 때 다시 찾아주시면 보듬이와 의료진이 함께 도와드릴게요.",
+                    [START_CONSULTATION_QUICK_REPLY],
+                ),
+            );
         }
 
         // 컨텍스트에서 파라미터 추출
@@ -141,23 +152,21 @@ router.post('/triage-complete', async (req, res) => {
         const confirm = (merged.confirm || '').toString().trim();
         if (confirm === '다시') {
             await followUpService.resetSession(userId);
-            return res.status(200).json({
-                version: "2.0",
-                template: {
-                    outputs: [{ simpleText: { text: "알겠습니다. 처음부터 다시 입력해주세요." } }],
-                    quickReplies: [{ label: "예진상담", action: "message", messageText: "예진상담" }]
-                }
-            });
+            return res.status(200).json(
+                createKakaoTextResponse(
+                    "좋습니다. 처음부터 다시 도와드릴게요.\n아래 버튼으로 상담을 다시 시작해 주세요.",
+                    [START_CONSULTATION_QUICK_REPLY],
+                ),
+            );
         }
         if (confirm === '종료') {
             await followUpService.resetSession(userId);
-            return res.status(200).json({
-                version: "2.0",
-                template: {
-                    outputs: [{ simpleText: { text: "알겠습니다.\n필요하실 때 언제든 다시 찾아주세요.\n건강 잘 챙기세요! 😊" } }],
-                    quickReplies: [{ label: "예진상담", action: "message", messageText: "예진상담" }]
-                }
-            });
+            return res.status(200).json(
+                createKakaoTextResponse(
+                    "알겠습니다.\n오늘 상담은 여기서 마칠게요.\n필요하실 때 다시 찾아주세요.",
+                    [START_CONSULTATION_QUICK_REPLY],
+                ),
+            );
         }
 
         // sys.* 엔티티 이름이 그대로 들어온 경우 기본값 처리
@@ -186,9 +195,9 @@ router.post('/triage-complete', async (req, res) => {
             return res.status(200).json({
                 version: "2.0",
                 template: {
-                    outputs: [{ simpleText: { text: "문진 정보가 아직 완성되지 않았습니다. 예진을 다시 시작해 주세요." } }],
+                    outputs: [{ simpleText: { text: "상담 정보를 아직 다 받지 못했어요.\n아래 버튼으로 다시 시작해 주세요." } }],
                     quickReplies: [
-                        { label: "예진상담", action: "message", messageText: "예진상담" }
+                        START_CONSULTATION_QUICK_REPLY
                     ]
                 }
             });
@@ -199,12 +208,9 @@ router.post('/triage-complete', async (req, res) => {
         const pendingFU = await followUpService.consumePendingFollowUp(userId);
         if (pendingFU) {
             console.log(`[F/U Pending] ${userId} — 대기 중인 F/U 질문 전달`);
-            return res.status(200).json({
-                version: "2.0",
-                template: {
-                    outputs: [{ simpleText: { text: `⏰ ${pendingFU}` } }]
-                }
-            });
+            return res.status(200).json(
+                createKakaoTextResponse(`보듬이가 경과를 한 번 더 확인드릴게요.\n\n${pendingFU}`),
+            );
         }
 
         // 새로운 상담 시작: 이전 상담 상태(타이머 등) 초기화
@@ -218,7 +224,7 @@ router.post('/triage-complete', async (req, res) => {
                 useCallback: true,
                 template: {
                     outputs: [{
-                        simpleText: { text: "🩺 입력해주신 증상을 분석하고 있습니다. 잠시만 기다려주세요..." }
+                        simpleText: { text: "보듬이가 상담 내용을 정리하고 있어요.\n잠시만 기다려 주세요..." }
                     }]
                 }
             });
@@ -232,12 +238,7 @@ router.post('/triage-complete', async (req, res) => {
     } catch (error) {
         console.error('[Kakao Webhook Error]', error);
         return res.status(500).json({
-            version: "2.0",
-            template: {
-                outputs: [{
-                    simpleText: { text: "죄송합니다. 시스템 오류가 발생했습니다. 잠시 후 다시 시도해주세요." }
-                }]
-            }
+            ...createKakaoTextResponse("죄송합니다. 상담 내용을 처리하는 중 문제가 생겼습니다.\n잠시 후 다시 시도해 주세요."),
         });
     }
 });
@@ -265,9 +266,9 @@ async function processTriageSync(userId, patientData) {
                 return {
                     version: "2.0",
                     template: {
-                        outputs: [{ simpleText: { text: "🩺 분석에 시간이 걸리고 있습니다.\n'예진상담' 버튼을 다시 눌러\n재시도해 주세요.\n\n계속 보이면 잠시 후 다시\n시도해 주세요." } }],
+                        outputs: [{ simpleText: { text: "답변 준비에 시간이 조금 더 필요합니다.\n아래 버튼으로 다시 시도해 주세요.\n계속 지연되면 잠시 후 다시 찾아주세요." } }],
                         quickReplies: [
-                            { label: "예진상담", action: "message", messageText: "예진상담" }
+                            START_CONSULTATION_QUICK_REPLY
                         ]
                     }
                 };
@@ -287,7 +288,7 @@ async function processTriageSync(userId, patientData) {
             enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId).catch(e => console.error('[Enqueue Error]', e));
             await followUpService.scheduleFollowUp(userId, analysisResult.soapChartForDoctor, 15);
             finalResponseText = analysisResult.replyToPatient +
-                "\n\n🩺 차트를 담당 전문의 선생님께\n보고드렸습니다.\n진료 틈틈이 확인 후 이곳으로\n직접 답변드릴 예정입니다.\n잠시만 대기해 주세요.\n(힘드시면 지체 없이 119!)";
+                "\n\n보듬이가 내용을 정리해 자원봉사 의료진에게 전달했습니다.\n답변이 준비되면 이 채널로 다시 안내드릴게요.\n증상이 많이 힘들어지면 지체 없이 119 또는 가까운 응급실을 이용해 주세요.";
         }
         finalResponseText += await logConsultationAndGetStatusLink(userId, patientData, analysisResult);
         return {
@@ -295,14 +296,17 @@ async function processTriageSync(userId, patientData) {
             template: {
                 outputs: [{ simpleText: { text: finalResponseText } }],
                 quickReplies: [
-                    { label: "예진상담", action: "message", messageText: "예진상담" },
-                    { label: "상담종료", action: "message", messageText: "상담종료" }
+                    START_CONSULTATION_QUICK_REPLY,
+                    END_CONSULTATION_QUICK_REPLY
                 ]
             }
         };
     } catch (error) {
         console.error('[Sync Triage Error]', error);
-        return { version: "2.0", template: { outputs: [{ simpleText: { text: "죄송합니다. 분석 중 오류가 발생했습니다. 다시 시도해주세요." } }] } };
+        return createKakaoTextResponse(
+            "죄송합니다. 상담 내용을 정리하는 중 문제가 생겼습니다.\n잠시 후 다시 시도해 주세요.",
+            [START_CONSULTATION_QUICK_REPLY],
+        );
     }
 }
 
@@ -324,7 +328,7 @@ async function processTriageAsync(callbackUrl, userId, patientData) {
             enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId).catch(e => console.error('[Enqueue Error]', e));
             await followUpService.scheduleFollowUp(userId, analysisResult.soapChartForDoctor, 15);
             finalResponseText = analysisResult.replyToPatient +
-                "\n\n🩺 차트를 담당 전문의 선생님께\n보고드렸습니다.\n진료 틈틈이 확인 후 이곳으로\n직접 답변드릴 예정입니다.\n잠시만 대기해 주세요.\n(힘드시면 지체 없이 119!)";
+                "\n\n보듬이가 내용을 정리해 자원봉사 의료진에게 전달했습니다.\n답변이 준비되면 이 채널로 다시 안내드릴게요.\n증상이 많이 힘들어지면 지체 없이 119 또는 가까운 응급실을 이용해 주세요.";
         }
 
         finalResponseText += await logConsultationAndGetStatusLink(userId, patientData, analysisResult);
@@ -338,8 +342,8 @@ async function processTriageAsync(callbackUrl, userId, patientData) {
                         simpleText: { text: finalResponseText }
                     }],
                     quickReplies: [
-                        { label: "예진상담", action: "message", messageText: "예진상담" },
-                        { label: "상담종료", action: "message", messageText: "상담종료" }
+                        START_CONSULTATION_QUICK_REPLY,
+                        END_CONSULTATION_QUICK_REPLY
                     ]
                 }
             };
@@ -363,7 +367,7 @@ async function processTriageAsync(callbackUrl, userId, patientData) {
                     version: "2.0",
                     template: {
                         outputs: [{
-                            simpleText: { text: "죄송합니다. 분석 중 오류가 발생했습니다. 다시 시도해주세요." }
+                            simpleText: { text: "죄송합니다. 상담 내용을 정리하는 중 문제가 생겼습니다.\n잠시 후 다시 시도해 주세요." }
                         }]
                     }
                 })
@@ -396,15 +400,12 @@ router.post('/fu-reply', async (req, res) => {
         // 세션 만료 또는 기록 없는 경우 — Gemini 호출 없이 안내 메시지 반환
         if (!originalChart || originalChart === '이전 차트 기록 없음') {
             console.warn(`[F/U Reply] ${userId} — 이전 차트 없음 또는 세션 만료. F/U 분석 생략.`);
-            return res.status(200).json({
-                version: "2.0",
-                template: {
-                    outputs: [{ simpleText: { text: "이전 상담 기록이 만료되었습니다. 증상이 지속된다면 새로 예진 상담을 시작해 주세요." } }],
-                    quickReplies: [
-                        { label: "예진상담", action: "message", messageText: "예진상담" }
-                    ]
-                }
-            });
+            return res.status(200).json(
+                createKakaoTextResponse(
+                    "이전 상담 흐름이 만료되었습니다.\n증상이 계속되면 아래 버튼으로 새 상담을 시작해 주세요.",
+                    [START_CONSULTATION_QUICK_REPLY],
+                ),
+            );
         }
 
         // 2. 증상 변화 AI 분석 (호전/유지 vs 악화)
@@ -416,7 +417,7 @@ router.post('/fu-reply', async (req, res) => {
         // 3. 악화 시 전문의 큐 재할당
         if (fuAnalysis.action === 'ESCALATE_FU') {
             enqueueDoctorNotification(`🚨 **[F/U 경고: 증상 악화 감지]**\n${fuAnalysis.fuChartForDoctor}`, userId).catch(e => console.error('[Enqueue Error]', e));
-            finalResponseText += "\n\n⚠️ 담당 전문의 선생님께\n긴급으로 재보고 드렸습니다.\n잠시 대기해 주세요.\n힘드시면 지체 없이 119!";
+            finalResponseText += "\n\n증상 변화를 의료진이 한 번 더 확인할 수 있도록 바로 전달했습니다.\n답변을 준비하는 동안 잠시만 기다려 주세요.\n많이 힘드시면 119 또는 가까운 응급실을 이용해 주세요.";
         } else {
              // 상황 유지/호전 시 F/U 타이머를 1시간 뒤로 연장 (선택사항)
              await followUpService.scheduleFollowUp(userId, originalChart, 60); 
@@ -431,8 +432,8 @@ router.post('/fu-reply', async (req, res) => {
             template: {
                 outputs: [{ simpleText: { text: finalResponseText } }],
                 quickReplies: [
-                    { label: "예진상담", action: "message", messageText: "예진상담" },
-                    { label: "상담종료", action: "message", messageText: "상담종료" }
+                    START_CONSULTATION_QUICK_REPLY,
+                    END_CONSULTATION_QUICK_REPLY
                 ]
             }
         });
@@ -440,8 +441,10 @@ router.post('/fu-reply', async (req, res) => {
     } catch (error) {
         console.error('[Kakao F/U Webhook Error]', error);
         return res.status(500).json({
-            version: "2.0",
-            template: { outputs: [{ simpleText: { text: "일시적인 오류가 발생했습니다." } }] }
+            ...createKakaoTextResponse(
+                "경과를 확인하는 중 일시적인 문제가 생겼습니다.\n잠시 후 다시 시도해 주세요.",
+                [START_CONSULTATION_QUICK_REPLY],
+            ),
         });
     }
 });
@@ -462,13 +465,10 @@ router.post('/cancel-triage', async (req, res) => {
     await followUpService.resetSession(userId);
 
     return res.status(200).json({
-        version: "2.0",
-        template: {
-            outputs: [{ simpleText: { text: "알겠습니다. 언제든 다시 찾아주시면 도와드릴게요. 건강 잘 챙기세요! 😊" } }],
-            quickReplies: [
-                { label: "예진상담", action: "message", messageText: "예진상담" }
-            ]
-        }
+        ...createKakaoTextResponse(
+            "알겠습니다. 지금은 여기서 멈출게요.\n필요하실 때 다시 찾아주시면 보듬이와 의료진이 함께 도와드릴게요.",
+            [START_CONSULTATION_QUICK_REPLY],
+        ),
     });
 });
 
@@ -518,30 +518,32 @@ router.post('/close-consultation', async (req, res) => {
 
         // 3) 종결 메시지
         const closeMessages = {
-            '증상 호전': '다행히 나아지셨군요! 😊\n증상이 다시 나타나면 언제든\n찾아주세요.',
-            '응급실 방문': '응급실에서 잘 치료 받으셨길\n바랍니다.\n퇴원 후에도 궁금하신 점은\n언제든 상담해 주세요.',
-            '외래 진료': '외래 진료 예약하셨군요! 😊\n담당 선생님께 꾸준히 진료\n받으시길 바랍니다.\n궁금한 점이 생기면 언제든\n찾아주세요.',
-            '단순 취소': '알겠습니다. 😊\n필요하실 때 언제든 다시\n찾아주세요.',
+            '증상 호전': '다행히 증상이 나아지고 있군요.\n불편이 다시 생기면 언제든 다시 찾아주세요.',
+            '응급실 방문': '응급실에서 필요한 진료를 잘 받으셨길 바랍니다.\n이후에 궁금한 점이 생기면 다시 말씀해 주세요.',
+            '외래 진료': '외래 진료로 이어지게 되어 다행입니다.\n진료 전후로 궁금한 점이 생기면 다시 찾아주세요.',
+            '단순 취소': '알겠습니다.\n필요하실 때 언제든 다시 찾아주세요.',
         };
-        const personalMsg = closeMessages[reason] || '상담이 종결되었습니다.\n문의사항이 있으면 언제든 다시 찾아주세요.';
+        const personalMsg = closeMessages[reason] || '오늘 상담은 여기서 마무리할게요.\n필요하실 때 언제든 다시 찾아주세요.';
 
         const statusLinkText = await getLatestStatusLinkForUser(userId);
-        const finalText = `🙏 보듬입니다.\n${personalMsg}\n\n환자분의 건강을 응원합니다! 😊\n\n🏥 해피닥터 행복한 의사는\n의료 취약계층을 위해 의사들이\n자원봉사로 운영하는 비영리단체입니다.\n도움이 되셨다면 응원 부탁드려요! 💛${statusLinkText}`;
+        const finalText = `보듬입니다.\n${personalMsg}\n\n해피닥터는 의료 접근성 취약계층을 위한 무료 온라인 의료상담입니다.\n필요하실 때 다시 이어서 도와드릴게요.${statusLinkText}`;
 
         return res.status(200).json({
             version: "2.0",
             template: {
                 outputs: [{ simpleText: { text: finalText } }],
                 quickReplies: [
-                    { label: "예진상담", action: "message", messageText: "예진상담" }
+                    START_CONSULTATION_QUICK_REPLY
                 ]
             }
         });
     } catch (error) {
         console.error('[Close Consultation Error]', error);
         return res.status(500).json({
-            version: "2.0",
-            template: { outputs: [{ simpleText: { text: "일시적인 오류가 발생했습니다." } }] }
+            ...createKakaoTextResponse(
+                "상담을 마무리하는 중 일시적인 문제가 생겼습니다.\n잠시 후 다시 시도해 주세요.",
+                [START_CONSULTATION_QUICK_REPLY],
+            ),
         });
     }
 });
@@ -566,7 +568,7 @@ router.post('/check-doctor-reply', async (req, res) => {
             }
             const statusLinkText = await getStatusLinkForConsultation(pending.consultationId);
             const replyText =
-                `💬 담당 의사 선생님의 답변이 도착했습니다!\n\n` +
+                `의료진 답변이 도착했습니다.\n\n` +
                 `👨‍⚕️ ${pending.doctorName}\n\n` +
                 `${pending.message}${statusLinkText}`;
 
@@ -575,8 +577,8 @@ router.post('/check-doctor-reply', async (req, res) => {
                 template: {
                     outputs: [{ simpleText: { text: replyText } }],
                     quickReplies: [
-                        { label: "예진상담", action: "message", messageText: "예진상담" },
-                        { label: "상담종료", action: "message", messageText: "상담종료" }
+                        START_CONSULTATION_QUICK_REPLY,
+                        END_CONSULTATION_QUICK_REPLY
                     ]
                 }
             });
@@ -585,19 +587,18 @@ router.post('/check-doctor-reply', async (req, res) => {
         // 대기 중인 답변 없음 → 일반 환영 메시지
         const statusLinkText = await getLatestStatusLinkForUser(userId);
         return res.status(200).json({
-            version: "2.0",
-            template: {
-                outputs: [{ simpleText: { text: `안녕하세요! 해피닥터 보듬입니다. 😊\n무엇을 도와드릴까요?${statusLinkText}` } }],
-                quickReplies: [
-                    { label: "예진상담", action: "message", messageText: "예진상담" }
-                ]
-            }
+            ...createKakaoTextResponse(
+                `안녕하세요. 해피닥터 보듬입니다.\n의료가 멀게 느껴질 때 먼저 말씀해 주세요.${statusLinkText}`,
+                [START_CONSULTATION_QUICK_REPLY],
+            ),
         });
     } catch (error) {
         console.error('[CheckDoctorReply Error]', error);
         return res.status(200).json({
-            version: "2.0",
-            template: { outputs: [{ simpleText: { text: "잠시 후 다시 시도해주세요." } }] }
+            ...createKakaoTextResponse(
+                "답변을 확인하는 중 잠시 문제가 생겼습니다.\n조금 뒤 다시 시도해 주세요.",
+                [START_CONSULTATION_QUICK_REPLY],
+            ),
         });
     }
 });

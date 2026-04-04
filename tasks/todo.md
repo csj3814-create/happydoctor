@@ -477,9 +477,21 @@
 - [x] `frontend/app`: `npm run build`
 - [x] Confirmed refreshed share assets exist at `frontend/homepage/public/design/brand-og.png` and `frontend/app/public/app-screenshot.png`
 
+## Phase 35: Kakao Consultation Copy & Safe Fallback Tone (2026.04.04)
+
+### Goal
+- [x] Rewrite patient-facing Kakao consultation messages so they sound like Happy Doctor's mission-led online medical consultation service, not a cold bot or generic triage utility
+- [x] Standardize quick-reply labels around `상담 시작` and `상담 종료` so the flow feels more intentional and less tool-driven
+- [x] Convert malformed Kakao payload handling into a safe `200` fallback that guides the user back into consultation instead of dropping a hard error response
+
+### Verification
+- [x] `node -e "require('./backend/routes/kakaoWebhook'); console.log('kakao-copy-ok');"`
+- [x] Started `createApp()` on an ephemeral local port and confirmed `POST /api/kakao/triage-complete` with an invalid non-object payload returns `200` plus a safe restart message/quick reply
+- [x] `git diff -- backend/routes/kakaoWebhook.js` reviewed to confirm the change stayed limited to Kakao-facing copy, safe fallback behavior, and shared quick-reply helpers
+
 ## Next Session Priorities
 
 - [ ] Check the live Render deployment for `/healthz` and `/api/version`, then decide whether to surface a tiny revision label in internal tooling
-- [ ] Review Kakao webhook responses for malformed payloads in production logs and decide whether any endpoints should return `200` safe-fallback instead of `400`
+- [ ] Review live Kakao webhook logs after the new copy ships and decide whether any follow-up/status paths still need softer safe-fallback wording
 - [ ] Decide whether to regenerate the remaining design-source PNG assets in `imgs/` to match the updated mission-led wording, or keep most surfaces HTML-driven
 - [ ] Review whether Kakao-specific share images should be split from general OG images, now that homepage/app previews are aligned
