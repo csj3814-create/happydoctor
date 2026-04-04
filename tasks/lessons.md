@@ -1,73 +1,78 @@
-# Happy Doctor Project - Lessons Learned
+# 해피닥터 프로젝트 - 작업 교훈
 
-*Update this file whenever a correction happens or a new pattern is established.*
+*사용자 교정이 있거나 새 패턴이 생기면 이 파일을 갱신한다.*
 
-## Persona and Tone
-- **Lesson**: Do not use "수련의" as it is less common; use "인턴 닥터" instead.
-- **Lesson**: Avoid naming specific doctors (like "최석재 교수님") in the public-facing or general scenario to encourage broader participation from other specialists. Use "해당 분야 전문의 선생님" instead.
-- **Lesson**: Ensure the persona name is warm and approachable for Koreans (e.g., "보듬" rather than foreign-sounding "헵/Hepp").
+## 페르소나와 톤
+- **교훈**: 한국 사용자에게 낯선 표현보다 자연스럽고 익숙한 한국어 표현을 우선한다.
+- **교훈**: 공개 문서나 일반 시나리오에서 특정 의사의 실명을 앞세우지 말고 `해당 분야 전문의` 같은 일반 표현을 사용한다.
+- **교훈**: 페르소나 이름은 한국어 화자에게 따뜻하고 친근하게 들려야 한다. 외래어 느낌보다 `보듬`처럼 정서가 전달되는 이름을 우선한다.
 
-## Architecture Decisions
-- **Lesson**: Do not force doctors to install new apps (like Telegram) for notifications. Use Kakao Openchat combined with MessengerBot R, replicating the successful Habit Coach architecture.
-- **Lesson**: Reuse Google Gemini API (`@google/generative-ai`) as it is both cost-effective and sufficient for SOAP note summarization, matching the reference project's success.
+## 아키텍처 결정
+- **교훈**: 의사에게 Telegram 같은 새 앱 설치를 강요하지 않는다. Habit Coach에서 검증된 Kakao Openchat + MessengerBot R 구조를 우선 재사용한다.
+- **교훈**: SOAP 요약에는 `@google/generative-ai` 기반 Gemini API를 우선 사용한다. 비용과 품질의 균형이 좋고 기존 레퍼런스와도 맞는다.
 
-## Mission & Branding
-- **Lesson**: 단체의 사회적 역할은 **의료 취약계층**(노숙자, 다문화 가정, 외국인 노동자, 주민등록 말소자, 의료보험 체불자 등)을 위한 봉사 활동임을 모든 대외 메시지에 명확히 한다.
-- **Lesson**: 요셉의원은 '형식적 영감'일 뿐, 별개의 단체이므로 요셉의원을 앞세우거나 대놓고 연결짓지 않는다. 단체 정체성은 '의료 취약계층을 위한 자원봉사 의사들의 비영리 단체'로 독립적으로 표현한다.
-- **Lesson**: 일반인 이용자를 거부하지 않되, 도움을 받은 이용자에게 소액 기부를 자연스럽게 안내하여 단체 지속성을 확보한다.
-- **Lesson**: 기부 안내는 강요가 아닌 따뜻한 권유 톤으로. 의료 취약계층에게는 기부 안내 대신 "주변에 도움이 필요한 분이 계시면 이 채널을 알려주세요"로 대체한다.
-- **Lesson**: Donation link는 아직 없음. 홈페이지 제작 시 함께 만들 예정. 그때까지 [DONATION_LINK] placeholder 사용하지 않기.
+## 미션과 브랜딩
+- **교훈**: 모든 대외 메시지는 해피닥터가 의료 접근성 취약계층을 위한 서비스라는 점을 먼저 드러낸다.
+- **교훈**: 해피닥터는 정식 병원이 아니라 의료 접근성 취약계층을 위해 자원봉사 의료진이 운영하는 비영리적 성격의 서비스로 표현한다.
+- **교훈**: 일반 이용자에게 죄책감을 주는 방식이 아니라, 기다려 준 이용자에게 자연스럽게 감사와 취지를 전하는 방향으로 메시지를 쓴다.
+- **교훈**: 후원 안내는 강요가 아니라 선택 권유의 톤으로 쓴다.
+- **교훈**: 실제 후원 링크가 준비되기 전에는 `[DONATION_LINK]` 같은 placeholder를 문서나 UI에 남기지 않는다.
 
-## Kakao OpenBuilder
-- **Lesson**: 슬롯필링(되물음)에서 `sys.date` 엔티티는 "어제부터", "3일 전" 같은 자연어를 인식 못함. onset 같은 자유 텍스트 입력은 `sys.text`를 사용할 것.
-- **Lesson**: `sys.image.url` 엔티티는 슬롯필링에 넣으면 이미지를 안 보내면 영원히 진행 불가. 선택적 입력은 슬롯필링에서 빼야 함.
-- **Lesson**: 8개 블록 분리 → 단일 블록 슬롯필링으로 통합해야 파라미터 전달 문제 없음. 블록 간 context 전달은 비-스킬 블록에서 불가.
-- **Lesson**: 바로연결 버튼의 타입이 "블록 연결"이면 슬롯필링 파라미터를 채우지 않음. "메시지" 타입으로 설정하여 사용자 발화로 인식되게 해야 함.
-- **Lesson**: 콜백 사용(callback) 토글이 OFF면 callbackUrl이 안 와서 동기 모드로 빠짐 → 5초 타임아웃 발생. 반드시 ON 확인.
-- **Lesson**: 스킬 서버 타임아웃 (1001) 에러는 대부분 Render 콜드스타트(50초+) 또는 API 할당량 초과가 원인.
-- **Lesson**: 상담종료 블록의 되묻기 버튼(바로연결 응답) 텍스트가 그대로 `close_reason` 파라미터 값으로 전달된다. 서버 closeMessages 키를 버튼 텍스트와 정확히 일치시켜야 함. (예: "호전" ❌ → "증상 호전" ✅)
+## 카카오 오픈빌더
+- **교훈**: 증상 시작 시점처럼 자연어가 섞인 입력은 `sys.date`보다 `sys.text`를 우선 고려한다.
+- **교훈**: `sys.image.url` 엔티티는 블록 설정이 맞지 않으면 이미지 업로드 자체가 막힐 수 있으므로 입력 설계를 단순하게 유지한다.
+- **교훈**: 블록을 과도하게 분리하지 말고, 필요한 경우 하나의 블록/컨텍스트 흐름으로 통합해 파라미터 전달을 안정화한다.
+- **교훈**: 바로연결 버튼에서 파라미터가 안 채워지면 `블록 연결` 대신 `메시지` 액션으로 바꿔 실제 발화처럼 인식되게 한다.
+- **교훈**: callback을 쓰는 플로우는 OpenBuilder에서 callback 설정이 켜져 있는지 항상 먼저 확인한다.
+- **교훈**: 서버 타임아웃이나 `1001` 오류는 Render 콜드스타트나 외부 API 지연일 수 있으니, 봇 스크립트 문제로 단정하지 말고 인프라 지연도 함께 본다.
+- **교훈**: 상담 종료 버튼 텍스트와 서버의 `close_reason` 매핑 문자열은 정확히 일치시킨다.
 
 ## Gemini API
-- **Lesson**: `maxOutputTokens: 1024`는 한국어 JSON 응답에 너무 작음. SOAP 차트 포함 시 잘려서 JSON 파싱 실패 → 최소 2048 사용.
-- **Lesson**: `responseMimeType: 'application/json'` 설정하면 Gemini가 순수 JSON만 반환 (```json 마크다운 불필요).
-- **Lesson**: JSON 파싱 실패 시 fallback 응답 반환하여 환자에게 에러 대신 기본 안내 제공.
-- **Lesson**: gemini-2.5-flash 무료 티어는 하루 20회 제한. 프로덕션에는 유료 전환 필수. 모델은 2.5 유지 (2.0으로 다운그레이드하지 말 것 - 사용자 지시).
-- **Lesson**: `sys.*` 엔티티 이름이 그대로 파라미터 값으로 들어올 수 있음. 서버에서 sanitize 처리 필요.
+- **교훈**: SOAP 차트까지 담는 JSON 응답에는 `maxOutputTokens: 1024`가 부족할 수 있으니 최소 `2048` 이상을 고려한다.
+- **교훈**: `responseMimeType: 'application/json'`을 지정해 Markdown fence 없이 순수 JSON을 받는다.
+- **교훈**: JSON 파싱이 실패하면 환자에게는 기본 안내 fallback을 주고, 서버에서는 파싱 실패를 명확히 기록한다.
+- **교훈**: 운영 환경에서는 무료 티어 한도를 전제로 하지 않는다. 모델 품질은 2.5 계열을 유지한다.
+- **교훈**: `sys.*` 엔티티 이름이 값으로 그대로 들어오는 경우를 대비해 서버에서 sanitize한다.
 
-## Render Deployment
-- **Lesson**: Render 무료 티어는 비활성 시 서버가 꺼짐. 14분 keep-alive ping으로 완화하지만 완전 방지는 불가.
-- **Lesson**: Root directory를 `backend`로 설정해야 함 (모노레포 구조).
-- **Lesson**: Render 자동 배포 브랜치는 대시보드에서만 설정 가능. 이 프로젝트는 `claude/upbeat-tharp` 브랜치를 배포 중 → main 변경 시 양쪽 동시 push 필요: `git push origin main && git push origin main:claude/upbeat-tharp`
-- **Lesson**: curl로 한국어 JSON 테스트 시 인코딩 문제 발생 가능. `\uXXXX` 유니코드 이스케이프 사용 또는 `--data-binary @-` + echo 파이프 방식 사용.
-- **Lesson**: Render 배포 완료 확인은 헬스체크(/) 응답 변경 여부로 판단 (버전 스탬프 임시 추가 방법 유효).
+## Render 배포
+- **교훈**: Render 무료 티어는 비활성 시 콜드스타트가 있으므로 keep-alive만으로 완전 해결된다고 가정하지 않는다.
+- **교훈**: 모노레포 구조에서는 Render root directory를 `backend`로 명시한다.
+- **교훈**: Render 자동 배포 브랜치는 현재 `claude/upbeat-tharp`이므로, 백엔드 변경은 `main`과 `main:claude/upbeat-tharp`를 함께 push한다.
+- **교훈**: Windows/PowerShell에서 JSON 테스트 시 인코딩 문제가 있으면 `\uXXXX` 이스케이프나 `--data-binary @-` 방식을 쓴다.
+- **교훈**: 배포 확인은 루트 응답만 보지 말고 `/healthz`, `/api/version`처럼 버전이 보이는 경로로 확인한다.
 
-## Domain & Canonical URL
-- **Lesson**: Public homepage canonical should use the agreed primary brand domain (currently `happydoctor.kr`), not temporary Vercel deployment URLs like `*.vercel.app`.
-- **Lesson**: If the product strategy separates Korean-first branding from future global expansion, use `happydoctor.kr` as the Korean primary domain now and reserve `happydoctors.net` for a later international site, but do not run duplicate public homepages on both domains at the same time.
-- **Lesson**: For the current Happy Doctor strategy, prefer one multilingual public site under the primary domain instead of operating separate Korean and international homepages too early.
-- **Lesson**: Reserve subdomains by product surface early: homepage on the root domain, future web app on `app.*`, and doctor portal on `portal.*`.
+## 도메인과 Canonical URL
+- **교훈**: 공개 홈페이지 canonical은 임시 Vercel URL이 아니라 합의된 대표 도메인 `happydoctor.kr`를 사용한다.
+- **교훈**: `happydoctors.net`은 국제 확장용으로 예약하되, 같은 시기에 중복 public homepage를 운영하지 않는다.
+- **교훈**: 현재 전략에서는 별도 사이트를 늘리기보다 대표 도메인 아래 다국어 구조를 우선한다.
+- **교훈**: 제품 표면별 서브도메인은 일찍 정한다. 루트는 홈페이지, `app.*`는 환자 앱, `portal.*`는 의료진 포털이다.
 
-## Homepage UI
-- **Lesson**: Keep browser tab branding consistent by removing default template favicon files and explicitly wiring Happy Doctor icon assets in Next metadata/app icon files.
-- **Lesson**: In public Q&A lists, expose only a short question preview (about 50 characters) while keeping professional answers visible, to balance readability and privacy tone.
-- **Lesson**: Favicon readability depends on optical fill, not file size; use a tightly cropped icon variant for tab/browser contexts.
+## 홈페이지 UI
+- **교훈**: 브라우저 탭 브랜딩은 기본 template favicon을 제거하고 해피닥터 아이콘 파일을 명시적으로 연결해 맞춘다.
+- **교훈**: 공개 Q&A에서는 질문 전문을 다 노출하지 말고 약 50자 미리보기만 보여주고, 전문의 답변은 노출 가능한 범위로 유지한다.
+- **교훈**: 파비콘은 파일 크기보다 시각적 점유율이 중요하므로, 여백을 줄인 전용 아이콘을 쓴다.
 
-## Firestore API Serialization
-- **Lesson**: When serializing Firestore documents, spread `doc.data()` first and write `id: doc.id` last. Otherwise a stored `id` field can silently override the real document id and break detail routes, mutations, and links.
-- **Lesson**: For legacy compatibility, detail lookups should gracefully fall back once when an older stored identifier may have been surfaced to the client.
-- **Lesson**: When a protected list view works but its detail route 404s in production, do not assume a single identifier bug too early. Verify the live request path and support the plausible legacy identifiers (`doc.id`, stored `id`, `userId`) before declaring the fix complete.
-- **Lesson**: Do not mask Firestore query errors as `null` in detail loaders. A missing composite index can look exactly like a 404 if the service swallows the error, so unexpected DB failures should bubble up as 500s instead.
-- **Lesson**: For small per-consultation reply histories, prefer fetching by equality filter and sorting in memory over adding a `where + orderBy` query that depends on a composite Firestore index.
+## Firestore API 직렬화
+- **교훈**: Firestore 문서 직렬화 시 `...doc.data()` 후에 `id: doc.id`를 마지막에 쓴다. 저장된 `id` 필드가 실제 문서 id를 덮어쓰지 않게 한다.
+- **교훈**: 레거시 호환을 위해 오래된 식별자가 노출됐을 가능성이 있으면 상세 조회에 한 번 정도 fallback을 둔다.
+- **교훈**: 목록은 열리는데 상세만 404인 경우, 단일 원인으로 단정하지 말고 `doc.id`, 저장된 `id`, `userId`까지 확인한다.
+- **교훈**: Firestore 쿼리 오류를 `null`로 삼키지 않는다. 복합 인덱스 누락도 404처럼 보일 수 있으므로 예상 밖 DB 실패는 500으로 드러내는 편이 낫다.
+- **교훈**: 상담별 회신 수가 작으면 복합 인덱스가 필요한 `where + orderBy`보다 동등 필터 후 메모리 정렬을 우선한다.
 
-## Cross-Origin Deployments
-- **Lesson**: After moving a frontend to a new production domain, verify the live preflight response headers, not just the status code. An `OPTIONS 204` can still be broken if `Access-Control-Allow-Origin` still points at the old host.
-- **Lesson**: Do not model portal CORS with a single `PORTAL_ORIGIN` string once multiple live domains exist. Keep a canonical allowlist that includes the current custom domain, legacy deployment host, and local development origins.
-- **Lesson**: For staff portals that always talk to one backend, prefer same-origin rewrites/proxying from the frontend deployment over direct browser calls to the backend. It makes domain cutovers much less fragile.
+## 크로스 오리진 배포
+- **교훈**: 새 프런트 도메인으로 옮긴 뒤에는 상태 코드만 보지 말고 `Access-Control-Allow-Origin` 헤더까지 확인한다.
+- **교훈**: 포털 CORS는 단일 `PORTAL_ORIGIN` 문자열보다 허용 도메인 목록으로 관리한다.
+- **교훈**: 포털처럼 항상 하나의 백엔드와만 통신하는 경우에는 브라우저 직접 호출보다 same-origin rewrite/proxy가 안전하다.
 
-## Vercel Project Setup
-- **Lesson**: When creating a new Vercel sub-app from the CLI, do not rely on the project default staying correct. If Vercel shows `Framework Preset: Other`, a Next.js app can build successfully yet still serve `NOT_FOUND` on its production aliases.
-- **Lesson**: For standalone Next.js surfaces like `frontend/app`, commit a local `vercel.json` with `"framework": "nextjs"` so the deployment metadata and live routing stay correct even before dashboard settings are cleaned up.
-- **Lesson**: If a manually created Vercel project needs Git auto-deploy later, the clean path is often to create a fresh Git-connected project with the correct `rootDirectory`, verify auto-build on push, and then swap the custom domain over. Updating the old manual project in place is not reliably supported by the API.
+## Vercel 프로젝트 설정
+- **교훈**: Vercel이 `Framework Preset: Other`로 잡히면 Next.js도 `NOT_FOUND`를 낼 수 있으니 기본값을 믿지 않는다.
+- **교훈**: `frontend/app` 같은 독립 Next.js 표면은 `vercel.json`에 `"framework": "nextjs"`를 명시해 둔다.
+- **교훈**: 수동 생성 프로젝트를 나중에 Git 자동 배포로 바꿔야 하면, 대개는 새 Git-connected 프로젝트를 만들고 도메인을 넘기는 편이 더 깔끔하다.
 
-## Patient App Messaging
-- **Lesson**: Patient app copy must not frame Happy Doctor as a pre-visit questionnaire or symptom-sorting app. Lead with "의료 접근성 취약계층을 위한 무료 온라인 의료상담" and treat AI, flow, and status-check language as supporting detail around that identity.
+## 환자 앱 메시징
+- **교훈**: 환자 앱은 사전 문진 앱이나 증상 분류 도구처럼 보이면 안 된다. `의료 접근성 취약계층을 위한 무료 온라인 의료상담` 정체성을 먼저 드러낸다.
+- **교훈**: AI, 상태 확인, 흐름 설명은 정체성을 보조하는 요소로만 배치한다.
+
+## 문서화
+- **교훈**: 프로젝트 문서는 기본적으로 한글로 저장한다.
+- **교훈**: handoff, todo, lessons 같은 운영 문서도 영어 제목이나 영어 위주 본문으로 남기지 않는다.
