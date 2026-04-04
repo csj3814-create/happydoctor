@@ -22,24 +22,24 @@ interface QAItem {
 
 const QUESTION_PREVIEW_LIMIT = 50
 
-const HERO_BADGES = ['무료 의료상담', '다국어 지원', '전문의 직접 검토']
+const HERO_BADGES = ['무료 온라인 의료상담', '의료 접근성 취약계층 중심', 'AI 인턴 보듬이 + 자원봉사 의료진']
 
 const HERO_POINTS = [
   {
-    title: '의료 취약계층 중심',
-    desc: '노숙인, 이주민, 농아인, 다문화가정까지 손이 잘 닿지 않는 곳부터 돕습니다.',
+    title: '의료 접근성 취약계층 중심',
+    desc: '노숙인, 이주민, 농아인, 다문화가정처럼 의료 접근성이 더 낮은 분들부터 먼저 돕습니다.',
   },
   {
     title: '카카오톡으로 간편하게',
-    desc: '별도 앱 설치 없이 익숙한 채널에서 상담을 시작하고 답변을 받을 수 있습니다.',
+    desc: '별도 앱 설치 없이 익숙한 채널에서 온라인 의료상담을 시작하고 답변을 받을 수 있습니다.',
   },
   {
-    title: 'AI 인턴 + 의료진 협업',
-    desc: 'AI가 먼저 정리하고, 필요하면 각 과 의료진이 직접 확인해 더 빠르게 연결합니다.',
+    title: 'AI 인턴 보듬이 + 자원봉사 의료진',
+    desc: '보듬이가 먼저 정리하고, 필요한 경우 자원봉사 의료진이 직접 확인해 다음 방향을 더 빠르게 전합니다.',
   },
   {
     title: '봉사와 기술의 결합',
-    desc: '의료봉사 경험과 디지털 접근성을 함께 살려 지속 가능한 구조를 만들어갑니다.',
+    desc: '의료봉사의 진심과 디지털 접근성을 함께 살려, 의료가 멀게 느껴지는 분들에게 먼저 닿는 구조를 만듭니다.',
   },
 ]
 
@@ -47,22 +47,22 @@ const FEATURE_CARDS = [
   {
     icon: '🩺',
     title: '완전 무료',
-    desc: '건강보험 유무와 상관없이 누구나 상담을 받을 수 있도록 문턱을 낮췄습니다.',
+    desc: '비용과 절차 때문에 망설이는 분들도 먼저 도움을 청할 수 있도록 무료 온라인 의료상담으로 문턱을 낮췄습니다.',
   },
   {
     icon: '👨‍⚕️',
-    title: '전문의 직접 답변',
-    desc: '자원봉사 의료진이 실제 상황을 읽고 직접 검토해 더 신뢰할 수 있는 답변을 드립니다.',
+    title: '자원봉사 의료진 직접 확인',
+    desc: 'AI 인턴 보듬이가 정리한 흐름을 바탕으로 자원봉사 의료진이 실제 상황을 읽고 직접 답변합니다.',
   },
   {
     icon: '🌍',
     title: '언어 장벽 완화',
-    desc: '한국어가 익숙하지 않아도 괜찮습니다. 이해하기 쉬운 방식으로 도움을 드립니다.',
+    desc: '한국어가 익숙하지 않아도 괜찮습니다. 설명 부담을 줄이고 이해하기 쉬운 방식으로 도움을 드립니다.',
   },
   {
     icon: '⏱️',
     title: '빠른 연결을 목표',
-    desc: '긴급하지 않은 상담도 오래 기다리지 않도록 AI와 의료진이 함께 흐름을 관리합니다.',
+    desc: '긴급하지 않은 상담도 오래 홀로 버티지 않도록 보듬이와 자원봉사 의료진이 함께 흐름을 관리합니다.',
   },
 ]
 
@@ -74,18 +74,18 @@ const STEPS = [
   },
   {
     number: '02',
-    title: '증상과 상황 입력',
-    desc: '나이, 성별, 주요 증상과 경과를 안내에 따라 입력하면 됩니다.',
+    title: '걱정과 상황을 편하게 설명',
+    desc: '나이, 성별, 주요 증상과 경과를 안내에 따라 적으면 보듬이가 읽기 좋게 정리합니다.',
   },
   {
     number: '03',
-    title: 'AI 예진과 의료진 검토',
-    desc: 'AI가 먼저 정리하고, 필요한 경우 의료진이 내용을 직접 확인합니다.',
+    title: 'AI 인턴 보듬이 정리 + 의료진 확인',
+    desc: '보듬이가 먼저 흐름을 정리하고, 필요한 경우 자원봉사 의료진이 내용을 직접 확인합니다.',
   },
   {
     number: '04',
     title: '카카오톡으로 답변 수신',
-    desc: '채널 안에서 그대로 답변과 추가 안내를 받아볼 수 있습니다.',
+    desc: '채널 안에서 그대로 답변과 추가 안내를 받아보며 같은 상담 흐름을 이어갈 수 있습니다.',
   },
 ]
 
@@ -106,7 +106,7 @@ const TIMELINE = [
   { year: '2022.10', title: '서대문농아인복지관 협력', desc: '교육과 상담이 함께 가는 형태로 활동을 정례화했습니다.' },
   { year: '2023.02', title: '사단법인 창립총회', desc: '임의단체를 넘어 비영리법인으로 전환하며 활동 기반을 다졌습니다.' },
   { year: '2023.04', title: '다가치 MOU', desc: '이주민 의료지원 체계 구축을 위한 협약을 체결했습니다.' },
-  { year: '2024-2026', title: '카카오톡 채널 + AI 예진 도입', desc: '언제 어디서나 접근 가능한 AI 기반 의료상담 흐름을 만들었습니다.' },
+  { year: '2024-2026', title: '카카오톡 채널 + AI 인턴 보듬이 도입', desc: '언제 어디서나 도움을 청할 수 있도록 온라인 의료상담 흐름을 만들었습니다.' },
 ]
 
 const GALLERY = [
@@ -254,7 +254,7 @@ function Hero({ stats }: { stats: Stats | null }) {
               제비처럼, 필요한 곳에 닿는 의료
             </h1>
             <p className="mt-6 text-sm leading-7 text-white/78 md:text-base md:leading-8 xl:whitespace-nowrap">
-              행복한 의사는 의료 취약계층을 위한 무료 온라인 의료상담 서비스입니다. AI 인턴 보듬이와 자원봉사 의료진이 함께 움직이며, 더 빨리 더 쉽게 도움에 닿도록 돕습니다.
+              행복한 의사는 의료 접근성 취약계층을 위한 무료 온라인 의료상담 서비스입니다. AI 인턴 보듬이와 자원봉사 의료진이 함께 움직이며, 더 빨리 더 쉽게 도움에 닿도록 돕습니다.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -324,7 +324,7 @@ function Hero({ stats }: { stats: Stats | null }) {
             <p className="text-3xl font-bold">
               <StatsValue value={stats?.doctorReplied ?? null} suffix="건" />
             </p>
-            <p className="mt-2 text-sm text-white/70">전문의 직접 회신</p>
+            <p className="mt-2 text-sm text-white/70">의료진 직접 회신</p>
           </div>
 
           <div className="stat-card">
@@ -728,7 +728,7 @@ function QASection() {
             <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-400">
               <span className="rounded-full bg-slate-100 px-3 py-1">실제 상담 사례 기반</span>
               <span className="rounded-full bg-slate-100 px-3 py-1">증상 검색 가능</span>
-              <span className="rounded-full bg-slate-100 px-3 py-1">전문의 답변 공개</span>
+              <span className="rounded-full bg-slate-100 px-3 py-1">의료진 답변 공개</span>
             </div>
           </div>
 
@@ -960,7 +960,7 @@ function SupportSection() {
                 <p className="mt-1 text-sm text-slate-500">예금주: 행복한의사</p>
               </div>
               <p className="mt-4 text-sm leading-7 text-slate-600">
-                작은 후원이 의료 취약계층에게 실제 도움으로 이어집니다.
+                작은 후원이 의료 접근성 취약계층에게 실제 도움으로 이어집니다.
               </p>
             </div>
           </div>

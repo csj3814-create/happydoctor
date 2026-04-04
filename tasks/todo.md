@@ -426,8 +426,21 @@
 - [x] `frontend/app`: `npm run lint`
 - [x] `frontend/app`: `npm run build`
 
+## Phase 31: Homepage/App Core Copy Alignment (2026.04.04)
+
+### Goal
+- [x] Align homepage and patient app wording around `무료 온라인 의료상담`, `의료 접근성 취약계층`, and `AI 인턴 보듬이 + 자원봉사 의료진`
+- [x] Remove homepage wording that still sounds more like triage tooling or an overly clinical product surface
+- [x] Keep the same mission across homepage and app while preserving each surface's role
+
+### Verification
+- [x] `frontend/homepage`: `npm run lint`
+- [x] `frontend/homepage`: `npm run build`
+- [x] `frontend/app`: `npm run lint`
+- [x] `frontend/app`: `npm run build`
+
 ## Next Session Priorities
 
-- [ ] Review homepage/app copy consistency around `무료 온라인 의료상담`, `의료 접근성 취약계층`, and `AI 인턴 보듬이 + 자원봉사 의료진`
 - [ ] Resume backend reliability work: unify follow-up/notification delivery and harden request validation
 - [ ] Decide whether to regenerate shared design-source PNG assets in `imgs/` to match the new app identity, or keep the app primarily HTML-driven
+- [ ] Review whether OG/share images should be regenerated so social previews match the updated mission-led wording
