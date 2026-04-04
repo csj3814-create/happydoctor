@@ -18,6 +18,7 @@ export type PublicConsultationStage =
 
 export interface PublicConsultationStatus {
   consultationId: string
+  trackingCode: string | null
   status: PublicConsultationStage
   chiefComplaint: string | null
   createdAt: string | null
@@ -28,24 +29,44 @@ export interface PublicConsultationStatus {
   followUpCount: number
   latestFollowUpAt: string | null
   doctorReplies: PublicDoctorReply[]
+  entryChannel: 'kakao' | 'web' | string
 }
 
 function tryExtractTokenFromUrl(value: string): string | null {
   try {
     const parsed = new URL(value)
-    return parsed.searchParams.get('token')
+    return (
+      parsed.searchParams.get('lookup') ||
+      parsed.searchParams.get('code') ||
+      parsed.searchParams.get('token')
+    )
   } catch {
     return null
   }
 }
 
-export function normalizeStatusToken(rawToken?: string | string[] | null): string | null {
+export interface PublicConsultationCreateResponse {
+  ok: boolean
+  consultationId: string
+  trackingCode: string | null
+  statusUrl: string
+  status: PublicConsultationStage
+  requiresDoctorReview: boolean
+  replyToPatient: string
+}
+
+export function normalizeStatusLookup(rawToken?: string | string[] | null): string | null {
   const source = Array.isArray(rawToken) ? rawToken[0] : rawToken
   const trimmed = source?.trim()
   if (!trimmed) return null
 
   const fromUrl = tryExtractTokenFromUrl(trimmed)
   const candidate = (fromUrl || trimmed).trim()
+  const upperCandidate = candidate.toUpperCase()
+
+  if (/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}$/.test(upperCandidate)) {
+    return upperCandidate
+  }
 
   if (!/^[a-zA-Z0-9_-]{16,128}$/.test(candidate)) {
     return null
@@ -53,6 +74,8 @@ export function normalizeStatusToken(rawToken?: string | string[] | null): strin
 
   return candidate
 }
+
+export const normalizeStatusToken = normalizeStatusLookup
 
 export async function fetchConsultationStatus(
   token: string,

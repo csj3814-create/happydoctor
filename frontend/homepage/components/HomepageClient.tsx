@@ -7,6 +7,7 @@ const FALLBACK_STATS = { total: 373, doctorReplied: 321 }
 const KAKAO_CHAT_URL = 'https://pf.kakao.com/_PxaTxhX/chat'
 const KAKAO_CHANNEL_URL = 'https://pf.kakao.com/_PxaTxhX'
 const VOLUNTEER_URL = 'https://open.kakao.com/me/csj3814'
+const WEB_START_URL = 'https://app.happydoctor.kr/start?source=homepage'
 
 interface Stats {
   total: number
@@ -30,8 +31,8 @@ const HERO_POINTS = [
     desc: '노숙인, 이주민, 농아인, 다문화가정처럼 의료 접근성이 더 낮은 분들부터 먼저 돕습니다.',
   },
   {
-    title: '카카오톡으로 간편하게',
-    desc: '별도 앱 설치 없이 익숙한 채널에서 온라인 의료상담을 시작하고 답변을 받을 수 있습니다.',
+    title: '웹과 카카오톡 두 경로',
+    desc: '익숙한 채널이 카카오톡이 아니어도 괜찮습니다. 홈페이지와 웹앱에서도 온라인 의료상담을 바로 시작할 수 있습니다.',
   },
   {
     title: 'AI 인턴 보듬이 + 자원봉사 의료진',
@@ -69,8 +70,8 @@ const FEATURE_CARDS = [
 const STEPS = [
   {
     number: '01',
-    title: '카카오 채널 접속',
-    desc: '카카오톡에서 행복한 의사를 검색하거나 아래 버튼으로 바로 들어옵니다.',
+    title: '웹 또는 카카오 채널에서 상담 시작',
+    desc: '홈페이지와 웹앱에서 바로 시작하거나, 카카오톡에서 행복한 의사를 검색해 들어올 수 있습니다.',
   },
   {
     number: '02',
@@ -84,8 +85,8 @@ const STEPS = [
   },
   {
     number: '04',
-    title: '카카오톡으로 답변 수신',
-    desc: '채널 안에서 그대로 답변과 추가 안내를 받아보며 같은 상담 흐름을 이어갈 수 있습니다.',
+    title: '짧은 상태 코드로 다시 확인',
+    desc: '웹과 카카오톡 어느 쪽에서 시작했든 짧은 상태 코드로 같은 상담 흐름과 의료진 답변을 다시 확인할 수 있습니다.',
   },
 ]
 
@@ -258,7 +259,10 @@ function Hero({ stats }: { stats: Stats | null }) {
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <CTAButton href={KAKAO_CHAT_URL}>카카오톡으로 상담하기</CTAButton>
+              <CTAButton href={WEB_START_URL}>웹으로 상담 시작</CTAButton>
+              <CTAButton href={KAKAO_CHAT_URL} variant="secondary">
+                카카오톡으로 상담하기
+              </CTAButton>
               <CTAButton href={VOLUNTEER_URL} variant="secondary">
                 의료진 참여 문의
               </CTAButton>
@@ -304,7 +308,7 @@ function Hero({ stats }: { stats: Stats | null }) {
 
             <div className="floating-chip absolute right-0 top-8 hidden rounded-2xl border border-white/16 bg-white/12 px-4 py-3 text-white shadow-lg backdrop-blur md:block">
               <p className="text-[11px] uppercase tracking-[0.25em] text-white/60">Access</p>
-              <p className="mt-1 text-sm font-semibold">카카오톡 채널로 바로 연결</p>
+              <p className="mt-1 text-sm font-semibold">웹과 카카오톡에서 모두 시작 가능</p>
             </div>
           </div>
         </div>
@@ -449,14 +453,14 @@ function HowToSection() {
           </div>
           <div className="floating-chip absolute -right-2 bottom-10 rounded-[1.4rem] bg-white px-4 py-3 text-slate-900 shadow-xl shadow-slate-900/10">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-700">Flow</p>
-            <p className="mt-1 text-sm font-semibold">카카오톡에서 바로 이어집니다</p>
+            <p className="mt-1 text-sm font-semibold">웹과 카카오톡에서 이어집니다</p>
           </div>
         </div>
 
         <div>
           <SectionHeading
             eyebrow="How It Works"
-            title="복잡한 설치 없이, 익숙한 채널에서 바로 시작합니다"
+            title="복잡한 설치 없이, 웹과 익숙한 채널에서 바로 시작합니다"
             desc="설명은 쉽고, 접근은 간단하고, 연결은 빠르게. 사용 흐름도 그 원칙에 맞춰 설계했습니다."
           />
           <div className="mt-10 grid gap-4">
@@ -476,7 +480,7 @@ function HowToSection() {
           </div>
 
           <div className="mt-8">
-            <CTAButton href={KAKAO_CHAT_URL}>지금 바로 상담하기</CTAButton>
+            <CTAButton href={WEB_START_URL}>지금 바로 상담 시작</CTAButton>
           </div>
         </div>
       </div>
@@ -826,7 +830,7 @@ function QASection() {
           )}
 
           <div className="mt-10 text-center">
-            <CTAButton href={KAKAO_CHAT_URL}>나도 상담받기</CTAButton>
+            <CTAButton href={WEB_START_URL}>나도 상담받기</CTAButton>
           </div>
         </div>
       </div>
