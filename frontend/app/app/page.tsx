@@ -67,6 +67,27 @@ const availableNext = [
   '다국어 안내와 앱 내부 도움말 확장',
 ]
 
+const carePromises = [
+  {
+    label: '누구를 위한 서비스인가요',
+    body: '의료 접근성 취약계층이 병원에 가기 전, 먼저 설명하고 도움을 청할 수 있는 온라인 의료상담 창구입니다.',
+  },
+  {
+    label: '상담은 어떻게 이어지나요',
+    body: '카카오톡에서 시작하고, AI 인턴 보듬이가 정리한 뒤 자원봉사 의료진이 필요한 상담을 직접 확인합니다.',
+  },
+  {
+    label: '앱은 어떤 역할을 하나요',
+    body: '같은 상담 흐름을 다시 열고, 진행 상태와 답변 도착 여부를 더 가깝게 확인하도록 돕습니다.',
+  },
+]
+
+const brandPrinciples = [
+  '해피닥터는 의료가 더 멀게 느껴지는 사람에게 먼저 닿습니다.',
+  '무료 온라인 의료상담으로 설명 부담과 거리 장벽을 낮춥니다.',
+  'AI 인턴 보듬이와 자원봉사 의료진이 함께 움직입니다.',
+]
+
 const installTips = [
   'Android Chrome에서는 메뉴에서 홈 화면 추가를 누르면 앱처럼 둘 수 있습니다.',
   'iPhone Safari에서는 공유 메뉴의 홈 화면에 추가로 바로가기 설치가 가능합니다.',
@@ -219,15 +240,57 @@ export default function AppHomePage() {
                         />
                       </div>
 
-                      <div className="mt-4 overflow-hidden rounded-[1.6rem] border border-[#d8eaf5] bg-white shadow-[0_16px_28px_rgba(11,38,62,0.06)]">
-                        <Image
-                          src="/app-screenshot.png"
-                          alt="해피닥터 앱 화면 미리보기"
-                          width={1179}
-                          height={2556}
-                          className="h-auto w-full"
-                          priority
-                        />
+                      <div className="phone-screen mt-4">
+                        <div className="rounded-[1.35rem] bg-[linear-gradient(180deg,#e9f6ff_0%,#f8fcff_100%)] p-4">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full bg-[var(--navy)] px-3 py-1 text-[11px] font-semibold text-white">
+                              무료 온라인 의료상담
+                            </span>
+                            <span className="rounded-full border border-[#c9deeb] bg-white/84 px-3 py-1 text-[11px] font-semibold text-[var(--blue)]">
+                              AI 인턴 보듬이 + 의료진
+                            </span>
+                          </div>
+
+                          <div className="mt-4 rounded-[1.3rem] bg-white p-4 shadow-[0_14px_24px_rgba(11,38,62,0.07)]">
+                            <p className="display-face text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--blue)]">
+                              First Contact
+                            </p>
+                            <p className="mt-2 text-lg font-semibold leading-7 text-[var(--ink)]">
+                              병원에 바로 가기 어렵거나,
+                              <br />
+                              먼저 설명할 곳이 필요할 때
+                            </p>
+                            <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
+                              해피닥터는 의료 접근성 취약계층이 온라인으로 먼저 도움에 닿도록 돕는 상담 서비스입니다.
+                            </p>
+                          </div>
+
+                          <div className="mt-4 space-y-3">
+                            {carePromises.map((item, index) => (
+                              <div
+                                key={item.label}
+                                className="rounded-[1.2rem] border border-[#d4e6f2] bg-white/92 px-4 py-3 shadow-[0_12px_20px_rgba(11,38,62,0.05)]"
+                              >
+                                <div className="flex items-start gap-3">
+                                  <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-[var(--sky)] text-[11px] font-semibold text-[var(--navy)]">
+                                    0{index + 1}
+                                  </span>
+                                  <div>
+                                    <p className="text-sm font-semibold text-[var(--ink)]">{item.label}</p>
+                                    <p className="mt-1 text-[13px] leading-6 text-[var(--muted)]">{item.body}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="mt-4 rounded-[1.3rem] bg-[var(--navy)] px-4 py-3 text-white">
+                            <p className="text-sm font-semibold">응급을 대신하지는 않지만, 먼저 도움을 청할 수는 있습니다.</p>
+                            <p className="mt-2 text-[13px] leading-6 text-white/78">
+                              상담은 카카오톡에서 시작되고, 앱은 같은 흐름을 다시 확인하는 연결면으로 작동합니다.
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -373,14 +436,39 @@ export default function AppHomePage() {
                   </p>
                 </div>
 
-                <div className="overflow-hidden rounded-[1.6rem] border border-white/14 bg-white/10">
-                  <Image
-                    src="/brand-banner.png"
-                    alt="해피닥터 브랜드 배너"
-                    width={1600}
-                    height={900}
-                    className="h-auto w-full object-cover"
-                  />
+                <div className="brand-mission-card">
+                  <div className="space-y-4">
+                    <div>
+                      <p className="display-face text-xs font-semibold uppercase tracking-[0.22em] text-white/62">
+                        Care Promise
+                      </p>
+                      <h4 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-white">
+                        의료가 닿기 어려운 순간,
+                        <br />
+                        먼저 열려 있는 상담 창구
+                      </h4>
+                    </div>
+
+                    <ul className="space-y-3 text-sm leading-7 text-white/82">
+                      {brandPrinciples.map((item) => (
+                        <li key={item} className="flex gap-3">
+                          <span className="mt-2 h-2 w-2 rounded-full bg-[var(--signal)]" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="brand-character-wrap">
+                    <div className="brand-character-ring" />
+                    <Image
+                      src="/chatbot-character.png"
+                      alt="AI 인턴 보듬이 캐릭터"
+                      width={220}
+                      height={220}
+                      className="brand-character"
+                    />
+                  </div>
                 </div>
               </div>
 

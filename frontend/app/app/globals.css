@@ -103,6 +103,14 @@ a {
   animation: deviceFloat 6.2s ease-in-out infinite;
 }
 
+.phone-screen {
+  overflow: hidden;
+  border: 1px solid #d8eaf5;
+  border-radius: 1.6rem;
+  background: white;
+  box-shadow: 0 16px 28px rgba(11, 38, 62, 0.06);
+}
+
 .signal-pulse {
   position: relative;
 }
@@ -181,6 +189,44 @@ a {
     radial-gradient(circle at top right, rgba(255, 255, 255, 0.2), transparent 30%),
     linear-gradient(150deg, #0a3f70 0%, #0f5f9c 58%, #79bfdf 100%);
   box-shadow: var(--shadow);
+}
+
+.brand-mission-card {
+  display: grid;
+  gap: 1.5rem;
+  align-items: end;
+  min-height: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 1.6rem;
+  padding: 1.4rem;
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.18), transparent 34%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
+}
+
+.brand-character-wrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: end;
+  min-height: 16rem;
+}
+
+.brand-character-ring {
+  position: absolute;
+  width: 13rem;
+  height: 13rem;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0));
+  filter: blur(4px);
+}
+
+.brand-character {
+  position: relative;
+  width: min(100%, 13rem);
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 20px 30px rgba(7, 28, 49, 0.22));
 }
 
 .faq-item {
@@ -307,5 +353,10 @@ a {
     grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
     align-items: end;
     padding: 1.8rem;
+  }
+
+  .brand-mission-card {
+    grid-template-columns: minmax(0, 1fr) minmax(13rem, 15rem);
+    padding: 1.6rem;
   }
 }
