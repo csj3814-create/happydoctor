@@ -491,7 +491,8 @@
 
 ## Next Session Priorities
 
-- [ ] Check the live Render deployment for `/healthz` and `/api/version`, then decide whether to surface a tiny revision label in internal tooling
+- [ ] Confirm the live Render backend has advanced from `835675a` to the newer Kakao-copy commit `924bc07`, then spot-check one or two real Kakao flow messages
 - [ ] Review live Kakao webhook logs after the new copy ships and decide whether any follow-up/status paths still need softer safe-fallback wording
 - [ ] Decide whether to regenerate the remaining design-source PNG assets in `imgs/` to match the updated mission-led wording, or keep most surfaces HTML-driven
+- [ ] Decide the next product phase for `app.happydoctor.kr`: keep it as a consultation entry/status surface or expand it into a broader patient web app
 - [ ] Review whether Kakao-specific share images should be split from general OG images, now that homepage/app previews are aligned
