@@ -99,8 +99,8 @@ router.get('/poll', checkApiKey, async (req, res) => {
  * MessengerBotR이 주기적으로 호출하여 F/U 메시지가 있으면
  * 해당 roomName으로 Api.replyRoom()을 통해 환자에게 직접 전송.
  */
-router.get('/fu-push-poll', checkApiKey, (req, res) => {
-    const fuItem = dequeueFUPush();
+router.get('/fu-push-poll', checkApiKey, async (req, res) => {
+    const fuItem = await dequeueFUPush();
     if (fuItem) {
         return res.status(200).json({
             hasNew: true,
@@ -117,12 +117,12 @@ router.get('/fu-push-poll', checkApiKey, (req, res) => {
  * MessengerBotR이 카카오 채널 1:1 채팅방에서 메시지를 수신하면
  * userId(sender)와 roomName을 서버에 등록하여 F/U 푸시 시 사용.
  */
-router.post('/register-room', checkApiKey, (req, res) => {
+router.post('/register-room', checkApiKey, async (req, res) => {
     const { userId, roomName } = req.body;
     if (!userId || !roomName) {
         return res.status(400).json({ error: 'userId and roomName required' });
     }
-    registerRoom(userId, roomName);
+    await registerRoom(userId, roomName);
     res.status(200).json({ ok: true });
 });
 

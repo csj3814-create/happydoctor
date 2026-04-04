@@ -439,8 +439,20 @@
 - [x] `frontend/app`: `npm run lint`
 - [x] `frontend/app`: `npm run build`
 
+## Phase 32: Backend Follow-Up Delivery Hardening (2026.04.04)
+
+### Goal
+- [x] Remove in-memory follow-up session caching so Firestore remains the single source of truth for pending follow-up state
+- [x] Move MessengerBot room registration and F/U push queue storage off process memory and into Firestore-backed collections
+- [x] Keep the existing MessengerBot endpoints compatible while making restart behavior less fragile
+
+### Verification
+- [x] `node -e "const { createApp } = require('./backend/app'); createApp(); console.log('app-ok');"`
+- [x] `node -e "require('./backend/services/notifyService'); require('./backend/services/followUpService'); require('./backend/routes/messengerBot'); console.log('services-ok');"`
+- [x] `git grep -n "memorySessions\|fuPushQueue\|roomMapping" -- backend` returned no matches
+
 ## Next Session Priorities
 
-- [ ] Resume backend reliability work: unify follow-up/notification delivery and harden request validation
+- [ ] Resume backend reliability work: harden request validation and inspect whether Render should expose a lightweight health/version endpoint for safer rollout checks
 - [ ] Decide whether to regenerate shared design-source PNG assets in `imgs/` to match the new app identity, or keep the app primarily HTML-driven
 - [ ] Review whether OG/share images should be regenerated so social previews match the updated mission-led wording

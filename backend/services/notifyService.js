@@ -1,157 +1,197 @@
 const { randomUUID } = require('crypto');
 const { getDb, getAdmin } = require('./dbService');
 
-// F/U 환자 푸시 전용 큐 (메모리 — 서버 재시작 시 재등록됨)
-const fuPushQueue = [];
+const DOCTOR_NOTIFICATIONS = 'doctor_notifications';
+const FOLLOW_UP_PUSHES = 'follow_up_pushes';
+const MESSENGER_ROOMS = 'messenger_rooms';
 
-// userId ↔ roomName 매핑 (메모리 — MessengerBotR이 메시지 올 때 재등록됨)
-const roomMapping = new Map();
+function getCollection(name) {
+  const db = getDb();
+  return db ? db.collection(name) : null;
+}
 
-/**
- * 발생한 예진 차트를 Firestore 큐에 저장합니다.
- * (서버 재시작해도 데이터 유지)
- */
+async function countDocuments(query) {
+  const snapshot = await query.get();
+  return snapshot.size;
+}
+
 async function enqueueDoctorNotification(message, patientId) {
-    const db = getDb();
-    if (!db) {
-        console.warn('[Notification] Firestore 없음 — 차트 저장 불가');
-        return;
-    }
-    await db.collection('doctor_notifications').add({
-        id: randomUUID(),
-        message,
-        patientId,
-        status: 'pending',
-        createdAt: getAdmin().firestore.FieldValue.serverTimestamp()
-    });
-    console.log(`[Notification Enqueued] Patient: ${patientId}`);
+  const collection = getCollection(DOCTOR_NOTIFICATIONS);
+  if (!collection) {
+    console.warn('[Notification] Firestore unavailable, skipping doctor notification enqueue.');
+    return false;
+  }
+
+  await collection.add({
+    id: randomUUID(),
+    message,
+    patientId,
+    status: 'pending',
+    createdAt: getAdmin().firestore.FieldValue.serverTimestamp(),
+  });
+
+  console.log(`[Notification Enqueued] Patient: ${patientId}`);
+  return true;
 }
 
-/**
- * 폴링용: 가장 오래된 pending 차트를 'notified'로 마킹합니다.
- * 'delivered'가 아닌 'notified'로 마킹하여, replyRoom이 실패해도
- * ~차트확인으로 복구할 수 있습니다.
- */
 async function peekDoctorNotification() {
-    const db = getDb();
-    if (!db) return null;
+  const collection = getCollection(DOCTOR_NOTIFICATIONS);
+  if (!collection) return null;
 
-    const snapshot = await db.collection('doctor_notifications')
-        .where('status', '==', 'pending')
-        .limit(1)
-        .get();
+  const snapshot = await collection
+    .where('status', '==', 'pending')
+    .limit(1)
+    .get();
 
-    if (snapshot.empty) return null;
+  if (snapshot.empty) return null;
 
-    const doc = snapshot.docs[0];
-    await doc.ref.update({
-        status: 'notified',
-        notifiedAt: getAdmin().firestore.FieldValue.serverTimestamp()
-    });
-    return { message: doc.data().message, patientId: doc.data().patientId };
+  const doc = snapshot.docs[0];
+  await doc.ref.update({
+    status: 'notified',
+    notifiedAt: getAdmin().firestore.FieldValue.serverTimestamp(),
+  });
+
+  const data = doc.data();
+  return { message: data.message, patientId: data.patientId };
 }
 
-/**
- * ~차트확인용: pending + notified 상태의 모든 차트를 조회하고
- * 'delivered'로 마킹합니다. 폴링이 실패해도 차트를 복구합니다.
- */
 async function confirmDoctorNotifications() {
-    const db = getDb();
-    if (!db) return [];
+  const collection = getCollection(DOCTOR_NOTIFICATIONS);
+  if (!collection) return [];
 
-    // 'in' 쿼리 대신 두 번 조회 — 단순 단일 필드 쿼리만 사용
-    const [pendingSnap, notifiedSnap] = await Promise.all([
-        db.collection('doctor_notifications').where('status', '==', 'pending').get(),
-        db.collection('doctor_notifications').where('status', '==', 'notified').get()
-    ]);
+  const [pendingSnap, notifiedSnap] = await Promise.all([
+    collection.where('status', '==', 'pending').get(),
+    collection.where('status', '==', 'notified').get(),
+  ]);
 
-    const docs = [...pendingSnap.docs, ...notifiedSnap.docs];
-    if (docs.length === 0) return [];
+  const docs = [...pendingSnap.docs, ...notifiedSnap.docs];
+  if (docs.length === 0) return [];
 
-    const batch = db.batch();
-    const now = getAdmin().firestore.FieldValue.serverTimestamp();
-    docs.forEach(doc => {
-        batch.update(doc.ref, { status: 'delivered', deliveredAt: now });
-    });
-    await batch.commit();
+  const batch = getDb().batch();
+  const now = getAdmin().firestore.FieldValue.serverTimestamp();
 
-    return docs.map(doc => ({
-        message: doc.data().message,
-        patientId: doc.data().patientId
-    }));
-}
+  docs.forEach((doc) => {
+    batch.update(doc.ref, { status: 'delivered', deliveredAt: now });
+  });
 
-/**
- * F/U 푸시 메시지를 환자 전송용 큐에 적재합니다.
- */
-function enqueueFUPush(userId, message) {
-    const roomName = roomMapping.get(userId);
-    if (!roomName) {
-        console.warn(`[F/U Push] ${userId}의 roomName 매핑 없음 — pending F/U로 대기`);
-        return false;
-    }
-    fuPushQueue.push({
-        id: randomUUID(),
-        userId,
-        roomName,
-        message,
-        timestamp: new Date()
-    });
-    console.log(`[F/U Push Enqueued] ${userId} → room: ${roomName}`);
-    return true;
-}
+  await batch.commit();
 
-/**
- * F/U 푸시 큐에서 메시지를 하나 꺼냅니다.
- */
-function dequeueFUPush() {
-    if (fuPushQueue.length > 0) {
-        return fuPushQueue.shift();
-    }
-    return null;
-}
-
-/**
- * userId ↔ roomName 매핑을 등록합니다.
- */
-function registerRoom(userId, roomName) {
-    roomMapping.set(userId, roomName);
-    console.log(`[Room Registered] ${userId} → ${roomName}`);
-}
-
-/**
- * userId로 roomName 조회
- */
-function getRoomName(userId) {
-    return roomMapping.get(userId) || null;
-}
-
-/**
- * 디버깅용 큐 상태 확인
- */
-async function getQueueStatus() {
-    const db = getDb();
-    let pendingCount = 0;
-    if (db) {
-        const snapshot = await db.collection('doctor_notifications')
-            .where('status', '==', 'pending')
-            .get();
-        pendingCount = snapshot.size;
-    }
+  return docs.map((doc) => {
+    const data = doc.data();
     return {
-        pendingCount,
-        fuPushPending: fuPushQueue.length,
-        registeredRooms: roomMapping.size
+      message: data.message,
+      patientId: data.patientId,
     };
+  });
+}
+
+async function enqueueFUPush(userId, message) {
+  const db = getDb();
+  if (!db) {
+    console.warn('[F/U Push] Firestore unavailable, skipping enqueue.');
+    return false;
+  }
+
+  const roomSnapshot = await db.collection(MESSENGER_ROOMS).doc(userId).get();
+  const roomName = roomSnapshot.exists ? roomSnapshot.data().roomName : null;
+
+  if (!roomName) {
+    console.warn(`[F/U Push] No registered room found for ${userId}.`);
+    return false;
+  }
+
+  await db.collection(FOLLOW_UP_PUSHES).add({
+    id: randomUUID(),
+    userId,
+    roomName,
+    message,
+    status: 'pending',
+    createdAt: getAdmin().firestore.FieldValue.serverTimestamp(),
+  });
+
+  console.log(`[F/U Push Enqueued] ${userId} -> ${roomName}`);
+  return true;
+}
+
+async function dequeueFUPush() {
+  const collection = getCollection(FOLLOW_UP_PUSHES);
+  if (!collection) return null;
+
+  const snapshot = await collection
+    .where('status', '==', 'pending')
+    .limit(1)
+    .get();
+
+  if (snapshot.empty) return null;
+
+  const doc = snapshot.docs[0];
+  await doc.ref.update({
+    status: 'delivered',
+    deliveredAt: getAdmin().firestore.FieldValue.serverTimestamp(),
+  });
+
+  return doc.data();
+}
+
+async function registerRoom(userId, roomName) {
+  const db = getDb();
+  if (!db) {
+    console.warn('[Room Registered] Firestore unavailable, skipping room registration.');
+    return false;
+  }
+
+  await db.collection(MESSENGER_ROOMS).doc(userId).set({
+    userId,
+    roomName,
+    updatedAt: getAdmin().firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+
+  console.log(`[Room Registered] ${userId} -> ${roomName}`);
+  return true;
+}
+
+async function getRoomName(userId) {
+  const db = getDb();
+  if (!db) return null;
+
+  const snapshot = await db.collection(MESSENGER_ROOMS).doc(userId).get();
+  return snapshot.exists ? snapshot.data().roomName || null : null;
+}
+
+async function getQueueStatus() {
+  const db = getDb();
+  if (!db) {
+    return {
+      pendingCount: 0,
+      fuPushPending: 0,
+      registeredRooms: 0,
+    };
+  }
+
+  const doctorCollection = db.collection(DOCTOR_NOTIFICATIONS);
+  const followUpCollection = db.collection(FOLLOW_UP_PUSHES);
+  const roomsCollection = db.collection(MESSENGER_ROOMS);
+
+  const [pendingCount, fuPushPending, registeredRooms] = await Promise.all([
+    countDocuments(doctorCollection.where('status', '==', 'pending')),
+    countDocuments(followUpCollection.where('status', '==', 'pending')),
+    countDocuments(roomsCollection),
+  ]);
+
+  return {
+    pendingCount,
+    fuPushPending,
+    registeredRooms,
+  };
 }
 
 module.exports = {
-    enqueueDoctorNotification,
-    peekDoctorNotification,
-    confirmDoctorNotifications,
-    enqueueFUPush,
-    dequeueFUPush,
-    registerRoom,
-    getRoomName,
-    getQueueStatus
+  enqueueDoctorNotification,
+  peekDoctorNotification,
+  confirmDoctorNotifications,
+  enqueueFUPush,
+  dequeueFUPush,
+  registerRoom,
+  getRoomName,
+  getQueueStatus,
 };

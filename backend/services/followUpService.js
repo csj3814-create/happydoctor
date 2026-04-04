@@ -4,7 +4,6 @@ const dbService = require('./dbService');
 class FollowUpService {
   constructor() {
     this.timers = new Map();
-    this.memorySessions = new Map();
     this.sessionExpiryMs = 30 * 60 * 1000;
     this.absoluteExpiryMs = 2 * 60 * 60 * 1000;
   }
@@ -49,17 +48,6 @@ class FollowUpService {
     const now = new Date();
     const dueAt = new Date(now.getTime() + delayMinutes * 60 * 1000);
 
-    this.memorySessions.set(userId, {
-      userId,
-      chart: originalSoapChart,
-      createdAt: now,
-      lastActiveAt: now,
-      dueAt,
-      status: 'scheduled',
-      pendingMessage: null,
-      pendingCreatedAt: null,
-    });
-
     await dbService.saveFollowUpSession(userId, {
       chart: originalSoapChart,
       createdAt: now,
@@ -76,19 +64,15 @@ class FollowUpService {
 
   async loadSession(userId) {
     const persisted = await dbService.getFollowUpSession(userId);
-    if (persisted) {
-      const normalized = {
-        ...persisted,
-        createdAt: this.toDate(persisted.createdAt),
-        lastActiveAt: this.toDate(persisted.lastActiveAt),
-        dueAt: this.toDate(persisted.dueAt),
-        pendingCreatedAt: this.toDate(persisted.pendingCreatedAt),
-      };
-      this.memorySessions.set(userId, normalized);
-      return normalized;
-    }
+    if (!persisted) return null;
 
-    return this.memorySessions.get(userId) || null;
+    return {
+      ...persisted,
+      createdAt: this.toDate(persisted.createdAt),
+      lastActiveAt: this.toDate(persisted.lastActiveAt),
+      dueAt: this.toDate(persisted.dueAt),
+      pendingCreatedAt: this.toDate(persisted.pendingCreatedAt),
+    };
   }
 
   isExpired(session) {
@@ -117,11 +101,11 @@ class FollowUpService {
     }
 
     const message = [
-      '보듬입니다. :)',
-      '상담하신 지 시간이 지났어요.',
+      '보듬입니다 :)',
+      '상담하신 지 시간이 조금 지났어요.',
       '',
       '지금 증상 점수는 어느 정도인가요?',
-      '(0=없음, 10=극심)',
+      '(0=없음, 10=극심함)',
       '',
       '새로운 증상이 있다면 함께 알려주세요.',
     ].join('\n');
@@ -131,17 +115,13 @@ class FollowUpService {
       userId,
     );
 
-    const nextSession = {
-      ...session,
+    await dbService.saveFollowUpSession(userId, {
       lastActiveAt: new Date(),
       dueAt: null,
       pendingMessage: message,
       pendingCreatedAt: new Date(),
       status: 'pending',
-    };
-
-    this.memorySessions.set(userId, nextSession);
-    await dbService.saveFollowUpSession(userId, nextSession);
+    });
 
     this.clearLocalTimer(userId);
   }
@@ -153,14 +133,7 @@ class FollowUpService {
       return '이전 차트 기록 없음';
     }
 
-    const nextSession = {
-      ...session,
-      lastActiveAt: new Date(),
-    };
-
-    this.memorySessions.set(userId, nextSession);
-    await dbService.saveFollowUpSession(userId, { lastActiveAt: nextSession.lastActiveAt });
-
+    await dbService.saveFollowUpSession(userId, { lastActiveAt: new Date() });
     return session.chart;
   }
 
@@ -175,17 +148,8 @@ class FollowUpService {
     }
 
     const message = session.pendingMessage;
-    const nextSession = {
-      ...session,
-      lastActiveAt: new Date(),
-      pendingMessage: null,
-      pendingCreatedAt: null,
-      status: 'active',
-    };
-
-    this.memorySessions.set(userId, nextSession);
     await dbService.saveFollowUpSession(userId, {
-      lastActiveAt: nextSession.lastActiveAt,
+      lastActiveAt: new Date(),
       pendingMessage: null,
       pendingCreatedAt: null,
       status: 'active',
@@ -201,7 +165,6 @@ class FollowUpService {
 
   async cancelFollowUp(userId) {
     this.clearLocalTimer(userId);
-    this.memorySessions.delete(userId);
     await dbService.deleteFollowUpSession(userId);
     console.log(`[F/U Cancelled] ${userId}`);
   }
