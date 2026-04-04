@@ -45,6 +45,50 @@ async function getStatusLinkForConsultation(consultationId) {
     }
 }
 
+function createKakaoErrorResponse(text) {
+    return {
+        version: "2.0",
+        template: {
+            outputs: [{ simpleText: { text } }]
+        }
+    };
+}
+
+function isPlainObject(value) {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function getValidatedKakaoPayload(req, res) {
+    if (!isPlainObject(req.body)) {
+        res.status(400).json(createKakaoErrorResponse('잘못된 요청 형식입니다.'));
+        return null;
+    }
+
+    return req.body;
+}
+
+function getKakaoParams(payload) {
+    return isPlainObject(payload?.action?.params) ? payload.action.params : {};
+}
+
+function getKakaoUserId(payload) {
+    return payload?.userRequest?.user?.id || 'kakao_user_unknown';
+}
+
+function getKakaoCallbackUrl(payload) {
+    const callbackUrl = payload?.userRequest?.callbackUrl;
+    if (typeof callbackUrl !== 'string') return null;
+    return /^https?:\/\//.test(callbackUrl) ? callbackUrl : null;
+}
+
+function getKakaoUtterance(payload) {
+    return (payload?.userRequest?.utterance || '').toString().trim();
+}
+
+function getKakaoContexts(payload) {
+    return Array.isArray(payload?.contexts) ? payload.contexts : [];
+}
+
 /**
  * 카카오 i 오픈빌더 Webhook Endpoint
  * 
@@ -55,11 +99,14 @@ async function getStatusLinkForConsultation(consultationId) {
 router.post('/triage-complete', async (req, res) => {
     try {
         console.log('[Kakao Webhook] Received Triage Data');
-        
-        const params = req.body.action?.params || {};
-        const userId = req.body.userRequest?.user?.id || 'kakao_user_unknown';
-        const callbackUrl = req.body.userRequest?.callbackUrl;
-        const utterance = (req.body.userRequest?.utterance || '').toString().trim();
+
+        const payload = getValidatedKakaoPayload(req, res);
+        if (!payload) return;
+
+        const params = getKakaoParams(payload);
+        const userId = getKakaoUserId(payload);
+        const callbackUrl = getKakaoCallbackUrl(payload);
+        const utterance = getKakaoUtterance(payload);
 
         // 사용자가 "다음에 할게요" 등으로 중단하고 싶어할 때, 예진을 시작하지 않고 종료 메시지 반환
         const cancelPhrases = ['다음에', '나중에', '그만', '중단', '끝낼게', '종료'];
@@ -78,7 +125,7 @@ router.post('/triage-complete', async (req, res) => {
 
         // 컨텍스트에서 파라미터 추출
         const contextParams = {};
-        const contexts = req.body.contexts || [];
+        const contexts = getKakaoContexts(payload);
         for (const ctx of contexts) {
             if (ctx.params) {
                 for (const [key, val] of Object.entries(ctx.params)) {
@@ -333,9 +380,12 @@ async function processTriageAsync(callbackUrl, userId, patientData) {
 router.post('/fu-reply', async (req, res) => {
     try {
         console.log('[Kakao Webhook] Received Follow-Up Reply');
-        
-        const params = req.body.action?.params || {};
-        const userId = req.body.userRequest?.user?.id || 'kakao_user_unknown';
+
+        const payload = getValidatedKakaoPayload(req, res);
+        if (!payload) return;
+
+        const params = getKakaoParams(payload);
+        const userId = getKakaoUserId(payload);
 
         const nrsChange = params.nrs || '응답 없음';
         const additionalSymptom = params.additional_symptom || '특이사항 없음';
@@ -403,7 +453,10 @@ router.post('/fu-reply', async (req, res) => {
  * - 따뜻한 중단 안내 메시지 반환
  */
 router.post('/cancel-triage', async (req, res) => {
-    const userId = req.body.userRequest?.user?.id || 'kakao_user_unknown';
+    const payload = getValidatedKakaoPayload(req, res);
+    if (!payload) return;
+
+    const userId = getKakaoUserId(payload);
     console.log(`[Cancel Triage] ${userId} — 예진 도중 중단 요청`);
 
     await followUpService.resetSession(userId);
@@ -428,7 +481,11 @@ router.post('/test-trigger-fu', async (req, res) => {
         return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { userId } = req.body;
+    if (!isPlainObject(req.body)) {
+        return res.status(400).json({ error: 'Invalid request body' });
+    }
+
+    const userId = typeof req.body.userId === 'string' ? req.body.userId.trim() : '';
     if (!userId) return res.status(400).json({ error: 'userId required' });
 
     await followUpService.executeFollowUpPush(userId);
@@ -444,8 +501,11 @@ router.post('/test-trigger-fu', async (req, res) => {
  */
 router.post('/close-consultation', async (req, res) => {
     try {
-        const params = req.body.action?.params || {};
-        const userId = req.body.userRequest?.user?.id || 'kakao_user_unknown';
+        const payload = getValidatedKakaoPayload(req, res);
+        if (!payload) return;
+
+        const params = getKakaoParams(payload);
+        const userId = getKakaoUserId(payload);
         const reason = (params.close_reason || '환자 종결').toString().trim();
 
         console.log(`[Close Consultation] ${userId}, reason: ${reason}`);
@@ -493,7 +553,10 @@ router.post('/close-consultation', async (req, res) => {
  */
 router.post('/check-doctor-reply', async (req, res) => {
     try {
-        const userId = req.body.userRequest?.user?.id || 'kakao_user_unknown';
+        const payload = getValidatedKakaoPayload(req, res);
+        if (!payload) return;
+
+        const userId = getKakaoUserId(payload);
         const pending = await dbService.getPendingDoctorReply(userId);
 
         if (pending) {
