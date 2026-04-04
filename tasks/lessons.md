@@ -63,6 +63,7 @@
 - **교훈**: 새 프런트 도메인으로 옮긴 뒤에는 상태 코드만 보지 말고 `Access-Control-Allow-Origin` 헤더까지 확인한다.
 - **교훈**: 포털 CORS는 단일 `PORTAL_ORIGIN` 문자열보다 허용 도메인 목록으로 관리한다.
 - **교훈**: 포털처럼 항상 하나의 백엔드와만 통신하는 경우에는 브라우저 직접 호출보다 same-origin rewrite/proxy가 안전하다.
+- **교훈**: 카카오 인앱 브라우저에서 Google 로그인처럼 보안 브라우저가 필요한 흐름은 직접 URL을 던지지 말고, 외부 브라우저 유도 전용 경유 페이지를 둔다.
 
 ## Vercel 프로젝트 설정
 - **교훈**: Vercel이 `Framework Preset: Other`로 잡히면 Next.js도 `NOT_FOUND`를 낼 수 있으니 기본값을 믿지 않는다.
