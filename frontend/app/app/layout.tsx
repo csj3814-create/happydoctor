@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://app.happydoctor.kr'),
   title: '해피닥터 앱 | Happy Doctor',
   description:
-    '의료 접근성 취약계층을 위한 무료 온라인 의료상담 앱입니다. 카카오톡으로 상담을 시작하고, 앱에서 같은 상담 흐름을 다시 확인할 수 있습니다.',
+    '의료 접근성 취약계층을 위한 무료 온라인 의료상담 앱입니다. 웹과 카카오톡에서 상담을 시작하고, 앱에서 같은 상담 흐름을 다시 확인할 수 있습니다.',
   applicationName: '해피닥터 앱',
   manifest: '/manifest.webmanifest',
   alternates: {

@@ -6,19 +6,25 @@ const followUpService = require('../services/followUpService');
 const dbService = require('../services/dbService');
 const { appSiteUrl } = require('../config');
 
-function buildStatusLinkText(trackingToken) {
-    if (!trackingToken) return '';
+function buildStatusLinkText(trackingInfo) {
+    const trackingCode = trackingInfo?.trackingCode || '';
+    const trackingToken = trackingInfo?.trackingToken || '';
+
+    if (!trackingCode && !trackingToken) return '';
 
     const normalizedBaseUrl = appSiteUrl.replace(/\/$/, '');
-    const statusUrl = `${normalizedBaseUrl}/status?token=${encodeURIComponent(trackingToken)}`;
+    const queryKey = trackingCode ? 'code' : 'token';
+    const queryValue = trackingCode || trackingToken;
+    const statusUrl = `${normalizedBaseUrl}/status?${queryKey}=${encodeURIComponent(queryValue)}`;
+    const directCodeLine = trackingCode ? `\n직접 입력 코드: ${trackingCode}` : '';
 
-    return `\n\n앱에서 진행 상태 확인하기\n${statusUrl}`;
+    return `\n\n앱에서 진행 상태 확인하기\n${statusUrl}${directCodeLine}`;
 }
 
 async function logConsultationAndGetStatusLink(userId, patientData, analysisResult) {
     try {
         const saved = await dbService.logConsultation(userId, patientData, analysisResult);
-        return buildStatusLinkText(saved?.trackingToken);
+        return buildStatusLinkText(saved);
     } catch (error) {
         console.error('[Status Link Logging Error]', error);
         return '';
@@ -28,7 +34,7 @@ async function logConsultationAndGetStatusLink(userId, patientData, analysisResu
 async function getLatestStatusLinkForUser(userId) {
     try {
         const latest = await dbService.getLatestConsultationTracking(userId);
-        return buildStatusLinkText(latest?.trackingToken);
+        return buildStatusLinkText(latest);
     } catch (error) {
         console.error('[Status Link Lookup Error]', error);
         return '';
@@ -38,7 +44,7 @@ async function getLatestStatusLinkForUser(userId) {
 async function getStatusLinkForConsultation(consultationId) {
     try {
         const consultation = await dbService.getConsultationTrackingById(consultationId);
-        return buildStatusLinkText(consultation?.trackingToken);
+        return buildStatusLinkText(consultation);
     } catch (error) {
         console.error('[Status Link Consultation Lookup Error]', error);
         return '';

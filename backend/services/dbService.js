@@ -3,6 +3,8 @@ const crypto = require('crypto');
 
 const PUBLIC_STATS_PATH = ['system', 'public_stats'];
 const FOLLOW_UP_SESSIONS = 'follow_up_sessions';
+const SHORT_TRACKING_CODE_LENGTH = 8;
+const SHORT_TRACKING_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 
 let db = null;
 
@@ -28,6 +30,87 @@ function getPublicStatsRef() {
 
 function createTrackingToken() {
   return crypto.randomBytes(24).toString('hex');
+}
+
+function createTrackingCode(length = SHORT_TRACKING_CODE_LENGTH) {
+  let result = '';
+  for (let index = 0; index < length; index += 1) {
+    const randomIndex = crypto.randomInt(0, SHORT_TRACKING_ALPHABET.length);
+    result += SHORT_TRACKING_ALPHABET[randomIndex];
+  }
+  return result;
+}
+
+function normalizeTrackingCode(value) {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toUpperCase();
+  if (!/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}$/.test(normalized)) {
+    return null;
+  }
+  return normalized;
+}
+
+async function createUniqueTrackingCode() {
+  if (!db) {
+    return createTrackingCode();
+  }
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const candidate = createTrackingCode();
+    const snapshot = await db.collection('consultations')
+      .where('publicTrackingCode', '==', candidate)
+      .limit(1)
+      .get();
+
+    if (snapshot.empty) {
+      return candidate;
+    }
+  }
+
+  return createTrackingCode();
+}
+
+async function createTrackingIdentifiers() {
+  return {
+    trackingToken: createTrackingToken(),
+    trackingCode: await createUniqueTrackingCode(),
+  };
+}
+
+async function ensurePublicTrackingIdentifiers(docRef, consultationData = {}) {
+  if (!docRef) {
+    return {
+      trackingToken: null,
+      trackingCode: null,
+    };
+  }
+
+  let trackingToken = typeof consultationData.publicTrackingToken === 'string'
+    ? consultationData.publicTrackingToken.trim()
+    : '';
+  let trackingCode = normalizeTrackingCode(consultationData.publicTrackingCode);
+  const updates = {};
+
+  if (!trackingToken) {
+    trackingToken = createTrackingToken();
+    updates.publicTrackingToken = trackingToken;
+    updates.publicTrackingIssuedAt = admin.firestore.FieldValue.serverTimestamp();
+  }
+
+  if (!trackingCode) {
+    trackingCode = await createUniqueTrackingCode();
+    updates.publicTrackingCode = trackingCode;
+    updates.publicTrackingCodeIssuedAt = admin.firestore.FieldValue.serverTimestamp();
+  }
+
+  if (Object.keys(updates).length > 0) {
+    await docRef.set(updates, { merge: true });
+  }
+
+  return {
+    trackingToken,
+    trackingCode,
+  };
 }
 
 function getTimestampMs(value) {
@@ -95,6 +178,7 @@ function buildPublicConsultationStatus(consultation, replies) {
 
   return {
     consultationId: consultation.id,
+    trackingCode: consultation.publicTrackingCode || null,
     status: stage,
     chiefComplaint: consultation.patientData?.cc || null,
     createdAt: toIsoString(consultation.createdAt),
@@ -105,6 +189,7 @@ function buildPublicConsultationStatus(consultation, replies) {
     followUpCount: followUpLogs.length,
     latestFollowUpAt: toIsoString(latestFollowUp?.timestamp),
     doctorReplies: replies.map(mapDoctorReplyForPatient),
+    entryChannel: consultation.entryChannel || 'kakao',
   };
 }
 
@@ -162,12 +247,12 @@ async function getPublicStats() {
   };
 }
 
-async function logConsultation(userId, patientData, analysisResult) {
+async function logConsultation(userId, patientData, analysisResult, options = {}) {
   if (!db) return null;
 
   try {
     const docRef = db.collection('consultations').doc();
-    const publicTrackingToken = createTrackingToken();
+    const { trackingToken, trackingCode } = await createTrackingIdentifiers();
 
     await docRef.set({
       userId,
@@ -178,8 +263,12 @@ async function logConsultation(userId, patientData, analysisResult) {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       status: 'ACTIVE',
       followUpLogs: [],
-      publicTrackingToken,
+      publicTrackingToken: trackingToken,
       publicTrackingIssuedAt: admin.firestore.FieldValue.serverTimestamp(),
+      publicTrackingCode: trackingCode,
+      publicTrackingCodeIssuedAt: admin.firestore.FieldValue.serverTimestamp(),
+      entryChannel: options.entryChannel || 'kakao',
+      entrySurface: options.entrySurface || null,
     });
 
     await updatePublicStats({ consultationCount: 1 });
@@ -187,7 +276,8 @@ async function logConsultation(userId, patientData, analysisResult) {
     console.log(`[DB Logged] Consultation saved. Doc ID: ${docRef.id}`);
     return {
       consultationId: docRef.id,
-      trackingToken: publicTrackingToken,
+      trackingToken,
+      trackingCode,
     };
   } catch (error) {
     console.error('[DB Logging Error]', error);
@@ -516,10 +606,12 @@ async function getLatestConsultationTracking(userId) {
 
     const doc = snapshot.docs[0];
     const data = doc.data() || {};
+    const identifiers = await ensurePublicTrackingIdentifiers(doc.ref, data);
 
     return {
       consultationId: doc.id,
-      trackingToken: data.publicTrackingToken || null,
+      trackingToken: identifiers.trackingToken,
+      trackingCode: identifiers.trackingCode,
     };
   } catch (error) {
     console.error('[DB LatestTracking Error]', error);
@@ -535,9 +627,11 @@ async function getConsultationTrackingById(consultationId) {
     if (!snapshot.exists) return null;
 
     const data = snapshot.data() || {};
+    const identifiers = await ensurePublicTrackingIdentifiers(snapshot.ref, data);
     return {
       consultationId: snapshot.id,
-      trackingToken: data.publicTrackingToken || null,
+      trackingToken: identifiers.trackingToken,
+      trackingCode: identifiers.trackingCode,
     };
   } catch (error) {
     console.error('[DB ConsultationTrackingById Error]', error);
@@ -545,19 +639,46 @@ async function getConsultationTrackingById(consultationId) {
   }
 }
 
-async function getPublicConsultationStatusByToken(trackingToken) {
-  if (!db || !trackingToken) return null;
+async function getPublicConsultationStatusByLookup(trackingLookup) {
+  if (!db || !trackingLookup) return null;
 
   try {
-    const consultationSnapshot = await db.collection('consultations')
-      .where('publicTrackingToken', '==', trackingToken)
-      .limit(1)
-      .get();
+    const normalizedLookup = trackingLookup.toString().trim();
+    if (!normalizedLookup) return null;
 
-    if (consultationSnapshot.empty) return null;
+    const candidateQueries = [];
+    const trackingCode = normalizeTrackingCode(normalizedLookup);
 
-    const consultationDoc = consultationSnapshot.docs[0];
-    const consultation = { ...consultationDoc.data(), id: consultationDoc.id };
+    if (trackingCode) {
+      candidateQueries.push(['publicTrackingCode', trackingCode]);
+    }
+
+    candidateQueries.push(['publicTrackingToken', normalizedLookup]);
+
+    let consultationDoc = null;
+
+    for (const [field, value] of candidateQueries) {
+      const consultationSnapshot = await db.collection('consultations')
+        .where(field, '==', value)
+        .limit(1)
+        .get();
+
+      if (!consultationSnapshot.empty) {
+        consultationDoc = consultationSnapshot.docs[0];
+        break;
+      }
+    }
+
+    if (!consultationDoc) return null;
+
+    const consultationData = consultationDoc.data() || {};
+    const identifiers = await ensurePublicTrackingIdentifiers(consultationDoc.ref, consultationData);
+    const consultation = {
+      ...consultationData,
+      id: consultationDoc.id,
+      publicTrackingToken: identifiers.trackingToken,
+      publicTrackingCode: identifiers.trackingCode,
+    };
 
     const repliesSnapshot = await db.collection('doctor_replies')
       .where('consultationId', '==', consultationDoc.id)
@@ -693,7 +814,8 @@ module.exports = {
   getConsultationById,
   getConsultationTrackingById,
   getLatestConsultationTracking,
-  getPublicConsultationStatusByToken,
+  getPublicConsultationStatusByLookup,
+  getPublicConsultationStatusByToken: getPublicConsultationStatusByLookup,
   awardHDT,
   getHDTLeaderboard,
   getDoctorStats,

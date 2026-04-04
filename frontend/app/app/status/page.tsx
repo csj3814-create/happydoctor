@@ -1,10 +1,12 @@
 import Link from 'next/link'
-import { fetchConsultationStatus, normalizeStatusToken, type PublicConsultationStatus } from '@/lib/status'
+import { fetchConsultationStatus, normalizeStatusLookup, type PublicConsultationStatus } from '@/lib/status'
 
 export const dynamic = 'force-dynamic'
 
 type StatusPageProps = {
   searchParams: Promise<{
+    lookup?: string
+    code?: string
     token?: string
   }>
 }
@@ -31,7 +33,7 @@ function getStatusCopy(status: PublicConsultationStatus) {
       return {
         badge: '답변 도착',
         title: '의료진 답변이 도착했습니다',
-        body: '자원봉사 의료진이 남긴 답변이 도착했습니다. 카카오톡에서 전달된 내용과 같은 상담 흐름을 이 화면에서 다시 확인할 수 있습니다.',
+        body: '자원봉사 의료진이 남긴 답변이 도착했습니다. 웹이나 카카오톡에서 이어진 같은 상담 흐름을 이 화면에서 다시 확인할 수 있습니다.',
       }
     case 'waiting_doctor':
       return {
@@ -43,7 +45,7 @@ function getStatusCopy(status: PublicConsultationStatus) {
       return {
         badge: '상담 종료',
         title: '이 상담은 종료된 상태입니다',
-        body: '필요하면 카카오톡 채널에서 새 상담을 다시 시작할 수 있습니다.',
+        body: '필요하면 웹이나 카카오톡에서 새 상담을 다시 시작할 수 있습니다.',
       }
     default:
       return {
@@ -56,19 +58,20 @@ function getStatusCopy(status: PublicConsultationStatus) {
 
 export default async function StatusPage({ searchParams }: StatusPageProps) {
   const resolvedSearchParams = await searchParams
-  const rawToken = resolvedSearchParams.token || ''
-  const normalizedToken = normalizeStatusToken(rawToken)
+  const rawLookup =
+    resolvedSearchParams.lookup || resolvedSearchParams.code || resolvedSearchParams.token || ''
+  const normalizedLookup = normalizeStatusLookup(rawLookup)
 
   let consultation: PublicConsultationStatus | null = null
   let fetchError: string | null = null
 
-  if (rawToken && !normalizedToken) {
+  if (rawLookup && !normalizedLookup) {
     fetchError = '상태 확인 링크 또는 코드를 다시 확인해 주세요.'
-  } else if (normalizedToken) {
+  } else if (normalizedLookup) {
     try {
-      consultation = await fetchConsultationStatus(normalizedToken)
+      consultation = await fetchConsultationStatus(normalizedLookup)
       if (!consultation) {
-        fetchError = '상담 상태를 찾지 못했습니다. 카카오톡에서 받은 최신 링크를 다시 열어 주세요.'
+        fetchError = '상담 상태를 찾지 못했습니다. 받은 링크 또는 상태 코드를 다시 확인해 주세요.'
       }
     } catch {
       fetchError = '지금은 상태를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'
@@ -93,8 +96,8 @@ export default async function StatusPage({ searchParams }: StatusPageProps) {
               온라인 의료상담 진행 상태 확인
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted)]">
-              카카오톡에서 받은 상태 확인 링크 또는 코드를 열면, 현재 상담 단계와 의료진 답변 도착 여부를 다시
-              확인할 수 있습니다.
+              웹이나 카카오톡에서 상담을 시작한 뒤 받은 상태 확인 링크 또는 짧은 코드를 열면, 현재 상담 단계와 의료진
+              답변 도착 여부를 다시 확인할 수 있습니다.
             </p>
           </div>
 
@@ -105,12 +108,12 @@ export default async function StatusPage({ searchParams }: StatusPageProps) {
             >
               앱 홈으로
             </Link>
-            <a
-              href="https://pf.kakao.com/_PxaTxhX"
-              className="rounded-full bg-[var(--signal)] px-5 py-2.5 text-sm font-semibold text-[#493500] shadow-[0_14px_24px_rgba(255,223,87,0.28)] transition hover:translate-y-[-1px]"
+            <Link
+              href="/start"
+              className="rounded-full bg-[var(--navy)] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_14px_24px_rgba(18,60,103,0.22)] transition hover:translate-y-[-1px]"
             >
-              카카오톡 상담 열기
-            </a>
+              새 상담 시작
+            </Link>
           </div>
         </header>
 
@@ -118,13 +121,13 @@ export default async function StatusPage({ searchParams }: StatusPageProps) {
           <form action="/status" className="grid gap-3 lg:grid-cols-[1fr_auto]">
             <label className="block">
               <span className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
-                Status Link
+                Status Code
               </span>
               <input
                 type="text"
-                name="token"
-                defaultValue={rawToken}
-                placeholder="카카오톡에서 받은 상태 확인 링크 또는 코드"
+                name="lookup"
+                defaultValue={rawLookup}
+                placeholder="받은 상태 확인 링크 또는 8자리 코드"
                 className="mt-3 w-full rounded-[1.2rem] border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--blue)] focus:bg-white"
               />
             </label>
@@ -136,7 +139,7 @@ export default async function StatusPage({ searchParams }: StatusPageProps) {
             </button>
           </form>
           <p className="mt-3 text-xs leading-6 text-[var(--muted)]">
-            링크 전체를 붙여넣어도 되고, 마지막에 보이는 코드만 입력해도 됩니다.
+            링크 전체를 붙여넣어도 되고, 함께 받은 짧은 상태 코드만 입력해도 됩니다.
           </p>
         </section>
 
@@ -148,8 +151,8 @@ export default async function StatusPage({ searchParams }: StatusPageProps) {
 
         {!consultation && !fetchError ? (
           <section className="mt-6 rounded-[2rem] border border-dashed border-[var(--line)] bg-white/72 p-6 text-sm leading-7 text-[var(--muted)]">
-            해피닥터 상담이 시작되면 상태 확인용 링크를 함께 보내드립니다. 그 링크를 열면 의료 접근성 취약계층을 위한
-            무료 온라인 의료상담 흐름을 이 화면에서 계속 확인할 수 있습니다.
+            해피닥터 상담이 시작되면 상태 확인용 링크와 짧은 코드가 함께 제공됩니다. 그 코드를 적어 두면 나중에 직접
+            입력해서 같은 온라인 의료상담 흐름을 다시 확인할 수 있습니다.
           </section>
         ) : null}
 
@@ -182,6 +185,21 @@ export default async function StatusPage({ searchParams }: StatusPageProps) {
 
             <div className="grid gap-5 lg:grid-cols-[1.08fr_0.92fr]">
               <div className="space-y-5">
+                <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
+                  <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
+                    상태 코드
+                  </p>
+                  <div className="mt-4 rounded-[1.4rem] bg-[var(--surface)] p-4">
+                    <p className="text-sm font-semibold text-[var(--ink)]">직접 입력 코드</p>
+                    <p className="mt-3 text-3xl font-semibold tracking-[0.14em] text-[var(--navy)]">
+                      {consultation.trackingCode || '생성 중'}
+                    </p>
+                    <p className="mt-2 text-xs leading-6 text-[var(--muted)]">
+                      링크를 다시 찾기 어려울 때 이 코드만 적어 두면 같은 상담 상태를 다시 열 수 있습니다.
+                    </p>
+                  </div>
+                </div>
+
                 <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
                   <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
                     상담 단계
@@ -237,8 +255,8 @@ export default async function StatusPage({ searchParams }: StatusPageProps) {
                     </div>
                   ) : (
                     <p className="mt-4 rounded-[1.4rem] bg-[var(--surface)] p-4 text-sm leading-7 text-[var(--muted)]">
-                      아직 의료진 답변이 도착하지 않았습니다. 카카오톡 채널과 이 화면에서 같은 무료 온라인 의료상담
-                      흐름을 이어서 확인하실 수 있습니다.
+                      아직 의료진 답변이 도착하지 않았습니다. 웹이나 카카오톡에서 시작한 같은 무료 온라인 의료상담
+                      흐름을 이 화면에서 이어서 확인하실 수 있습니다.
                     </p>
                   )}
                 </div>
@@ -256,7 +274,7 @@ export default async function StatusPage({ searchParams }: StatusPageProps) {
                     </li>
                     <li className="flex gap-3">
                       <span className="mt-2 h-2 w-2 rounded-full bg-[var(--blue)]" />
-                      <span>답변은 카카오톡 채널에서도 전달되며, 앱 링크는 같은 상담 상태를 다시 여는 용도입니다.</span>
+                      <span>웹에서 시작한 상담도 이 화면에서 계속 이어지고, 카카오톡으로 시작한 상담도 같은 상태를 다시 열 수 있습니다.</span>
                     </li>
                     <li className="flex gap-3">
                       <span className="mt-2 h-2 w-2 rounded-full bg-[var(--blue)]" />

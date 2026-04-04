@@ -1,6 +1,9 @@
 import Link from 'next/link'
 import Image from 'next/image'
 
+const KAKAO_CHAT_URL = 'https://pf.kakao.com/_PxaTxhX/chat'
+const WEB_START_URL = '/start?source=app'
+
 const trustSignals = [
   {
     label: '의료 접근성 취약계층 중심',
@@ -8,7 +11,7 @@ const trustSignals = [
   },
   {
     label: '무료 온라인 의료상담',
-    value: '비용과 거리 때문에 망설이는 순간, 온라인으로 먼저 도움에 닿도록 돕습니다.',
+    value: '비용과 거리 때문에 망설이는 순간, 웹과 카카오톡에서 먼저 도움에 닿도록 돕습니다.',
   },
   {
     label: 'AI 인턴 보듬이 + 의료진',
@@ -34,8 +37,8 @@ const careGroups = [
 const processSteps = [
   {
     step: '01',
-    title: '카카오톡으로 걱정과 증상을 편하게 보냅니다',
-    body: '복통, 발열, 어지러움처럼 지금 불편한 점을 평소 말하듯 보내면 상담이 시작됩니다.',
+    title: '웹 또는 카카오톡으로 걱정과 증상을 편하게 보냅니다',
+    body: '복통, 발열, 어지러움처럼 지금 불편한 점을 적으면 상담이 시작되고 같은 흐름을 계속 확인할 수 있습니다.',
   },
   {
     step: '02',
@@ -49,16 +52,16 @@ const processSteps = [
   },
   {
     step: '04',
-    title: '앱과 카카오톡에서 같은 상담 흐름을 이어 확인합니다',
-    body: '상담은 카카오톡에서 이어지고, 앱에서는 같은 상담의 진행 상태와 답변 도착 여부를 다시 확인할 수 있습니다.',
+    title: '앱과 상태 코드로 같은 상담 흐름을 이어 확인합니다',
+    body: '웹이나 카카오톡에서 시작한 상담 모두 짧은 상태 코드로 다시 열 수 있고, 의료진 답변이 도착하면 같은 흐름에서 이어 확인할 수 있습니다.',
   },
 ]
 
 const availableNow = [
-  '카카오톡 채널에서 무료 온라인 의료상담 시작',
+  '웹앱 또는 카카오톡에서 무료 온라인 의료상담 시작',
   '의료 접근성 취약계층 중심 안내와 연결',
   'AI 인턴 보듬이와 자원봉사 의료진 협업',
-  '상태 확인 링크로 같은 상담 흐름 다시 열기',
+  '짧은 상태 코드로 같은 상담 흐름 다시 열기',
 ]
 
 const availableNext = [
@@ -74,7 +77,7 @@ const carePromises = [
   },
   {
     label: '상담은 어떻게 이어지나요',
-    body: '카카오톡에서 시작하고, AI 인턴 보듬이가 정리한 뒤 자원봉사 의료진이 필요한 상담을 직접 확인합니다.',
+    body: '웹이나 카카오톡에서 시작하고, AI 인턴 보듬이가 정리한 뒤 자원봉사 의료진이 필요한 상담을 직접 확인합니다.',
   },
   {
     label: '앱은 어떤 역할을 하나요',
@@ -91,14 +94,14 @@ const brandPrinciples = [
 const installTips = [
   'Android Chrome에서는 메뉴에서 홈 화면 추가를 누르면 앱처럼 둘 수 있습니다.',
   'iPhone Safari에서는 공유 메뉴의 홈 화면에 추가로 바로가기 설치가 가능합니다.',
-  '설치하지 않아도 괜찮습니다. 지금은 카카오톡 상담 진입이 가장 빠른 경로입니다.',
+  '설치하지 않아도 괜찮습니다. 웹과 카카오톡 모두 상담 시작이 가능하고, 상태 확인은 같은 앱 흐름으로 이어집니다.',
 ]
 
 const faqItems = [
   {
     question: '앱을 꼭 설치해야 하나요?',
     answer:
-      '아니요. 해피닥터 앱은 무료 온라인 의료상담을 더 쉽게 이어주는 웹앱입니다. 지금 상담 시작은 카카오톡에서, 상태 확인은 앱에서 다시 열 수 있습니다.',
+      '아니요. 해피닥터 앱은 무료 온라인 의료상담을 더 쉽게 이어주는 웹앱입니다. 지금은 웹과 카카오톡 둘 다 상담 시작이 가능하고, 상태 확인은 앱에서 다시 열 수 있습니다.',
   },
   {
     question: '비용이 드나요?',
@@ -159,7 +162,7 @@ export default function AppHomePage() {
                   Mobile-first
                 </span>
                 <span className="rounded-full border border-[var(--line)] bg-white/80 px-3 py-1 text-xs font-semibold text-[var(--blue)]">
-                  Kakao Consultation
+                  Web + Kakao
                 </span>
               </div>
 
@@ -179,11 +182,17 @@ export default function AppHomePage() {
               </p>
 
               <div className="reveal-2 mt-8 flex flex-wrap gap-3">
+                <Link
+                  href={WEB_START_URL}
+                  className="rounded-full bg-[var(--navy)] px-6 py-3 text-sm font-semibold text-white shadow-[0_16px_26px_rgba(12,68,124,0.28)] transition hover:translate-y-[-1px]"
+                >
+                  웹으로 상담 시작
+                </Link>
                 <a
-                  href="https://pf.kakao.com/_PxaTxhX"
+                  href={KAKAO_CHAT_URL}
                   className="signal-pulse rounded-full bg-[var(--signal)] px-6 py-3 text-sm font-semibold text-[#493500] shadow-[0_16px_26px_rgba(255,223,87,0.32)] transition hover:translate-y-[-1px]"
                 >
-                  카카오톡으로 상담 시작
+                  카카오톡으로 상담하기
                 </a>
                 <Link
                   href="/status"
@@ -213,7 +222,7 @@ export default function AppHomePage() {
             <div className="reveal-2 relative lg:pl-10">
               <div className="hero-stage">
                 <div className="floating-label right-5 top-5">
-                  상담 시작은 카카오톡에서
+                  웹과 카카오톡에서 모두 시작 가능
                 </div>
                 <div className="floating-label left-5 top-24 [animation-delay:0.8s]">
                   보듬이가 먼저 읽기 좋게 정리합니다
@@ -287,7 +296,7 @@ export default function AppHomePage() {
                           <div className="mt-4 rounded-[1.3rem] bg-[var(--navy)] px-4 py-3 text-white">
                             <p className="text-sm font-semibold">응급을 대신하지는 않지만, 먼저 도움을 청할 수는 있습니다.</p>
                             <p className="mt-2 text-[13px] leading-6 text-white/78">
-                              상담은 카카오톡에서 시작되고, 앱은 같은 흐름을 다시 확인하는 연결면으로 작동합니다.
+                              상담은 웹과 카카오톡에서 모두 시작할 수 있고, 앱은 같은 흐름을 다시 확인하는 연결면으로 작동합니다.
                             </p>
                           </div>
                         </div>
@@ -303,7 +312,7 @@ export default function AppHomePage() {
                     </p>
                     <p className="mt-2 text-base font-semibold text-white">무료 온라인 의료상담을 지금 시작</p>
                     <p className="mt-2 text-sm leading-6">
-                      지금은 가장 익숙한 카카오톡 채널에서 상담을 시작하고, 앱은 같은 상담 흐름을 다시 확인하는 역할을 합니다.
+                      지금은 웹과 카카오톡 두 경로 모두 열려 있고, 앱은 같은 상담 흐름을 다시 확인하는 역할도 함께 맡습니다.
                     </p>
                   </div>
                   <div>
@@ -335,8 +344,8 @@ export default function AppHomePage() {
                 같은 흐름을 다시 확인하세요
               </h3>
               <p className="mt-4 max-w-md text-sm leading-7 text-[var(--muted)]">
-                카카오톡에서 받은 상태 확인 링크를 다시 열거나 코드만 붙여넣어도, 현재 상담 단계와 의료진 답변 도착
-                여부를 이어서 확인할 수 있습니다.
+                웹이나 카카오톡에서 받은 상태 확인 링크를 다시 열거나 짧은 상태 코드만 붙여넣어도, 현재 상담 단계와
+                의료진 답변 도착 여부를 이어서 확인할 수 있습니다.
               </p>
             </div>
 
@@ -344,8 +353,8 @@ export default function AppHomePage() {
               <form action="/status" className="grid gap-3 sm:grid-cols-[1fr_auto]">
                 <input
                   type="text"
-                  name="token"
-                  placeholder="카카오톡에서 받은 상태 확인 링크 또는 코드"
+                  name="lookup"
+                  placeholder="받은 상태 확인 링크 또는 8자리 코드"
                   className="w-full rounded-[1.1rem] border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--blue)] focus:bg-white"
                 />
                 <button
@@ -357,7 +366,7 @@ export default function AppHomePage() {
               </form>
               <div className="mt-4 grid gap-3 text-sm leading-7 text-[var(--muted)] sm:grid-cols-2">
                 <p>상담 직후 받은 링크를 그대로 열면 가장 빠르게 같은 상담 기록으로 돌아올 수 있습니다.</p>
-                <p>앱이 설치되어 있지 않아도 괜찮고, 카카오톡에서 이어진 무료 온라인 의료상담 흐름을 다시 여는 용도입니다.</p>
+                <p>앱이 설치되어 있지 않아도 괜찮고, 웹이나 카카오톡에서 이어진 무료 온라인 의료상담 흐름을 다시 여는 용도입니다.</p>
               </div>
             </div>
           </div>
@@ -558,16 +567,22 @@ export default function AppHomePage() {
                 <h3 className="mt-3 text-3xl font-semibold tracking-[-0.04em]">
                   상담은 지금
                   <br />
-                  카카오톡에서 시작합니다
+                  웹과 카카오톡에서 시작할 수 있습니다
                 </h3>
                 <p className="mt-4 text-sm leading-7 text-white/78">
                   해피닥터 앱은 의료 접근성 취약계층을 위한 무료 온라인 의료상담을 더 쉽게 이어가기 위한 첫 공개
-                  단계입니다. 상담은 지금 카카오톡에서 바로 시작할 수 있습니다.
+                  단계입니다. 웹에서 바로 시작하거나, 익숙한 카카오톡 채널을 통해 상담을 이어갈 수 있습니다.
                 </p>
 
                 <div className="mt-6 flex flex-wrap gap-3">
+                  <Link
+                    href={WEB_START_URL}
+                    className="rounded-full bg-white px-6 py-3 text-sm font-semibold text-[var(--navy)] transition hover:translate-y-[-1px]"
+                  >
+                    웹으로 상담 시작
+                  </Link>
                   <a
-                    href="https://pf.kakao.com/_PxaTxhX"
+                    href={KAKAO_CHAT_URL}
                     className="rounded-full bg-[var(--signal)] px-6 py-3 text-sm font-semibold text-[#493500] transition hover:translate-y-[-1px]"
                   >
                     카카오톡 채널 열기
