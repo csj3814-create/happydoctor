@@ -42,7 +42,7 @@ def add_shadow(image: Image.Image, box: tuple[int, int, int, int], blur: int = 1
 
 def draw_brand_og() -> None:
     base = resize_cover(Image.open(SOURCE_BRAND).convert("RGBA"), (1200, 630))
-    panel_box = (58, 430, 1142, 580)
+    panel_box = (58, 430, 1142, 604)
 
     add_shadow(base, panel_box, blur=18, alpha=100)
 
@@ -53,11 +53,18 @@ def draw_brand_og() -> None:
 
     badge_font = load_font(18, bold=True)
     title_font = load_font(48, bold=True)
-    body_font = load_font(22, bold=False)
+    body_font = load_font(21, bold=False)
 
     draw.text((118, 462), "무료 온라인 의료상담", font=badge_font, fill=(17, 53, 98, 255))
-    draw.text((92, 507), "의료 접근성 취약계층을 위해", font=title_font, fill=(255, 255, 255, 255))
-    draw.text((92, 554), "AI 인턴 보듬이와 자원봉사 의료진이 함께 움직입니다.", font=body_font, fill=(224, 236, 250, 255))
+    title_position = (92, 507)
+    title_text = "의료 접근성 취약계층을 위해"
+    body_text = "AI 인턴 보듬이와 자원봉사 의료진이 함께 움직입니다."
+
+    draw.text(title_position, title_text, font=title_font, fill=(255, 255, 255, 255))
+
+    title_bounds = draw.textbbox(title_position, title_text, font=title_font)
+    body_position = (92, title_bounds[3] + 16)
+    draw.text(body_position, body_text, font=body_font, fill=(224, 236, 250, 255))
 
     result = Image.alpha_composite(base, overlay)
     result.save(OUTPUT_BRAND, format="PNG", optimize=True)
