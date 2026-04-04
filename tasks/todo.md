@@ -463,9 +463,23 @@
 - [x] Started `createApp()` on an ephemeral local port and fetched `/healthz` and `/api/version` successfully
 - [x] `git diff -- backend/app.js backend/config.js backend/routes/portal.js backend/routes/kakaoWebhook.js` reviewed to confirm only health/version + validation changes landed
 
+## Phase 34: Homepage/App Share Image Alignment (2026.04.04)
+
+### Goal
+- [x] Replace the old generic app preview image so social cards no longer make Happy Doctor look like a simple chat utility or pre-visit questionnaire
+- [x] Align homepage and app share images with the current mission-led identity using the design-source OG artwork as the base
+- [x] Update homepage/app metadata copy so Open Graph and Twitter descriptions match the current service framing
+
+### Verification
+- [x] `frontend/homepage`: `npm run lint`
+- [x] `frontend/homepage`: `npm run build`
+- [x] `frontend/app`: `npm run lint`
+- [x] `frontend/app`: `npm run build`
+- [x] Confirmed refreshed share assets exist at `frontend/homepage/public/design/brand-og.png` and `frontend/app/public/app-screenshot.png`
+
 ## Next Session Priorities
 
 - [ ] Check the live Render deployment for `/healthz` and `/api/version`, then decide whether to surface a tiny revision label in internal tooling
 - [ ] Review Kakao webhook responses for malformed payloads in production logs and decide whether any endpoints should return `200` safe-fallback instead of `400`
-- [ ] Decide whether to regenerate shared design-source PNG assets in `imgs/` to match the new app identity, or keep the app primarily HTML-driven
-- [ ] Review whether OG/share images should be regenerated so social previews match the updated mission-led wording
+- [ ] Decide whether to regenerate the remaining design-source PNG assets in `imgs/` to match the updated mission-led wording, or keep most surfaces HTML-driven
+- [ ] Review whether Kakao-specific share images should be split from general OG images, now that homepage/app previews are aligned
