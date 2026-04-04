@@ -233,11 +233,10 @@ export default function WebConsultationStartForm({
             Consultation Started
           </p>
           <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-[var(--ink)]">
-            상담이 시작되었습니다
+            상담 접수가 완료되었습니다
           </h2>
           <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
-            아래 답변은 보듬이가 먼저 정리해 드린 첫 안내입니다. 의료진 확인이 필요한 상담이면 같은 상태 확인 화면에
-            이후 답변이 이어집니다.
+            아래는 보듬이의 첫 안내입니다.
           </p>
 
           <div className="mt-6 rounded-[1.6rem] bg-[var(--surface)] p-5">
@@ -254,7 +253,7 @@ export default function WebConsultationStartForm({
                 {result.trackingCode || '생성 중'}
               </p>
               <p className="mt-2 text-xs leading-6 text-[var(--muted)]">
-                링크가 길어도 괜찮습니다. 이 짧은 코드만 적어 두면 나중에 직접 입력해 같은 상담 상태를 다시 열 수 있습니다.
+                링크 대신 이 코드만 저장해 두셔도 됩니다.
               </p>
             </div>
 
@@ -273,13 +272,7 @@ export default function WebConsultationStartForm({
               className="rounded-[1.2rem] bg-[var(--navy)] px-5 py-3 text-sm font-semibold text-white visited:text-white transition hover:bg-[#123c67]"
               style={{ color: '#ffffff' }}
             >
-              상태 확인 화면 열기
-            </a>
-            <a
-              href="https://pf.kakao.com/_PxaTxhX/chat"
-              className="rounded-[1.2rem] border border-[var(--line)] bg-white px-5 py-3 text-sm font-semibold text-[var(--ink)] transition hover:bg-[var(--soft-blue)]"
-            >
-              카카오톡으로 이어서 상담하기
+              상태 확인
             </a>
           </div>
         </section>

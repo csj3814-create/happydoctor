@@ -564,6 +564,18 @@
 - [x] 시작 화면에서 카카오 대체 안내 문구가 제거됐는지 확인한다.
 - [x] 결과 버튼 클래스에 흰색 텍스트가 명시적으로 고정됐는지 확인한다.
 
+## 단계 42: 6자리 상태 코드 + 환자 화면 간결화 (2026.04.05)
+
+### 목표
+- [x] 새로 발급되는 공개 상태 코드를 6자리로 줄이되, 기존 8자리 코드와 링크는 계속 조회되게 유지한다.
+- [x] 상태 확인 화면에서 반복 설명을 줄이고 현재 상태, 접수 시각, 주요 증상, 코드, 최근 답변 중심으로 단순화한다.
+- [x] 앱 홈/상담 시작/상담 접수 완료 화면의 중복 문구를 줄이고 필요한 안내만 남긴다.
+
+### 검증
+- [x] `frontend/app`: `npm run build`
+- [x] `node -e "require('./backend/services/dbService'); require('./backend/routes/public'); require('./backend/routes/kakaoWebhook'); console.log('status-code-ok');"`
+- [ ] 라이브 `app.happydoctor.kr/status`와 `app.happydoctor.kr/start` 문구가 간결하게 정리됐는지 확인한다.
+
 ## 다음 세션 우선순위
 
 - [ ] 새 웹 상담 시작 흐름이 실제 사용자/의료진 운영 방식과 맞는지 보고 후속 입력 항목·안내 문구를 조정한다.
