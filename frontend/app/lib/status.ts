@@ -1,6 +1,9 @@
 const BACKEND_BASE_URL =
   process.env.HAPPYDOCTOR_BACKEND_URL || 'https://happydoctor.onrender.com'
 
+export const PUBLIC_STATUS_CODE_LENGTH = 6
+const LEGACY_STATUS_CODE_LENGTH = 8
+
 export interface PublicDoctorReply {
   id: string
   doctorName: string
@@ -64,7 +67,11 @@ export function normalizeStatusLookup(rawToken?: string | string[] | null): stri
   const candidate = (fromUrl || trimmed).trim()
   const upperCandidate = candidate.toUpperCase()
 
-  if (/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}$/.test(upperCandidate)) {
+  if (
+    new RegExp(
+      `^(?:[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{${PUBLIC_STATUS_CODE_LENGTH}}|[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{${LEGACY_STATUS_CODE_LENGTH}})$`,
+    ).test(upperCandidate)
+  ) {
     return upperCandidate
   }
 

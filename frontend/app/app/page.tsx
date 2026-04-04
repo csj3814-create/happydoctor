@@ -38,7 +38,7 @@ const processSteps = [
   {
     step: '01',
     title: '웹 또는 카카오톡으로 걱정과 증상을 편하게 보냅니다',
-    body: '복통, 발열, 어지러움처럼 지금 불편한 점을 적으면 상담이 시작되고 같은 흐름을 계속 확인할 수 있습니다.',
+    body: '복통, 발열, 어지러움처럼 지금 가장 불편한 점을 적으면 상담이 시작됩니다.',
   },
   {
     step: '02',
@@ -52,8 +52,8 @@ const processSteps = [
   },
   {
     step: '04',
-    title: '앱과 상태 코드로 같은 상담 흐름을 이어 확인합니다',
-    body: '웹이나 카카오톡에서 시작한 상담 모두 짧은 상태 코드로 다시 열 수 있고, 의료진 답변이 도착하면 같은 흐름에서 이어 확인할 수 있습니다.',
+    title: '6자리 코드로 상태를 다시 확인합니다',
+    body: '상담 뒤 받은 링크나 코드로 현재 상태와 의료진 답변을 다시 볼 수 있습니다.',
   },
 ]
 
@@ -61,7 +61,7 @@ const availableNow = [
   '웹앱 또는 카카오톡에서 무료 온라인 의료상담 시작',
   '의료 접근성 취약계층 중심 안내와 연결',
   'AI 인턴 보듬이와 자원봉사 의료진 협업',
-  '짧은 상태 코드로 같은 상담 흐름 다시 열기',
+  '6자리 코드로 상태 확인',
 ]
 
 const availableNext = [
@@ -81,7 +81,7 @@ const carePromises = [
   },
   {
     label: '앱은 어떤 역할을 하나요',
-    body: '같은 상담 흐름을 다시 열고, 진행 상태와 답변 도착 여부를 더 가깝게 확인하도록 돕습니다.',
+    body: '상담 시작과 상태 확인을 더 쉽게 이어 주는 웹앱입니다.',
   },
 ]
 
@@ -94,14 +94,14 @@ const brandPrinciples = [
 const installTips = [
   'Android Chrome에서는 메뉴에서 홈 화면 추가를 누르면 앱처럼 둘 수 있습니다.',
   'iPhone Safari에서는 공유 메뉴의 홈 화면에 추가로 바로가기 설치가 가능합니다.',
-  '설치하지 않아도 괜찮습니다. 웹과 카카오톡 모두 상담 시작이 가능하고, 상태 확인은 같은 앱 흐름으로 이어집니다.',
+  '설치하지 않아도 상담 시작과 상태 확인은 그대로 이용할 수 있습니다.',
 ]
 
 const faqItems = [
   {
     question: '앱을 꼭 설치해야 하나요?',
     answer:
-      '아니요. 해피닥터 앱은 무료 온라인 의료상담을 더 쉽게 이어주는 웹앱입니다. 지금은 웹과 카카오톡 둘 다 상담 시작이 가능하고, 상태 확인은 앱에서 다시 열 수 있습니다.',
+      '아니요. 설치하지 않아도 웹에서 상담 시작과 상태 확인이 가능합니다.',
   },
   {
     question: '비용이 드나요?',
@@ -177,8 +177,7 @@ export default function AppHomePage() {
                 온라인 의료상담
               </h2>
               <p className="reveal-2 mt-6 max-w-lg text-lg leading-8 text-[var(--muted)]">
-                해피닥터 앱은 의료 접근성 취약계층을 위한 무료 온라인 의료상담 서비스입니다. AI 인턴 보듬이와
-                자원봉사 의료진이 함께 움직이며, 병원에 가기 전 막막한 순간 더 빨리 도움에 닿도록 돕습니다.
+                의료 접근성 취약계층이 병원에 가기 전 먼저 설명하고 도움을 청할 수 있도록 만든 웹앱입니다.
               </p>
 
               <div className="reveal-2 mt-8 flex flex-wrap gap-3">
@@ -312,7 +311,7 @@ export default function AppHomePage() {
                     </p>
                     <p className="mt-2 text-base font-semibold text-white">무료 온라인 의료상담을 지금 시작</p>
                     <p className="mt-2 text-sm leading-6">
-                      지금은 웹과 카카오톡 두 경로 모두 열려 있고, 앱은 같은 상담 흐름을 다시 확인하는 역할도 함께 맡습니다.
+                      웹과 카카오톡에서 상담을 시작하고, 필요할 때 상태를 다시 확인할 수 있습니다.
                     </p>
                   </div>
                   <div>
@@ -339,13 +338,10 @@ export default function AppHomePage() {
                 Status Check
               </p>
               <h3 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-[var(--ink)]">
-                상담이 시작된 뒤에도
-                <br />
-                같은 흐름을 다시 확인하세요
+                필요할 때 다시 확인하세요
               </h3>
               <p className="mt-4 max-w-md text-sm leading-7 text-[var(--muted)]">
-                웹이나 카카오톡에서 받은 상태 확인 링크를 다시 열거나 짧은 상태 코드만 붙여넣어도, 현재 상담 단계와
-                의료진 답변 도착 여부를 이어서 확인할 수 있습니다.
+                받은 링크나 코드만 있으면 현재 상태와 최근 답변을 다시 볼 수 있습니다.
               </p>
             </div>
 
@@ -354,7 +350,7 @@ export default function AppHomePage() {
                 <input
                   type="text"
                   name="lookup"
-                  placeholder="받은 상태 확인 링크 또는 8자리 코드"
+                  placeholder="받은 링크 또는 코드"
                   className="w-full rounded-[1.1rem] border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--blue)] focus:bg-white"
                 />
                 <button
@@ -364,10 +360,9 @@ export default function AppHomePage() {
                   상태 확인
                 </button>
               </form>
-              <div className="mt-4 grid gap-3 text-sm leading-7 text-[var(--muted)] sm:grid-cols-2">
-                <p>상담 직후 받은 링크를 그대로 열면 가장 빠르게 같은 상담 기록으로 돌아올 수 있습니다.</p>
-                <p>앱이 설치되어 있지 않아도 괜찮고, 웹이나 카카오톡에서 이어진 무료 온라인 의료상담 흐름을 다시 여는 용도입니다.</p>
-              </div>
+              <p className="mt-4 text-sm leading-7 text-[var(--muted)]">
+                링크를 그대로 열거나 코드를 직접 입력하면 됩니다.
+              </p>
             </div>
           </div>
         </div>

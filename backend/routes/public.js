@@ -77,7 +77,7 @@ function buildInitialReply(analysisResult) {
     return (
       `${analysisResult.replyToPatient}\n\n` +
       '보듬이가 내용을 정리해 자원봉사 의료진에게 전달했습니다.\n' +
-      '답변이 준비되면 상태 확인 화면에서 같은 상담 흐름을 이어서 보실 수 있습니다.\n' +
+      '답변이 준비되면 상태 확인 화면에서 바로 확인하실 수 있습니다.\n' +
       '증상이 많이 힘들어지면 지체 없이 119 또는 가까운 응급실을 이용해 주세요.'
     );
   }

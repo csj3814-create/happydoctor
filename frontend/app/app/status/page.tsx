@@ -34,27 +34,43 @@ function getStatusCopy(status: PublicConsultationStatus) {
       return {
         badge: '답변 도착',
         title: '의료진 답변이 도착했습니다',
-        body: '자원봉사 의료진이 남긴 답변이 도착했습니다. 웹이나 카카오톡에서 이어진 같은 상담 흐름을 이 화면에서 다시 확인할 수 있습니다.',
+        body: '아래 최신 답변을 확인해 주세요.',
       }
     case 'waiting_doctor':
       return {
         badge: '확인 대기',
         title: '의료진이 확인 중입니다',
-        body: '보듬이가 먼저 정리한 내용을 바탕으로 자원봉사 의료진이 온라인 상담 흐름 안에서 순서대로 확인하고 있습니다.',
+        body: '보듬이가 정리한 내용을 바탕으로 순서대로 확인하고 있습니다.',
       }
     case 'closed':
       return {
         badge: '상담 종료',
-        title: '이 상담은 종료된 상태입니다',
-        body: '필요하면 웹이나 카카오톡에서 새 상담을 다시 시작할 수 있습니다.',
+        title: '이 상담은 종료되었습니다',
+        body: '필요하면 새 상담을 다시 시작해 주세요.',
       }
     default:
       return {
         badge: '상담 진행 중',
-        title: '상담 안내가 먼저 전달된 상태입니다',
-        body: '현재 상담은 기본 안내가 먼저 전달된 상태이며, 필요 시 같은 흐름 안에서 추가 답변이나 후속 안내가 이어질 수 있습니다.',
+        title: '상담이 접수되었습니다',
+        body: '기본 안내가 먼저 전달된 상태입니다.',
       }
   }
+}
+
+function getLatestUpdate(status: PublicConsultationStatus) {
+  if (status.doctorRepliedAt) {
+    return formatDateTime(status.doctorRepliedAt)
+  }
+
+  if (status.latestFollowUpAt) {
+    return formatDateTime(status.latestFollowUpAt)
+  }
+
+  if (status.requiresDoctorReview) {
+    return '의료진 확인 대기 중'
+  }
+
+  return '기본 안내 전달됨'
 }
 
 export default async function StatusPage({ searchParams }: StatusPageProps) {
@@ -67,12 +83,12 @@ export default async function StatusPage({ searchParams }: StatusPageProps) {
   let fetchError: string | null = null
 
   if (rawLookup && !normalizedLookup) {
-    fetchError = '상태 확인 링크 또는 코드를 다시 확인해 주세요.'
+    fetchError = '받은 링크 또는 코드를 다시 확인해 주세요.'
   } else if (normalizedLookup) {
     try {
       consultation = await fetchConsultationStatus(normalizedLookup)
       if (!consultation) {
-        fetchError = '상담 상태를 찾지 못했습니다. 받은 링크 또는 상태 코드를 다시 확인해 주세요.'
+        fetchError = '상담 상태를 찾지 못했습니다. 받은 링크 또는 코드를 다시 확인해 주세요.'
       }
     } catch {
       fetchError = '지금은 상태를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.'
@@ -94,11 +110,10 @@ export default async function StatusPage({ searchParams }: StatusPageProps) {
               Happy Doctor Status
             </p>
             <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--ink)] sm:text-4xl">
-              온라인 의료상담 진행 상태 확인
+              상담 상태 확인
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted)]">
-              웹이나 카카오톡에서 상담을 시작한 뒤 받은 상태 확인 링크 또는 짧은 코드를 열면, 현재 상담 단계와 의료진
-              답변 도착 여부를 다시 확인할 수 있습니다.
+              받은 링크나 코드를 넣으면 현재 상태와 최근 답변을 확인할 수 있습니다.
             </p>
           </div>
 
@@ -122,13 +137,13 @@ export default async function StatusPage({ searchParams }: StatusPageProps) {
           <form action="/status" className="grid gap-3 lg:grid-cols-[1fr_auto]">
             <label className="block">
               <span className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
-                Status Code
+                Lookup
               </span>
               <input
                 type="text"
                 name="lookup"
                 defaultValue={rawLookup}
-                placeholder="받은 상태 확인 링크 또는 8자리 코드"
+                placeholder="받은 링크 또는 코드"
                 className="mt-3 w-full rounded-[1.2rem] border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--blue)] focus:bg-white"
               />
             </label>
@@ -139,9 +154,6 @@ export default async function StatusPage({ searchParams }: StatusPageProps) {
               상태 확인
             </button>
           </form>
-          <p className="mt-3 text-xs leading-6 text-[var(--muted)]">
-            링크 전체를 붙여넣어도 되고, 함께 받은 짧은 상태 코드만 입력해도 됩니다.
-          </p>
         </section>
 
         {fetchError ? (
@@ -152,8 +164,7 @@ export default async function StatusPage({ searchParams }: StatusPageProps) {
 
         {!consultation && !fetchError ? (
           <section className="mt-6 rounded-[2rem] border border-dashed border-[var(--line)] bg-white/72 p-6 text-sm leading-7 text-[var(--muted)]">
-            해피닥터 상담이 시작되면 상태 확인용 링크와 짧은 코드가 함께 제공됩니다. 그 코드를 적어 두면 나중에 직접
-            입력해서 같은 온라인 의료상담 흐름을 다시 확인할 수 있습니다.
+            상담을 시작하면 상태 확인 링크와 코드가 함께 제공됩니다.
           </section>
         ) : null}
 
@@ -164,106 +175,82 @@ export default async function StatusPage({ searchParams }: StatusPageProps) {
                 {statusCopy.badge}
               </p>
               <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em]">{statusCopy.title}</h2>
-              <p className="mt-4 max-w-2xl text-sm leading-7 text-white/82">{statusCopy.body}</p>
+              <p className="mt-4 text-sm leading-7 text-white/82">{statusCopy.body}</p>
+            </div>
 
-              <div className="mt-6 grid gap-4 md:grid-cols-3">
-                <div className="rounded-[1.5rem] bg-white/10 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/60">접수 시각</p>
-                  <p className="mt-2 text-base font-semibold">{formatDateTime(consultation.createdAt)}</p>
-                </div>
-                <div className="rounded-[1.5rem] bg-white/10 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/60">주요 증상</p>
-                  <p className="mt-2 text-base font-semibold">
-                    {consultation.chiefComplaint || '증상 정보 준비 중'}
-                  </p>
-                </div>
-                <div className="rounded-[1.5rem] bg-white/10 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/60">추가 문진</p>
-                  <p className="mt-2 text-base font-semibold">{consultation.followUpCount}회 기록</p>
-                </div>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
+                <p className="text-sm font-semibold text-[var(--ink)]">접수 시각</p>
+                <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
+                  {formatDateTime(consultation.createdAt)}
+                </p>
+              </div>
+              <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
+                <p className="text-sm font-semibold text-[var(--ink)]">주요 증상</p>
+                <p className="mt-3 text-base font-semibold text-[var(--navy)]">
+                  {consultation.chiefComplaint || '기록 없음'}
+                </p>
+              </div>
+              <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
+                <p className="text-sm font-semibold text-[var(--ink)]">직접 입력 코드</p>
+                <p className="mt-3 text-3xl font-semibold tracking-[0.14em] text-[var(--navy)]">
+                  {consultation.trackingCode || '생성 중'}
+                </p>
+              </div>
+              <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
+                <p className="text-sm font-semibold text-[var(--ink)]">최근 업데이트</p>
+                <p className="mt-3 text-sm leading-7 text-[var(--muted)]">{getLatestUpdate(consultation)}</p>
               </div>
             </div>
 
-            <div className="grid gap-5 lg:grid-cols-[1.08fr_0.92fr]">
-              <div className="space-y-5">
-                <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
-                  <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
-                    상태 코드
-                  </p>
-                  <div className="mt-4 rounded-[1.4rem] bg-[var(--surface)] p-4">
-                    <p className="text-sm font-semibold text-[var(--ink)]">직접 입력 코드</p>
-                    <p className="mt-3 text-3xl font-semibold tracking-[0.14em] text-[var(--navy)]">
-                      {consultation.trackingCode || '생성 중'}
-                    </p>
-                    <p className="mt-2 text-xs leading-6 text-[var(--muted)]">
-                      링크를 다시 찾기 어려울 때 이 코드만 적어 두면 같은 상담 상태를 다시 열 수 있습니다.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
-                  <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
-                    상담 단계
-                  </p>
-                  <div className="mt-4 space-y-4">
-                    <div className="rounded-[1.4rem] bg-[var(--surface)] p-4">
-                      <p className="text-sm font-semibold text-[var(--ink)]">현재 단계</p>
-                      <p className="mt-2 text-sm leading-7 text-[var(--muted)]">{statusCopy.body}</p>
+            <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
+              <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
+                <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
+                  의료진 답변
+                </p>
+                {latestReply ? (
+                  <article className="mt-4 rounded-[1.4rem] bg-[var(--surface)] p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-[var(--ink)]">
+                        {latestReply.doctorName}
+                        {consultation.doctorReplies.length > 1 ? ` · 총 ${consultation.doctorReplies.length}건` : ''}
+                      </p>
+                      <p className="text-xs text-[var(--muted)]">{formatDateTime(latestReply.createdAt)}</p>
                     </div>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="rounded-[1.4rem] border border-[var(--line)] p-4">
-                        <p className="text-sm font-semibold text-[var(--ink)]">마지막 답변 도착</p>
-                        <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
-                          {consultation.doctorRepliedAt
-                            ? formatDateTime(consultation.doctorRepliedAt)
-                            : consultation.requiresDoctorReview
-                              ? '아직 의료진 답변 전입니다.'
-                              : '현재 상담은 기본 안내 중심으로 진행 중입니다.'}
-                        </p>
-                      </div>
-                      <div className="rounded-[1.4rem] border border-[var(--line)] p-4">
-                        <p className="text-sm font-semibold text-[var(--ink)]">최근 추가 문진</p>
-                        <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
-                          {consultation.latestFollowUpAt
-                            ? formatDateTime(consultation.latestFollowUpAt)
-                            : '아직 추가 문진 기록이 없습니다.'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
-                  <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
-                    의료진 답변
-                  </p>
-                  {consultation.doctorReplies.length > 0 ? (
-                    <div className="mt-4 space-y-4">
-                      {consultation.doctorReplies.map((reply) => (
-                        <article
-                          key={reply.id}
-                          className="rounded-[1.4rem] border border-[var(--line)] bg-[var(--surface)] p-4"
-                        >
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p className="text-sm font-semibold text-[var(--ink)]">{reply.doctorName}</p>
-                            <p className="text-xs text-[var(--muted)]">{formatDateTime(reply.createdAt)}</p>
-                          </div>
-                          <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--ink)]">
-                            {reply.message}
-                          </p>
-                        </article>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="mt-4 rounded-[1.4rem] bg-[var(--surface)] p-4 text-sm leading-7 text-[var(--muted)]">
-                      아직 의료진 답변이 도착하지 않았습니다. 웹이나 카카오톡에서 시작한 같은 무료 온라인 의료상담
-                      흐름을 이 화면에서 이어서 확인하실 수 있습니다.
+                    <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--ink)]">
+                      {latestReply.message}
                     </p>
-                  )}
-                </div>
+                  </article>
+                ) : (
+                  <p className="mt-4 rounded-[1.4rem] bg-[var(--surface)] p-4 text-sm leading-7 text-[var(--muted)]">
+                    아직 의료진 답변이 없습니다.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-5">
+                {(consultation.closedAt || consultation.closeReason) && (
+                  <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
+                    <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
+                      종료 정보
+                    </p>
+                    <div className="mt-4 space-y-3 text-sm leading-7 text-[var(--muted)]">
+                      <p>
+                        <span className="font-semibold text-[var(--ink)]">종료 시각</span>
+                        <br />
+                        {consultation.closedAt ? formatDateTime(consultation.closedAt) : '아직 종료되지 않았습니다.'}
+                      </p>
+                      {consultation.closeReason ? (
+                        <p>
+                          <span className="font-semibold text-[var(--ink)]">종료 사유</span>
+                          <br />
+                          {consultation.closeReason}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                )}
+
                 <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
                   <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
                     안내
@@ -271,60 +258,14 @@ export default async function StatusPage({ searchParams }: StatusPageProps) {
                   <ul className="mt-4 space-y-3 text-sm leading-7 text-[var(--muted)]">
                     <li className="flex gap-3">
                       <span className="mt-2 h-2 w-2 rounded-full bg-[var(--blue)]" />
-                      <span>응급이 의심되면 이 화면보다 119 또는 가까운 응급실 이용이 우선입니다.</span>
+                      <span>응급이 의심되면 119 또는 가까운 응급실 이용이 우선입니다.</span>
                     </li>
                     <li className="flex gap-3">
                       <span className="mt-2 h-2 w-2 rounded-full bg-[var(--blue)]" />
-                      <span>웹에서 시작한 상담도 이 화면에서 계속 이어지고, 카카오톡으로 시작한 상담도 같은 상태를 다시 열 수 있습니다.</span>
-                    </li>
-                    <li className="flex gap-3">
-                      <span className="mt-2 h-2 w-2 rounded-full bg-[var(--blue)]" />
-                      <span>새 증상이 생기거나 상태가 달라지면 기존 상담을 기다리기보다 새 상담을 다시 시작해 주세요.</span>
-                    </li>
-                    <li className="flex gap-3">
-                      <span className="mt-2 h-2 w-2 rounded-full bg-[var(--blue)]" />
-                      <span>해피닥터는 의료 접근성 취약계층을 위한 무료 온라인 의료상담 서비스입니다.</span>
+                      <span>상태가 달라졌다면 기존 상담을 기다리기보다 새 상담을 다시 시작해 주세요.</span>
                     </li>
                   </ul>
                 </div>
-
-                <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
-                  <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
-                    상담 기록
-                  </p>
-                  <div className="mt-4 space-y-4">
-                    <div className="rounded-[1.4rem] bg-[var(--surface)] p-4">
-                      <p className="text-sm font-semibold text-[var(--ink)]">의료진 답변 개수</p>
-                      <p className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-[var(--navy)]">
-                        {consultation.doctorReplies.length}건
-                      </p>
-                    </div>
-                    <div className="rounded-[1.4rem] bg-[var(--surface)] p-4">
-                      <p className="text-sm font-semibold text-[var(--ink)]">상담 종료 시각</p>
-                      <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
-                        {consultation.closedAt ? formatDateTime(consultation.closedAt) : '아직 종료되지 않았습니다.'}
-                      </p>
-                    </div>
-                    <div className="rounded-[1.4rem] bg-[var(--surface)] p-4">
-                      <p className="text-sm font-semibold text-[var(--ink)]">종료 사유</p>
-                      <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
-                        {consultation.closeReason || '아직 기록되지 않았습니다.'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {latestReply ? (
-                  <div className="rounded-[1.8rem] bg-[linear-gradient(145deg,#0c4f88_0%,#1f77bf_100%)] p-5 text-white shadow-[0_24px_60px_rgba(12,79,136,0.24)]">
-                    <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-white/64">
-                      최근 답변
-                    </p>
-                    <h3 className="mt-3 text-2xl font-semibold tracking-[-0.04em]">같은 상담 흐름 안에서 최근 답변을 확인하세요</h3>
-                    <p className="mt-4 text-sm leading-7 text-white/82">
-                      {latestReply.message}
-                    </p>
-                  </div>
-                ) : null}
               </div>
             </div>
           </section>

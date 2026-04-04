@@ -3,7 +3,8 @@ const crypto = require('crypto');
 
 const PUBLIC_STATS_PATH = ['system', 'public_stats'];
 const FOLLOW_UP_SESSIONS = 'follow_up_sessions';
-const SHORT_TRACKING_CODE_LENGTH = 8;
+const SHORT_TRACKING_CODE_LENGTH = 6;
+const LEGACY_TRACKING_CODE_LENGTH = 8;
 const SHORT_TRACKING_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 
 let db = null;
@@ -44,7 +45,10 @@ function createTrackingCode(length = SHORT_TRACKING_CODE_LENGTH) {
 function normalizeTrackingCode(value) {
   if (typeof value !== 'string') return null;
   const normalized = value.trim().toUpperCase();
-  if (!/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}$/.test(normalized)) {
+  if (!/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]+$/.test(normalized)) {
+    return null;
+  }
+  if (![SHORT_TRACKING_CODE_LENGTH, LEGACY_TRACKING_CODE_LENGTH].includes(normalized.length)) {
     return null;
   }
   return normalized;

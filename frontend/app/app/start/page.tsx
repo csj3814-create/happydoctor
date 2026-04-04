@@ -29,8 +29,7 @@ export default async function StartPage({ searchParams }: StartPageProps) {
               웹에서 바로 상담 시작
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted)]">
-              카카오톡이 익숙하지 않아도 괜찮습니다. 해피닥터는 의료 접근성 취약계층이 온라인으로 먼저 도움에 닿을 수
-              있도록 웹에서도 무료 의료상담을 시작할 수 있게 열어 둡니다.
+              필요한 정보만 적어 주시면 상담을 접수하고 상태 확인 코드도 함께 드립니다.
             </p>
           </div>
 
@@ -62,36 +61,31 @@ export default async function StartPage({ searchParams }: StartPageProps) {
             </h2>
             <div className="mt-6 space-y-4 text-sm leading-7 text-white/82">
               <p>
-                이 화면은 정식 진료를 대신하는 곳이 아니라, 어디서부터 도움을 구해야 할지 막막한 순간에 먼저 상황을
-                설명하고 연결되는 무료 온라인 의료상담 창구입니다.
-              </p>
-              <p>
-                보듬이가 먼저 내용을 정리하고, 필요하면 자원봉사 의료진이 같은 상담 흐름 안에서 확인합니다. 상담이
-                시작되면 짧은 상태 코드가 함께 발급되어 나중에 직접 입력해 상태를 다시 볼 수 있습니다.
+                이 화면은 어디서부터 도움을 구해야 할지 막막한 순간에 먼저 설명하고 연결되는 온라인 의료상담 창구입니다.
               </p>
             </div>
 
             <div className="mt-6 rounded-[1.5rem] bg-white/10 p-4 text-sm leading-7 text-white/82">
-              <p className="font-semibold text-white">이런 경우에 먼저 열어 보세요</p>
+              <p className="font-semibold text-white">이런 내용을 적어 주세요</p>
               <ul className="mt-3 space-y-2">
-                <li>병원에 바로 가기 어렵거나, 먼저 어디에 설명해야 할지 막막할 때</li>
-                <li>카카오톡이 익숙하지 않거나, 외국인/이주민 등 웹이 더 쉬운 경우</li>
-                <li>같은 상담 흐름을 링크와 짧은 코드로 다시 확인하고 싶을 때</li>
+                <li>가장 불편한 증상</li>
+                <li>언제부터 시작됐는지</li>
+                <li>기저질환이나 복용 중인 약이 있는지</li>
               </ul>
             </div>
           </div>
 
           <div className="rounded-[2rem] border border-[var(--line)] bg-white/80 p-6 shadow-[0_24px_60px_rgba(8,34,55,0.08)] sm:p-7">
             <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
-              How It Works
+              진행 방식
             </p>
             <div className="mt-4 space-y-4 text-sm leading-7 text-[var(--muted)]">
               <p>
-                1. 가장 불편한 증상과 자세한 설명을 남깁니다.
+                1. 증상과 상황을 적습니다.
                 <br />
-                2. 보듬이가 먼저 온라인 상담 흐름에 맞게 정리합니다.
+                2. 보듬이가 먼저 정리합니다.
                 <br />
-                3. 필요하면 자원봉사 의료진이 확인하고, 상태 화면에 답변이 이어집니다.
+                3. 필요하면 의료진 답변이 이어집니다.
               </p>
             </div>
           </div>
