@@ -15,6 +15,7 @@ const {
 const { enqueuePatientChannelPush } = require('../services/notifyService');
 const { appSiteUrl } = require('../config');
 const { getAllowedDoctorEmails } = require('../config');
+const followUpService = require('../services/followUpService');
 
 const router = express.Router();
 const ALLOWED_LIST_STATUS = new Set(['all', 'active', 'replied', 'closed']);
@@ -189,6 +190,7 @@ router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
       }),
       'doctor_reply',
     );
+    await followUpService.cancelFollowUp(consultation.userId);
 
     await awardHDT(req.doctor.email, req.doctor.name, HDT_REPLY, 'reply');
     console.log(`[Portal] ${req.doctor.email} replied to ${consultation.userId} (${replyId})`);

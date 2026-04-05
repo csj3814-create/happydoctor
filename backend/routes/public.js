@@ -118,7 +118,19 @@ router.post('/consultations', async (req, res) => {
     }
 
     if (analysisResult.action === 'ESCALATE') {
-      await enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId);
+      await enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId, {
+        type: 'triage_initial',
+        priority: 'urgent',
+      });
+      await followUpService.scheduleFollowUpWithOptions(userId, analysisResult.soapChartForDoctor, 15, {
+        doctorReminderNeeded: true,
+        reminderIntervalMinutes: 15,
+      });
+    } else {
+      const fallbackChart = `[최초 자동 해결된 경증 환자]\n증상: ${patientData.cc}\n증상점수: ${patientData.nrs}`;
+      await followUpService.scheduleFollowUpWithOptions(userId, fallbackChart, 15, {
+        doctorReminderNeeded: false,
+      });
     }
 
     const statusUrl = buildPublicStatusUrl(saved.trackingCode, saved.trackingToken);
