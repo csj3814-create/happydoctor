@@ -674,3 +674,11 @@
 
 ### 결과 메모
 - [x] 카카오 인앱 브라우저 감지를 더 보수적으로 바꾸고, Android에서는 크롬 intent와 일반 외부 브라우저 열기를 순차 시도하도록 보완했다.
+- [x] 라이브 `portal.happydoctor.kr/open-browser`에서 기본 브라우저 유도 문구가 반영된 HTML 응답을 확인했다.
+
+## 다음 세션 우선순위
+
+- [ ] 공기계 MessengerBotR에 최신 [messengerbot_script.js](C:/SJ/antigravity/happydoctor/backend/messengerbot_script.js)를 반영한다.
+- [ ] `2기 행복한 의사 의료봉사방`에서 `~알림방등록`을 보내 실제 의료진 알림방 등록을 완료한다.
+- [ ] 응급/협진 테스트 상담 1건으로 자동 의료진 푸시가 즉시 도착하는지 운영 리허설을 다시 한다.
+- [ ] 경증 자동 해결 상담 1건으로 15분 뒤 의료진방에 불필요한 F/U 알림이 가지 않는지 확인한다.
