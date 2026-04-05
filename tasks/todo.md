@@ -661,3 +661,13 @@
 ### 결과 메모
 - [x] `notifyService`, `followUpService`, `kakaoWebhook`, `messengerBot`, `portal`, `public` 라우트/서비스 로드를 로컬에서 함께 확인했다.
 - [x] 카카오 상담 경로뿐 아니라 `public` 웹 상담 생성 경로도 동일한 의료진 알림/F/U 규칙을 타도록 코드 정리를 마쳤다.
+
+## 단계 48: 카카오 인앱 브라우저 포털 열기 보완 (2026.04.05)
+
+### 목표
+- [ ] `portal.happydoctor.kr/open-browser`가 카카오 인앱 브라우저에서 더 보수적으로 외부 브라우저 열기를 시도하도록 보완한다.
+- [ ] Android에서는 크롬 intent와 일반 외부 브라우저 열기 둘 다 제공해 Google 로그인 차단을 줄인다.
+
+### 검증
+- [ ] `frontend/portal`: `npm run build`
+- [ ] `open-browser` 경로에서 외부 브라우저 유도 버튼/문구가 정상 렌더되는지 확인
