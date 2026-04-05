@@ -5,6 +5,8 @@ const DOCTOR_NOTIFICATIONS = 'doctor_notifications';
 const FOLLOW_UP_PUSHES = 'follow_up_pushes';
 const PATIENT_CHANNEL_PUSHES = 'patient_channel_pushes';
 const MESSENGER_ROOMS = 'messenger_rooms';
+const DELIVERY_ROOMS = 'delivery_rooms';
+const DOCTOR_ROOM_DOC_ID = 'doctor_room';
 
 function getCollection(name) {
   const db = getDb();
@@ -16,7 +18,7 @@ async function countDocuments(query) {
   return snapshot.size;
 }
 
-async function enqueueDoctorNotification(message, patientId) {
+async function enqueueDoctorNotification(message, patientId, options = {}) {
   const collection = getCollection(DOCTOR_NOTIFICATIONS);
   if (!collection) {
     console.warn('[Notification] Firestore unavailable, skipping doctor notification enqueue.');
@@ -27,6 +29,8 @@ async function enqueueDoctorNotification(message, patientId) {
     id: randomUUID(),
     message,
     patientId,
+    type: options.type || 'triage',
+    priority: options.priority || 'normal',
     status: 'pending',
     createdAt: getAdmin().firestore.FieldValue.serverTimestamp(),
   });
@@ -53,19 +57,20 @@ async function peekDoctorNotification() {
   });
 
   const data = doc.data();
-  return { message: data.message, patientId: data.patientId };
+  return {
+    message: data.message,
+    patientId: data.patientId,
+    type: data.type || 'triage',
+    priority: data.priority || 'normal',
+  };
 }
 
 async function confirmDoctorNotifications() {
   const collection = getCollection(DOCTOR_NOTIFICATIONS);
   if (!collection) return [];
 
-  const [pendingSnap, notifiedSnap] = await Promise.all([
-    collection.where('status', '==', 'pending').get(),
-    collection.where('status', '==', 'notified').get(),
-  ]);
-
-  const docs = [...pendingSnap.docs, ...notifiedSnap.docs];
+  const pendingSnap = await collection.where('status', '==', 'pending').get();
+  const docs = pendingSnap.docs;
   if (docs.length === 0) return [];
 
   const batch = getDb().batch();
@@ -82,6 +87,8 @@ async function confirmDoctorNotifications() {
     return {
       message: data.message,
       patientId: data.patientId,
+      type: data.type || 'triage',
+      priority: data.priority || 'normal',
     };
   });
 }
@@ -190,6 +197,30 @@ async function registerRoom(userId, roomName) {
   return true;
 }
 
+async function registerDoctorRoom(roomName) {
+  const db = getDb();
+  if (!db || !roomName) {
+    return false;
+  }
+
+  await db.collection(DELIVERY_ROOMS).doc(DOCTOR_ROOM_DOC_ID).set({
+    roomName,
+    updatedAt: getAdmin().firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+
+  console.log(`[Doctor Room Registered] ${roomName}`);
+  return true;
+}
+
+async function getDoctorRoomName() {
+  const db = getDb();
+  if (!db) return null;
+
+  const snapshot = await db.collection(DELIVERY_ROOMS).doc(DOCTOR_ROOM_DOC_ID).get();
+  if (!snapshot.exists) return null;
+  return snapshot.data()?.roomName || null;
+}
+
 async function getRoomName(userId) {
   const db = getDb();
   if (!db) return null;
@@ -236,6 +267,8 @@ module.exports = {
   dequeuePatientChannelPush,
   clearPatientChannelPushes,
   registerRoom,
+  registerDoctorRoom,
   getRoomName,
+  getDoctorRoomName,
   getQueueStatus,
 };

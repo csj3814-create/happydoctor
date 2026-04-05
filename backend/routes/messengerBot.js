@@ -6,6 +6,8 @@ const {
     dequeueFUPush,
     dequeuePatientChannelPush,
     registerRoom,
+    registerDoctorRoom,
+    getDoctorRoomName,
 } = require('../services/notifyService');
 
 const PORTAL_OPEN_IN_BROWSER_URL = 'https://portal.happydoctor.kr/open-browser?next=%2F';
@@ -47,9 +49,15 @@ router.post('/', checkApiKey, async (req, res) => {
         return res.status(200).json({ reply: replyMsg });
     }
 
-    // ===== 의료진 카톡 단체방 알림 푸시 (Polling 응답) =====
-    // 메신저봇이 "!확인" 과 같은 메세지를 보내거나 정기적으로 ping을 시도하면
-    // 쌓여있는 차트를 응답으로 내려보냄.
+    if (isGroupChat && msg.trim() === '~알림방등록') {
+        await registerDoctorRoom(room);
+        return res.status(200).json({
+            reply: `이 방을 해피닥터 의료진 알림방으로 등록했습니다.\n이제 응급/협진 상담은 자동 푸시로 먼저 전달됩니다.`,
+        });
+    }
+
+    // ===== 의료진 카톡 단체방 알림 수동 확인 =====
+    // 자동 푸시가 기본이며, 이 명령은 수동 백업 용도로만 사용합니다.
     if (msg.trim() === '~차트확인') {
         try {
             const charts = await confirmDoctorNotifications();
@@ -64,9 +72,13 @@ router.post('/', checkApiKey, async (req, res) => {
                     "3. 미답변 탭에서 환자 차트 확인\n" +
                     "4. 답변 입력 → '환자에게 전송' 클릭\n" +
                     "※ 카카오톡 안에서 안 열리면 우측 상단 메뉴의 브라우저 열기를 사용해 주세요.";
-                return res.status(200).json({ reply: charts.map(c => c.message).join('\n\n---\n\n') + portalGuide });
+                return res.status(200).json({
+                    reply: charts.map(c => c.message).join('\n\n---\n\n') + portalGuide
+                });
             } else {
-                return res.status(200).json({ reply: "✅ 대기 중인 신규 예진 차트가 없습니다." });
+                return res.status(200).json({
+                    reply: "✅ 지금 수동 확인이 필요한 신규 차트는 없습니다.\n자동 푸시 수신 방을 바꾸려면 해당 방에서 `~알림방등록`을 한 번 보내 주세요."
+                });
             }
         } catch (e) {
             console.error('[차트확인 오류]', e);
@@ -86,6 +98,7 @@ router.post('/', checkApiKey, async (req, res) => {
 router.get('/poll', checkApiKey, async (req, res) => {
     const chart = await peekDoctorNotification();
     if (chart) {
+        const roomName = await getDoctorRoomName();
         const portalGuide =
             "\n\n━━━━━━━━━━━━━━━\n" +
             "💻 해피닥터 포털에서 답변해주세요!\n" +
@@ -98,6 +111,7 @@ router.get('/poll', checkApiKey, async (req, res) => {
             "※ 카카오톡 안에서 안 열리면 우측 상단 메뉴의 브라우저 열기를 사용해 주세요.";
         return res.status(200).json({
             hasNew: true,
+            roomName,
             reply: chart.message + portalGuide
         });
     }

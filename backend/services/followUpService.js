@@ -45,8 +45,14 @@ class FollowUpService {
   }
 
   async scheduleFollowUp(userId, originalSoapChart, delayMinutes = 15) {
+    return this.scheduleFollowUpWithOptions(userId, originalSoapChart, delayMinutes, {});
+  }
+
+  async scheduleFollowUpWithOptions(userId, originalSoapChart, delayMinutes = 15, options = {}) {
     const now = new Date();
     const dueAt = new Date(now.getTime() + delayMinutes * 60 * 1000);
+    const doctorReminderNeeded = Boolean(options.doctorReminderNeeded);
+    const reminderIntervalMinutes = Math.max(15, Number(options.reminderIntervalMinutes) || delayMinutes || 15);
 
     await dbService.saveFollowUpSession(userId, {
       chart: originalSoapChart,
@@ -54,6 +60,9 @@ class FollowUpService {
       lastActiveAt: now,
       dueAt,
       status: 'scheduled',
+      doctorReminderNeeded,
+      reminderIntervalMinutes,
+      lastDoctorReminderAt: null,
       pendingMessage: null,
       pendingCreatedAt: null,
     });
@@ -72,6 +81,7 @@ class FollowUpService {
       lastActiveAt: this.toDate(persisted.lastActiveAt),
       dueAt: this.toDate(persisted.dueAt),
       pendingCreatedAt: this.toDate(persisted.pendingCreatedAt),
+      lastDoctorReminderAt: this.toDate(persisted.lastDoctorReminderAt),
     };
   }
 
@@ -109,21 +119,35 @@ class FollowUpService {
       '',
       '새로운 증상이 있다면 함께 알려주세요.',
     ].join('\n');
-
-    await enqueueDoctorNotification(
-      `**[F/U 알림]**\n환자 ${userId}의 추적 관찰 시점이 도래했습니다.\n\n${session.chart}`,
-      userId,
-    );
-
-    await dbService.saveFollowUpSession(userId, {
-      lastActiveAt: new Date(),
+    const now = new Date();
+    const hasPendingMessage = Boolean(session.pendingMessage);
+    const doctorReminderNeeded = Boolean(session.doctorReminderNeeded);
+    const updates = {
+      lastActiveAt: now,
+      pendingMessage: hasPendingMessage ? session.pendingMessage : message,
+      pendingCreatedAt: hasPendingMessage ? (session.pendingCreatedAt || now) : now,
       dueAt: null,
-      pendingMessage: message,
-      pendingCreatedAt: new Date(),
       status: 'pending',
-    });
+    };
 
-    this.clearLocalTimer(userId);
+    if (doctorReminderNeeded && session.chart) {
+      await enqueueDoctorNotification(
+        `⏰ [의료진 답변 필요]\n환자 ${userId}의 상담이 아직 답변 대기 중입니다.\n포털에서 확인 후 회신해 주세요.\n\n${session.chart}`,
+        userId,
+        { type: 'follow_up_doctor', priority: 'follow_up' },
+      );
+
+      const reminderIntervalMinutes = Math.max(15, Number(session.reminderIntervalMinutes) || 15);
+      const nextDueAt = new Date(now.getTime() + reminderIntervalMinutes * 60 * 1000);
+      updates.dueAt = nextDueAt;
+      updates.status = 'scheduled';
+      updates.lastDoctorReminderAt = now;
+      this.scheduleLocalTimer(userId, nextDueAt);
+    } else {
+      this.clearLocalTimer(userId);
+    }
+
+    await dbService.saveFollowUpSession(userId, updates);
   }
 
   async getOriginalChart(userId) {
@@ -148,11 +172,12 @@ class FollowUpService {
     }
 
     const message = session.pendingMessage;
+    const shouldKeepScheduling = Boolean(session.doctorReminderNeeded && session.dueAt);
     await dbService.saveFollowUpSession(userId, {
       lastActiveAt: new Date(),
       pendingMessage: null,
       pendingCreatedAt: null,
-      status: 'active',
+      status: shouldKeepScheduling ? 'scheduled' : 'active',
     });
 
     return message;

@@ -5,7 +5,7 @@
  *
  * 기능 2가지:
  * 1) 오픈채팅방 안내: "~상담", "아파요" 등 키워드 → 1:1 채널 안내
- * 2) 의료진 단톡방 차트: "~차트확인" → 서버에서 SOAP 차트 가져와서 방에 전송
+ * 2) 의료진 단톡방 차트: 자동 푸시 + "~차트확인" 수동 백업
  *
  * ※ 명령어 접두사를 "!"가 아닌 "~"로 사용합니다.
  *    같은 기기에서 구동 중인 해빛스쿨 봇과 충돌 방지용입니다.
@@ -90,7 +90,8 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
                 "🤖 해피닥터 봇 도움말 (의료진/운영위)\n" +
                 "━━━━━━━━━━━━━━━\n" +
                 "[의료진]\n" +
-                "~차트확인   대기 중인 신규 예진 차트 조회\n" +
+                "~차트확인   대기 중인 신규/미전달 차트 수동 조회\n" +
+                "~알림방등록 현재 방을 자동 알림방으로 등록\n" +
                 "※ 신규 차트는 10초마다 자동으로도 전송됩니다.\n\n" +
                 "[공통]\n" +
                 "~도움말    이 도움말 표시\n" +
@@ -111,7 +112,8 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
                 "🤖 해피닥터 봇 도움말 (실험방)\n" +
                 "━━━━━━━━━━━━━━━\n" +
                 "[의료진]\n" +
-                "~차트확인   대기 차트 조회\n\n" +
+                "~차트확인   대기 차트 조회\n" +
+                "~알림방등록 현재 방을 자동 알림방으로 등록\n\n" +
                 "[공통]\n" +
                 "~도움말    이 도움말 표시\n" +
                 "━━━━━━━━━━━━━━━\n" +
@@ -147,8 +149,35 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
         }
     }
 
-    // [2] 의료진 단톡방 또는 실험방: 차트 확인
-    if ((room === DOCTOR_ROOM || room === EXPERIMENT_ROOM) && msg.trim() === "~차트확인") {
+    // [2] 의료진 단톡방 또는 실험방: 알림방 등록
+    if (isGroupChat && msg.trim() === "~알림방등록") {
+        try {
+            var registerConn = org.jsoup.Jsoup.connect(SERVER_URL + "/api/messengerbot")
+                .header("Content-Type", "application/json")
+                .header("x-api-key", API_KEY)
+                .requestBody(JSON.stringify({
+                    room: room,
+                    msg: msg.trim(),
+                    sender: sender,
+                    isGroupChat: isGroupChat
+                }))
+                .ignoreContentType(true)
+                .ignoreHttpErrors(true)
+                .method(org.jsoup.Connection.Method.POST)
+                .execute();
+
+            var registerData = JSON.parse(registerConn.body());
+            if (registerData.reply) {
+                replier.reply(registerData.reply);
+            }
+        } catch (e) {
+            replier.reply("⚠️ 알림방 등록 중 오류: " + e.message);
+        }
+        return;
+    }
+
+    // [3] 의료진 단톡방 또는 실험방: 차트 확인
+    if (isGroupChat && msg.trim() === "~차트확인") {
         try {
             var conn = org.jsoup.Jsoup.connect(SERVER_URL + "/api/messengerbot")
                 .header("Content-Type", "application/json")
@@ -203,8 +232,8 @@ function startDoctorPolling() {
 
                     var data = JSON.parse(pollRes);
                     if (data.hasNew && data.reply) {
-                        // 의료진 단톡방에 차트 전송
-                        Api.replyRoom(DOCTOR_ROOM, data.reply);
+                        // 서버가 기억한 알림방을 우선 사용하고, 없으면 기본값으로 전송
+                        Api.replyRoom(data.roomName || DOCTOR_ROOM, data.reply);
                     }
                 } catch (e) {
                     // 폴링 실패는 무시
