@@ -669,5 +669,8 @@
 - [ ] Android에서는 크롬 intent와 일반 외부 브라우저 열기 둘 다 제공해 Google 로그인 차단을 줄인다.
 
 ### 검증
-- [ ] `frontend/portal`: `npm run build`
+- [x] `frontend/portal`: `npm run build`
 - [ ] `open-browser` 경로에서 외부 브라우저 유도 버튼/문구가 정상 렌더되는지 확인
+
+### 결과 메모
+- [x] 카카오 인앱 브라우저 감지를 더 보수적으로 바꾸고, Android에서는 크롬 intent와 일반 외부 브라우저 열기를 순차 시도하도록 보완했다.
