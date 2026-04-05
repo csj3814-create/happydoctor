@@ -619,3 +619,23 @@
 ### 검증
 - [x] `frontend/homepage`: `npm run lint`
 - [x] `frontend/homepage`: `npm run build`
+
+## 단계 46: 라이브 웹 상담 흐름 리허설 (2026.04.05)
+
+### 목표
+- [x] 라이브 기준으로 웹 상담 생성 → 상태 확인 → 상담 종료까지 실제 요청으로 점검한다.
+- [x] 실운영 의료진 알림을 불필요하게 울리지 않도록 일반 안내형 상담으로 안전하게 리허설한다.
+- [x] 의료진 답변/카카오 전달 구간에서 자동으로 재현되지 않는 수동 요소를 분리해 기록한다.
+
+### 검증
+- [x] `https://app.happydoctor.kr/api/public/consultations`에 테스트 상담을 생성해 `201` 응답과 6자리 코드(`ALFL5M`)를 확인
+- [x] `https://happydoctor.onrender.com/api/public/consultations/status/ALFL5M`에서 상태 조회 성공 확인
+- [x] `https://app.happydoctor.kr/api/public/consultations/status/ALFL5M/close`로 종료 요청 성공 확인
+- [x] 종료 후 상태 재조회 시 `closed` 상태와 종료 시각이 반영됐는지 확인
+- [x] `https://happydoctor.onrender.com/api/version`에서 Render 라이브 리비전 `076be23` 확인
+
+### 결과 메모
+- [x] 테스트 상담 문진은 `codex-rehearsal` 표면으로 생성했고, 의료진 알림을 울리지 않는 일반 안내형 상담으로 안전하게 검증했다.
+- [x] 웹 상담은 상태 코드만으로 재조회/종료가 가능했다.
+- [x] 의료진 답변 → 환자 카카오 전달 흐름은 서버 코드와 큐는 준비돼 있지만, 실제 5분 폴링 전달은 공기계 MessengerBotR 스크립트 최신 반영이 있어야 실동작한다.
+- [x] 실운영에서 의료진 알림까지 포함한 리허설은 테스트 전용 채널 또는 스테이징 없이 바로 수행하면 실제 담당자에게 혼선을 줄 수 있으므로 분리 운영이 필요하다.
