@@ -19,7 +19,8 @@ function buildDoctorAlertPreview(message, priority = 'normal') {
         : '⏰ 의료진 답변이 아직 필요한 상담이 있습니다.';
 
     const preview = (message || '')
-        .replace(/[*#`_>-]/g, '')
+        .replace(/[~∼〜]/g, '-')
+        .replace(/[*#`_>]/g, '')
         .split('\n')
         .map((line) => line.trim())
         .filter(Boolean)
