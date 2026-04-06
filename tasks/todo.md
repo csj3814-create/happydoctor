@@ -851,3 +851,4 @@
 ### 진행 메모 (2026.04.06 - 포털 아이콘)
 - [x] 홈페이지 `app/icon.png`를 포털 `app/icon.png`로 복사했다.
 - [x] 포털 metadata `icons`를 명시적으로 추가했다.
+- [x] 기존 `app/favicon.ico`가 우선 적용되던 원인을 확인하고 제거했다.
