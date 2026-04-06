@@ -124,10 +124,14 @@ router.post('/consultations', async (req, res) => {
         priority: 'urgent',
         reminderDelaysMinutes: [0, 5, 15],
       });
-      await followUpService.scheduleFollowUpWithOptions(userId, analysisResult.soapChartForDoctor, 15);
+      await followUpService.scheduleFollowUpWithOptions(userId, analysisResult.soapChartForDoctor, 15, {
+        reminderDelaysMinutes: [15, 180, 1440],
+      });
     } else {
       const fallbackChart = `[최초 자동 해결된 경증 환자]\n증상: ${patientData.cc}\n증상점수: ${patientData.nrs}`;
-      await followUpService.scheduleFollowUpWithOptions(userId, fallbackChart, 15);
+      await followUpService.scheduleFollowUpWithOptions(userId, fallbackChart, 15, {
+        reminderDelaysMinutes: [15, 180, 1440],
+      });
     }
 
     const statusUrl = buildPublicStatusUrl(saved.trackingCode, saved.trackingToken);

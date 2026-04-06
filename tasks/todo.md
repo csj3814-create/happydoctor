@@ -736,3 +736,21 @@
 - [x] 의사 대응 필요 상담은 즉시 / 5분 / 15분 세 번만 알림 문서를 생성하도록 정리했다.
 - [x] 의사 답변 전송 또는 상담 종료 시 남아 있는 의료진 알림을 취소하도록 연결했다.
 - [x] backend/routes/kakaoWebhook.js, backend/routes/public.js, backend/routes/portal.js, backend/services/notifyService.js, backend/services/followUpService.js 구문 및 앱 로드를 확인했다.
+
+## 단계 53: 환자 F/U 재질문 3회 제한 (2026.04.06)
+
+### 목표
+- [ ] 환자 follow-up 질문을 15분, 3시간, 1일 뒤 총 세 번만 보낸다.
+- [ ] 환자가 응답하지 않아도 무한 반복되지 않게 한다.
+- [ ] follow-up 응답 후에도 다음 질문 주기가 명확하게 유지되도록 정리한다.
+
+### 검증
+- [ ] follow-up 서비스 구문 및 앱 로드 확인
+- [ ] 세 번 이후 추가 dueAt 이 생기지 않는지 확인
+- [ ] F/U 응답 경로가 새 스케줄 구조와 충돌하지 않는지 확인
+
+### 진행 메모 (2026.04.06 - 환자 F/U)
+- [x] 환자 follow-up 기본 스케줄을 15분 / 3시간 / 1일 세 단계로 통일했다.
+- [x] F/U 응답 라우트에서 임의의 15분·1시간 재스케줄을 제거했다.
+- [x] follow-up 타이머가 환자 채널 푸시를 보내면서도 다음 dueAt 만 남기도록 정리했다.
+- [x] 마지막 질문 뒤에는 추가 dueAt 없이 종료되도록 정리했다.

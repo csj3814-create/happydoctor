@@ -293,14 +293,18 @@ async function processTriageSync(userId, patientData) {
         if (analysisResult.action === 'AUTONOMOUS_REPLY') {
             finalResponseText = analysisResult.replyToPatient;
             const fallbackChart = `[최초 자동 해결된 경증 환자]\n증상: ${patientData.cc}\n증상점수: ${patientData.nrs}`;
-            await followUpService.scheduleFollowUpWithOptions(userId, fallbackChart, 15);
+            await followUpService.scheduleFollowUpWithOptions(userId, fallbackChart, 15, {
+                reminderDelaysMinutes: [15, 180, 1440],
+            });
         } else {
             await enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId, {
                 type: 'triage_initial',
                 priority: 'urgent',
                 reminderDelaysMinutes: [0, 5, 15],
             });
-            await followUpService.scheduleFollowUpWithOptions(userId, analysisResult.soapChartForDoctor, 15);
+            await followUpService.scheduleFollowUpWithOptions(userId, analysisResult.soapChartForDoctor, 15, {
+                reminderDelaysMinutes: [15, 180, 1440],
+            });
             finalResponseText = analysisResult.replyToPatient +
                 "\n\n보듬이가 내용을 정리해 자원봉사 의료진에게 전달했습니다.\n답변이 준비되면 이 채널로 다시 안내드릴게요.\n증상이 많이 힘들어지면 지체 없이 119 또는 가까운 응급실을 이용해 주세요.";
         }
@@ -337,14 +341,18 @@ async function processTriageAsync(callbackUrl, userId, patientData) {
         if (analysisResult.action === 'AUTONOMOUS_REPLY') {
             finalResponseText = analysisResult.replyToPatient;
             const fallbackChart = `[최초 자동 해결된 경증 환자]\n증상: ${patientData.cc}\n증상점수: ${patientData.nrs}`;
-            await followUpService.scheduleFollowUpWithOptions(userId, fallbackChart, 15);
+            await followUpService.scheduleFollowUpWithOptions(userId, fallbackChart, 15, {
+                reminderDelaysMinutes: [15, 180, 1440],
+            });
         } else {
             await enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId, {
                 type: 'triage_initial',
                 priority: 'urgent',
                 reminderDelaysMinutes: [0, 5, 15],
             });
-            await followUpService.scheduleFollowUpWithOptions(userId, analysisResult.soapChartForDoctor, 15);
+            await followUpService.scheduleFollowUpWithOptions(userId, analysisResult.soapChartForDoctor, 15, {
+                reminderDelaysMinutes: [15, 180, 1440],
+            });
             finalResponseText = analysisResult.replyToPatient +
                 "\n\n보듬이가 내용을 정리해 자원봉사 의료진에게 전달했습니다.\n답변이 준비되면 이 채널로 다시 안내드릴게요.\n증상이 많이 힘들어지면 지체 없이 119 또는 가까운 응급실을 이용해 주세요.";
         }
@@ -439,11 +447,7 @@ router.post('/fu-reply', async (req, res) => {
                 priority: 'urgent',
                 reminderDelaysMinutes: [0, 5, 15],
             });
-            await followUpService.scheduleFollowUpWithOptions(userId, fuAnalysis.fuChartForDoctor, 15);
             finalResponseText += "\n\n증상 변화를 의료진이 한 번 더 확인할 수 있도록 바로 전달했습니다.\n답변을 준비하는 동안 잠시만 기다려 주세요.\n많이 힘드시면 119 또는 가까운 응급실을 이용해 주세요.";
-        } else {
-             // 상황 유지/호전 시 F/U 타이머를 1시간 뒤로 연장 (선택사항)
-             await followUpService.scheduleFollowUpWithOptions(userId, originalChart, 60);
         }
 
         // [추가] 4. F/U 내역에 대한 상태 점검 기록을 추후 홈페이지 조회를 위해 DB에 병합
