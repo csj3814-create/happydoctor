@@ -10,6 +10,7 @@ const DOCTOR_ROOM_DOC_ID = 'doctor_room';
 const DOCTOR_NOTIFICATION_LEASE_MS = 60 * 1000;
 const DEFAULT_DOCTOR_REMINDER_DELAYS_MINUTES = Object.freeze([0, 5, 15]);
 const DOCTOR_NOTIFICATION_DUPLICATE_WINDOW_MS = 20 * 60 * 1000;
+const DOCTOR_NOTIFICATION_CATCHUP_GAP_MS = 5 * 60 * 1000;
 
 function getCollection(name) {
   const db = getDb();
@@ -156,6 +157,8 @@ function splitDueDoctorNotifications(docs) {
 
   const keep = [];
   const supersede = [];
+  const defer = [];
+  const now = Date.now();
 
   groupedByNotification.forEach((schedules) => {
     const orderedSchedules = [...schedules.values()].sort((leftGroup, rightGroup) => {
@@ -176,18 +179,26 @@ function splitDueDoctorNotifications(docs) {
       return;
     }
 
-    // If polling wakes up late and multiple reminder stages are already due,
-    // send only the most recent stage and discard older stale reminders.
-    const keepDoc = orderedDueDocs.at(-1);
+    const keepDoc = orderedDueDocs[0];
     keep.push(keepDoc);
 
-    orderedDueDocs.slice(0, -1).forEach((doc) => {
-      supersede.push({ doc, supersededById: getDoctorNotificationInfo(keepDoc).id || null });
+    orderedDueDocs.slice(1).forEach((doc, index) => {
+      const info = getDoctorNotificationInfo(doc);
+      const sameStage = info.reminderStage === getDoctorNotificationInfo(keepDoc).reminderStage;
+      if (sameStage) {
+        supersede.push({ doc, supersededById: getDoctorNotificationInfo(keepDoc).id || null });
+        return;
+      }
+
+      defer.push({
+        doc,
+        availableAt: new Date(now + DOCTOR_NOTIFICATION_CATCHUP_GAP_MS * (index + 1)),
+      });
     });
   });
 
   keep.sort(compareDoctorNotificationDueOrder);
-  return { keep, supersede };
+  return { keep, supersede, defer };
 }
 
 async function normalizeDueDoctorNotifications(collection, dueDocs) {
@@ -195,8 +206,8 @@ async function normalizeDueDoctorNotifications(collection, dueDocs) {
     return [];
   }
 
-  const { keep, supersede } = splitDueDoctorNotifications(dueDocs);
-  if (supersede.length === 0) {
+  const { keep, supersede, defer } = splitDueDoctorNotifications(dueDocs);
+  if (supersede.length === 0 && defer.length === 0) {
     return keep;
   }
 
@@ -207,6 +218,17 @@ async function normalizeDueDoctorNotifications(collection, dueDocs) {
       status: 'superseded',
       supersededAt: now,
       supersededById,
+      leaseId: null,
+      leaseExpiresAt: null,
+      lastFailureReason: null,
+    });
+  });
+
+  defer.forEach(({ doc, availableAt }) => {
+    batch.update(doc.ref, {
+      status: 'pending',
+      availableAt,
+      deferredAt: now,
       leaseId: null,
       leaseExpiresAt: null,
       lastFailureReason: null,
