@@ -258,11 +258,29 @@
 ### Goal
 - [x] Make consultation cards easier to triage at a glance from the list view
 - [x] Surface follow-up count, close context, and reply timing directly on inbox cards
-- [x] Strengthen the top-level inbox summary so doctors can spot where attention is needed
+
+## Phase 55: 의료진 승인 대기 + 웹 상담 세션 복구 (2026.04.06)
+
+### Goal
+- [x] Google 로그인 후 미승인 의료진을 `승인 대기` 상태로 저장하고, 대표자가 포털에서 승인할 수 있게 만든다
+- [x] 승인된 의료진만 포털 상담 목록/답변 기능에 접근하도록 권한 구조를 재정리한다
+- [x] 환자 웹앱에서 상담 생성 후 새로고침해도 1시간 동안 상담 상태 화면을 복구할 수 있게 한다
+- [x] 환자 웹앱 문진 입력 중 새로고침해도 임시 입력 내용이 복구되게 한다
 
 ### Verification
+- [x] `backend`: 앱 로드 확인
 - [x] `frontend/portal`: `npm run lint`
 - [x] `frontend/portal`: `npm run build`
+- [x] `frontend/app`: `npm run lint`
+- [x] `frontend/app`: `npm run build`
+
+### 진행 메모 (2026.04.06 - 승인 대기/세션 복구)
+- [x] 포털 인증 상태 API를 추가해 `approved / pending` 상태와 관리자 여부를 함께 내려주도록 정리했다.
+- [x] 미승인 의료진은 로그인 직후 `승인 대기` 화면으로 보내고, 승인 전에는 상담 목록과 답변 기능에 접근하지 못하게 막았다.
+- [x] 대표자는 포털 상단의 `승인 대기 중인 의료진` 목록에서 바로 승인할 수 있게 했다.
+- [x] `PORTAL_ADMIN_EMAILS` 환경변수가 있으면 그 이메일을 대표자(admin)로 사용하고, 없으면 `ALLOWED_DOCTOR_EMAILS`가 1개일 때만 자동 대표자로 간주한다.
+- [x] 웹 상담 시작 폼은 1시간 동안 임시 입력 초안을 브라우저에 저장해 새로고침 후 복구할 수 있게 했다.
+- [x] 웹 상담 제출 후에는 최근 상담 세션(상태 조회 코드/링크)을 1시간 저장해 `/status`에서 자동 복구할 수 있게 했다.
 
 ## Phase 17: Portal Detail 404 Fix (2026.04.03)
 

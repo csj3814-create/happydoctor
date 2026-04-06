@@ -18,6 +18,24 @@ function getAllowedDoctorEmails() {
     .filter(Boolean);
 }
 
+function getPortalAdminEmails() {
+  const configured = getEnv('PORTAL_ADMIN_EMAILS')
+    .split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (configured.length > 0) {
+    return configured;
+  }
+
+  const allowedDoctors = getAllowedDoctorEmails();
+  if (allowedDoctors.length === 1) {
+    return allowedDoctors;
+  }
+
+  return [];
+}
+
 function getPortalOrigins() {
   const configured = getEnv('PORTAL_ORIGIN');
   const defaults = [
@@ -69,6 +87,7 @@ module.exports = {
   LEGACY_COMPLETED,
   DEFAULT_STATS,
   getAllowedDoctorEmails,
+  getPortalAdminEmails,
   getPortalOrigins,
   getRuntimeRevision,
   port: getEnv('PORT', '3000'),
