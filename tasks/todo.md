@@ -718,3 +718,21 @@
 - [x] `backend`: `routes/messengerBot` 와 `messengerbot_script.js` 로드 확인
 - [x] 로컬 임시 서버에서 `register_doctor_room` 명령이 `isGroupChat=false`여도 성공하는지 확인
 - [ ] 등록 방이 없을 때 `/api/messengerbot/poll` 결과를 스크립트가 개인톡이 아닌 안전한 미전달 상태로 처리하는지 확인
+
+## 단계 52: 의료진 단톡방 재알림 주기 제한 (2026.04.06)
+
+### 목표
+- [ ] 의료진 단톡방 알림을 `즉시`, `5분`, `15분` 세 번으로만 보내고 그 이후 반복은 중단한다.
+- [ ] 환자 follow-up 타이머와 의료진 재알림 타이머를 분리해, 환자 안내 주기 변경이 의료진 단톡방 알림에 섞이지 않게 한다.
+- [ ] 의사 답변 또는 상담 종료 시 남아 있는 의료진 재알림을 취소한다.
+
+### 검증
+- [ ] `backend`: notify/follow-up/portal/public/kakao routes 로드 확인
+- [ ] 로컬에서 의료진 알림 enqueue 시 0/5/15분 스케줄 문서가 생성되는지 확인
+- [ ] 의사 답변 또는 상담 종료 호출 시 pending 의료진 재알림이 취소되는지 확인
+
+### 진행 메모 (2026.04.06)
+- [x] 의료진 알림을 환자 follow-up 타이머와 분리했다.
+- [x] 의사 대응 필요 상담은 즉시 / 5분 / 15분 세 번만 알림 문서를 생성하도록 정리했다.
+- [x] 의사 답변 전송 또는 상담 종료 시 남아 있는 의료진 알림을 취소하도록 연결했다.
+- [x] backend/routes/kakaoWebhook.js, backend/routes/public.js, backend/routes/portal.js, backend/services/notifyService.js, backend/services/followUpService.js 구문 및 앱 로드를 확인했다.
