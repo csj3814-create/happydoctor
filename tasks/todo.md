@@ -676,6 +676,16 @@
 - [x] 카카오 인앱 브라우저 감지를 더 보수적으로 바꾸고, Android에서는 크롬 intent와 일반 외부 브라우저 열기를 순차 시도하도록 보완했다.
 - [x] 라이브 `portal.happydoctor.kr/open-browser`에서 기본 브라우저 유도 문구가 반영된 HTML 응답을 확인했다.
 
+## 단계 49: MessengerBotR 명령 분기 안정화 (2026.04.06)
+
+### 목표
+- [ ] `~알림방등록`, `~차트확인` 같은 운영 명령이 한글 문자열 인코딩 차이와 무관하게 서버에서 안정적으로 동작하게 한다.
+- [ ] 메신저봇 스크립트가 서버로는 ASCII command 키를 보내고, 서버는 그 키를 우선 분기하도록 맞춘다.
+
+### 검증
+- [ ] `backend`: `/api/messengerbot`에 `command=register_doctor_room` 요청 시 등록 응답이 오는지 확인
+- [ ] `backend`: `/api/messengerbot`에 `command=confirm_doctor_notifications` 요청 시 수동 조회 응답이 오는지 확인
+
 ## 다음 세션 우선순위
 
 - [ ] 공기계 MessengerBotR에 최신 [messengerbot_script.js](C:/SJ/antigravity/happydoctor/backend/messengerbot_script.js)를 반영한다.
