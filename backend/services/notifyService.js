@@ -1,4 +1,4 @@
-const { randomUUID } = require('crypto');
+const { randomUUID, createHash } = require('crypto');
 const { getDb, getAdmin } = require('./dbService');
 
 const DOCTOR_NOTIFICATIONS = 'doctor_notifications';
@@ -9,6 +9,8 @@ const DELIVERY_ROOMS = 'delivery_rooms';
 const DOCTOR_ROOM_DOC_ID = 'doctor_room';
 const DOCTOR_NOTIFICATION_LEASE_MS = 60 * 1000;
 const DEFAULT_DOCTOR_REMINDER_DELAYS_MINUTES = Object.freeze([0, 5, 15]);
+const DOCTOR_NOTIFICATION_DUPLICATE_WINDOW_MS = 20 * 60 * 1000;
+const DOCTOR_NOTIFICATION_CATCHUP_GAP_MS = 5 * 60 * 1000;
 
 function getCollection(name) {
   const db = getDb();
@@ -48,15 +50,37 @@ function getDoctorNotificationPriorityWeight(priority) {
   return 0;
 }
 
+function getDoctorNotificationType(data = {}) {
+  return data.type || 'triage';
+}
+
+function buildDoctorNotificationGroupKey(patientId, type = 'triage') {
+  return `${patientId || 'unknown'}:${type}`;
+}
+
+function createDoctorNotificationFingerprint(message) {
+  return createHash('sha1').update(String(message || '')).digest('hex').slice(0, 16);
+}
+
+function getDoctorNotificationGroupKey(data = {}, fallbackId = '') {
+  return data.groupKey || buildDoctorNotificationGroupKey(data.patientId, getDoctorNotificationType(data)) || fallbackId;
+}
+
 function getDoctorNotificationInfo(doc) {
   const data = typeof doc.data === 'function' ? (doc.data() || {}) : (doc.data || {});
+  const createdAtMs = toDate(data.createdAt)?.getTime() || 0;
+  const groupKey = getDoctorNotificationGroupKey(data, doc.id || data.id || '');
   return {
     id: doc.id || data.id || '',
     patientId: data.patientId || '',
+    type: getDoctorNotificationType(data),
+    groupKey,
+    scheduleKey: data.scheduleKey || `${groupKey}:${createdAtMs || 'legacy'}`,
+    messageFingerprint: data.messageFingerprint || '',
     priorityWeight: getDoctorNotificationPriorityWeight(data.priority),
     availableAtMs: toDate(data.availableAt)?.getTime() || 0,
     reminderStage: Number(data.reminderStage) || 0,
-    createdAtMs: toDate(data.createdAt)?.getTime() || 0,
+    createdAtMs,
   };
 }
 
@@ -98,53 +122,98 @@ function compareDoctorNotificationDueOrder(left, right) {
   return compareDoctorNotificationFreshness(left, right);
 }
 
-function selectLatestDueDoctorNotifications(docs) {
-  const grouped = new Map();
+function compareDoctorNotificationCurrentStage(left, right) {
+  const leftInfo = getDoctorNotificationInfo(left);
+  const rightInfo = getDoctorNotificationInfo(right);
+
+  if (leftInfo.availableAtMs !== rightInfo.availableAtMs) {
+    return leftInfo.availableAtMs - rightInfo.availableAtMs;
+  }
+
+  if (leftInfo.reminderStage !== rightInfo.reminderStage) {
+    return leftInfo.reminderStage - rightInfo.reminderStage;
+  }
+
+  return compareDoctorNotificationFreshness(left, right);
+}
+
+function splitDueDoctorNotifications(docs) {
+  const groupedByNotification = new Map();
+
   docs.forEach((doc) => {
-    const { patientId, id } = getDoctorNotificationInfo(doc);
-    const key = patientId || id;
-    if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key).push(doc);
+    const info = getDoctorNotificationInfo(doc);
+    const groupKey = info.groupKey || info.id;
+    if (!groupedByNotification.has(groupKey)) {
+      groupedByNotification.set(groupKey, new Map());
+    }
+
+    const schedules = groupedByNotification.get(groupKey);
+    const scheduleKey = info.scheduleKey || info.id;
+    if (!schedules.has(scheduleKey)) {
+      schedules.set(scheduleKey, []);
+    }
+    schedules.get(scheduleKey).push(doc);
   });
 
-  const kept = [];
-  const superseded = [];
+  const keep = [];
+  const supersede = [];
+  const defer = [];
+  const now = Date.now();
 
-  grouped.forEach((groupDocs) => {
-    if (groupDocs.length === 1) {
-      kept.push(groupDocs[0]);
+  groupedByNotification.forEach((schedules) => {
+    const orderedSchedules = [...schedules.values()].sort((leftGroup, rightGroup) => {
+      const leftNewest = [...leftGroup].sort(compareDoctorNotificationFreshness).at(-1);
+      const rightNewest = [...rightGroup].sort(compareDoctorNotificationFreshness).at(-1);
+      return compareDoctorNotificationFreshness(leftNewest, rightNewest);
+    });
+
+    const activeSchedule = orderedSchedules.at(-1) || [];
+    orderedSchedules.slice(0, -1).forEach((staleGroup) => {
+      staleGroup.forEach((doc) => {
+        supersede.push({ doc, supersededById: getDoctorNotificationInfo(activeSchedule[0]).id || null });
+      });
+    });
+
+    const orderedDueDocs = [...activeSchedule].sort(compareDoctorNotificationCurrentStage);
+    if (orderedDueDocs.length === 0) {
       return;
     }
 
-    const sorted = [...groupDocs].sort(compareDoctorNotificationFreshness);
-    const keepDoc = sorted[sorted.length - 1];
-    kept.push(keepDoc);
+    const keepDoc = orderedDueDocs[0];
+    keep.push(keepDoc);
 
-    sorted.slice(0, -1).forEach((doc) => {
-      superseded.push({
+    orderedDueDocs.slice(1).forEach((doc, index) => {
+      const info = getDoctorNotificationInfo(doc);
+      const sameStage = info.reminderStage === getDoctorNotificationInfo(keepDoc).reminderStage;
+      if (sameStage) {
+        supersede.push({ doc, supersededById: getDoctorNotificationInfo(keepDoc).id || null });
+        return;
+      }
+
+      defer.push({
         doc,
-        supersededById: keepDoc.id,
+        availableAt: new Date(now + DOCTOR_NOTIFICATION_CATCHUP_GAP_MS * (index + 1)),
       });
     });
   });
 
-  kept.sort(compareDoctorNotificationDueOrder);
-  return { kept, superseded };
+  keep.sort(compareDoctorNotificationDueOrder);
+  return { keep, supersede, defer };
 }
 
-async function coalesceDueDoctorNotifications(collection, dueDocs) {
-  if (!dueDocs || dueDocs.length <= 1) {
-    return dueDocs || [];
+async function normalizeDueDoctorNotifications(collection, dueDocs) {
+  if (!dueDocs || dueDocs.length === 0) {
+    return [];
   }
 
-  const { kept, superseded } = selectLatestDueDoctorNotifications(dueDocs);
-  if (superseded.length === 0) {
-    return kept;
+  const { keep, supersede, defer } = splitDueDoctorNotifications(dueDocs);
+  if (supersede.length === 0 && defer.length === 0) {
+    return keep;
   }
 
   const batch = getDb().batch();
   const now = getAdmin().firestore.FieldValue.serverTimestamp();
-  superseded.forEach(({ doc, supersededById }) => {
+  supersede.forEach(({ doc, supersededById }) => {
     batch.update(doc.ref, {
       status: 'superseded',
       supersededAt: now,
@@ -155,8 +224,19 @@ async function coalesceDueDoctorNotifications(collection, dueDocs) {
     });
   });
 
+  defer.forEach(({ doc, availableAt }) => {
+    batch.update(doc.ref, {
+      status: 'pending',
+      availableAt,
+      deferredAt: now,
+      leaseId: null,
+      leaseExpiresAt: null,
+      lastFailureReason: null,
+    });
+  });
+
   await batch.commit();
-  return kept;
+  return keep;
 }
 
 async function getDuePendingDoctorNotificationDocs(collection, limit = 20) {
@@ -181,6 +261,56 @@ async function getDuePendingDoctorNotificationDocs(collection, limit = 20) {
     .slice(0, limit);
 }
 
+async function getDoctorNotificationDocsForPatient(collection, patientId) {
+  if (!collection || !patientId) return [];
+  const snapshot = await collection.where('patientId', '==', patientId).get();
+  return snapshot.docs;
+}
+
+function isDoctorNotificationActiveStatus(status) {
+  return status === 'pending' || status === 'leased';
+}
+
+async function findRecentDuplicateDoctorNotification(collection, patientId, groupKey, messageFingerprint) {
+  const docs = await getDoctorNotificationDocsForPatient(collection, patientId);
+  const threshold = Date.now() - DOCTOR_NOTIFICATION_DUPLICATE_WINDOW_MS;
+
+  return docs.find((doc) => {
+    const data = doc.data() || {};
+    const status = data.status || 'pending';
+    const info = getDoctorNotificationInfo(doc);
+    if (status === 'cancelled') return false;
+    if (info.groupKey !== groupKey) return false;
+    if ((data.messageFingerprint || '') !== messageFingerprint) return false;
+    return info.createdAtMs >= threshold;
+  }) || null;
+}
+
+async function cancelActiveDoctorNotificationGroup(collection, patientId, groupKey) {
+  const docs = await getDoctorNotificationDocsForPatient(collection, patientId);
+  const activeDocs = docs.filter((doc) => {
+    const data = doc.data() || {};
+    return isDoctorNotificationActiveStatus(data.status) && getDoctorNotificationInfo(doc).groupKey === groupKey;
+  });
+
+  if (activeDocs.length === 0) return 0;
+
+  const batch = getDb().batch();
+  const now = getAdmin().firestore.FieldValue.serverTimestamp();
+  activeDocs.forEach((doc) => {
+    batch.update(doc.ref, {
+      status: 'cancelled',
+      cancelledAt: now,
+      cancelReason: 'replaced_by_newer_schedule',
+      leaseId: null,
+      leaseExpiresAt: null,
+      lastFailureReason: null,
+    });
+  });
+  await batch.commit();
+  return activeDocs.length;
+}
+
 async function enqueueDoctorNotification(message, patientId, options = {}) {
   const collection = getCollection(DOCTOR_NOTIFICATIONS);
   if (!collection) {
@@ -189,7 +319,26 @@ async function enqueueDoctorNotification(message, patientId, options = {}) {
   }
 
   const reminderDelaysMinutes = normalizeReminderDelaysMinutes(options.reminderDelaysMinutes);
+  const type = options.type || 'triage';
+  const priority = options.priority || 'normal';
+  const groupKey = options.groupKey || buildDoctorNotificationGroupKey(patientId, type);
+  const messageFingerprint = createDoctorNotificationFingerprint(message);
+
+  const recentDuplicate = await findRecentDuplicateDoctorNotification(
+    collection,
+    patientId,
+    groupKey,
+    messageFingerprint,
+  );
+  if (recentDuplicate) {
+    console.log(`[Notification Skipped] Duplicate reminder set detected for ${groupKey}`);
+    return false;
+  }
+
+  await cancelActiveDoctorNotificationGroup(collection, patientId, groupKey);
+
   const now = Date.now();
+  const scheduleId = randomUUID();
   const batch = getDb().batch();
 
   reminderDelaysMinutes.forEach((delayMinutes, index) => {
@@ -198,8 +347,11 @@ async function enqueueDoctorNotification(message, patientId, options = {}) {
       id: randomUUID(),
       message,
       patientId,
-      type: options.type || 'triage',
-      priority: options.priority || 'normal',
+      type,
+      priority,
+      groupKey,
+      scheduleId,
+      messageFingerprint,
       status: 'pending',
       reminderDelayMinutes: delayMinutes,
       reminderStage: index + 1,
@@ -267,7 +419,7 @@ async function claimDoctorNotification() {
 
   await reclaimExpiredDoctorNotificationLeases();
   const dueDocs = await getDuePendingDoctorNotificationDocs(collection, 20);
-  const coalescedDocs = await coalesceDueDoctorNotifications(collection, dueDocs);
+  const coalescedDocs = await normalizeDueDoctorNotifications(collection, dueDocs);
   if (coalescedDocs.length === 0) return null;
 
   const doc = coalescedDocs[0];
@@ -329,7 +481,7 @@ async function confirmDoctorNotifications() {
 
   await reclaimExpiredDoctorNotificationLeases();
   const dueDocs = await getDuePendingDoctorNotificationDocs(collection, 50);
-  const docs = await coalesceDueDoctorNotifications(collection, dueDocs);
+  const docs = await normalizeDueDoctorNotifications(collection, dueDocs);
   if (docs.length === 0) return [];
 
   const batch = getDb().batch();
@@ -566,6 +718,7 @@ module.exports = {
   getDoctorRoomName,
   getQueueStatus,
   __test__: {
-    selectLatestDueDoctorNotifications,
+    splitDueDoctorNotifications,
+    buildDoctorNotificationGroupKey,
   },
 };
