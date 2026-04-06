@@ -852,3 +852,4 @@
 - [x] 홈페이지 `app/icon.png`를 포털 `app/icon.png`로 복사했다.
 - [x] 포털 metadata `icons`를 명시적으로 추가했다.
 - [x] 기존 `app/favicon.ico`가 우선 적용되던 원인을 확인하고 제거했다.
+- [x] 브라우저 파비콘 캐시를 끊기 위해 포털 아이콘 파일 경로를 `portal-favicon.png`로 변경했다.

@@ -36,9 +36,9 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   icons: {
-    icon: [{ url: '/icon.png', type: 'image/png' }],
-    shortcut: ['/icon.png'],
-    apple: [{ url: '/icon.png' }],
+    icon: [{ url: '/portal-favicon.png?v=20260406', type: 'image/png' }],
+    shortcut: ['/portal-favicon.png?v=20260406'],
+    apple: [{ url: '/portal-favicon.png?v=20260406' }],
   },
 };
 
