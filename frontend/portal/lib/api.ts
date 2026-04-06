@@ -31,6 +31,19 @@ export interface FollowUpLog {
   alertMessage?: string;
 }
 
+export interface ConsultationMediaItem {
+  id?: string | null;
+  kind?: string;
+  source?: string | null;
+  status?: string;
+  contentType?: string | null;
+  originalName?: string | null;
+  size?: number | null;
+  storagePath?: string | null;
+  createdAt?: string | null;
+  url?: string | null;
+}
+
 export interface Consultation {
   id: string;
   userId: string;
@@ -45,6 +58,7 @@ export interface Consultation {
   followUpLogs?: FollowUpLog[];
   doctorReplies?: DoctorReply[];
   doctorRepliedAt?: string;
+  mediaItems?: ConsultationMediaItem[];
 }
 
 export type ConsultationStatus = 'all' | 'active' | 'replied' | 'closed';

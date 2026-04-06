@@ -1,5 +1,6 @@
 const express = require('express');
 const { randomUUID } = require('crypto');
+const multer = require('multer');
 
 const router = express.Router();
 
@@ -12,6 +13,14 @@ const {
   clearPatientChannelPushes,
 } = require('../services/notifyService');
 const { appSiteUrl } = require('../config');
+
+const consultationImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    files: 3,
+    fileSize: 10 * 1024 * 1024,
+  },
+});
 
 function isPlainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -171,6 +180,68 @@ router.get('/consultations/status/:lookup', async (req, res) => {
     console.error('[Public Consultation Status Error]', error);
     return res.status(500).json({ error: '상담 상태를 불러오지 못했습니다.' });
   }
+});
+
+router.post('/consultations/status/:lookup/images', (req, res) => {
+  consultationImageUpload.array('images', 3)(req, res, async (uploadError) => {
+    if (uploadError) {
+      console.error('[Public Consultation Image Upload Middleware Error]', uploadError);
+
+      if (uploadError instanceof multer.MulterError) {
+        if (uploadError.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ error: '사진은 한 장당 10MB 이하로 올려 주세요.' });
+        }
+
+        if (uploadError.code === 'LIMIT_FILE_COUNT') {
+          return res.status(400).json({ error: '사진은 한 번에 최대 3장까지 올릴 수 있습니다.' });
+        }
+      }
+
+      return res.status(400).json({ error: '사진 업로드를 다시 시도해 주세요.' });
+    }
+
+    try {
+      const lookup = (req.params.lookup || '').toString().trim();
+      if (!lookup) {
+        return res.status(404).json({ error: '상담 상태를 찾을 수 없습니다.' });
+      }
+
+      const files = Array.isArray(req.files) ? req.files : [];
+      if (files.length === 0) {
+        return res.status(400).json({ error: '먼저 올릴 사진을 선택해 주세요.' });
+      }
+
+      const uploaded = await dbService.addPublicConsultationImagesByLookup(lookup, files, {
+        source: 'web',
+        uploadedBy: 'public',
+      });
+
+      res.set('Cache-Control', 'no-store');
+      return res.json({
+        ok: true,
+        mediaItems: uploaded,
+      });
+    } catch (error) {
+      console.error('[Public Consultation Image Upload Error]', error);
+
+      switch (error.message) {
+        case 'STORAGE_NOT_CONFIGURED':
+          return res.status(503).json({ error: '사진 업로드 준비가 아직 끝나지 않았습니다.' });
+        case 'CONSULTATION_NOT_FOUND':
+          return res.status(404).json({ error: '상담 상태를 찾을 수 없습니다.' });
+        case 'CONSULTATION_CLOSED':
+          return res.status(400).json({ error: '종료된 상담에는 사진을 추가할 수 없습니다.' });
+        case 'MEDIA_LIMIT_EXCEEDED':
+          return res.status(400).json({ error: '사진은 상담당 최대 3장까지 올릴 수 있습니다.' });
+        case 'UNSUPPORTED_MEDIA_TYPE':
+          return res.status(400).json({ error: 'JPG, PNG, WEBP 사진만 올릴 수 있습니다.' });
+        case 'NO_FILES':
+          return res.status(400).json({ error: '먼저 올릴 사진을 선택해 주세요.' });
+        default:
+          return res.status(500).json({ error: '사진을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.' });
+      }
+    }
+  });
 });
 
 router.post('/consultations/status/:lookup/close', async (req, res) => {

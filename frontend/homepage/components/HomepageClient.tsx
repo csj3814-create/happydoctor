@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 const FALLBACK_STATS = { total: 373, doctorReplied: 321 }
 const KAKAO_CHAT_URL = 'https://pf.kakao.com/_PxaTxhX/chat'
 const KAKAO_CHANNEL_URL = 'https://pf.kakao.com/_PxaTxhX'
-const VOLUNTEER_URL = 'https://open.kakao.com/me/csj3814'
+const VOLUNTEER_URL = 'https://open.kakao.com/me/happydoctors'
 const WEB_START_URL = 'https://app.happydoctor.kr/start?source=homepage'
 
 interface Stats {
