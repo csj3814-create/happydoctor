@@ -63,6 +63,20 @@ function callMessengerEndpoint(room, msg, sender, isGroupChat, command) {
     });
 }
 
+function acknowledgeDoctorNotification(notificationId, delivered, errorMessage) {
+    if (!notificationId) return;
+
+    try {
+        postJson("/api/messengerbot/poll/ack", {
+            notificationId: notificationId,
+            delivered: delivered !== false,
+            error: errorMessage || null
+        });
+    } catch (e) {
+        // ack 실패는 다음 lease 만료 후 재전송될 수 있으므로 무시
+    }
+}
+
 function registerPatientRoom(userId, roomName) {
     try {
         postJson("/api/messengerbot/register-room", {
@@ -218,8 +232,17 @@ function startDoctorPolling() {
 
                     var data = JSON.parse(pollRes);
                     if (data.hasNew && data.reply) {
-                        // 서버가 기억한 알림방을 우선 사용하고, 없으면 기본값으로 전송
-                        Api.replyRoom(data.roomName || DOCTOR_ROOM, data.reply);
+                        try {
+                            // 서버가 기억한 알림방을 우선 사용하고, 없으면 기본값으로 전송
+                            Api.replyRoom(data.roomName || DOCTOR_ROOM, data.reply);
+                            acknowledgeDoctorNotification(data.notificationId, true, null);
+                        } catch (deliveryError) {
+                            acknowledgeDoctorNotification(
+                                data.notificationId,
+                                false,
+                                deliveryError && deliveryError.message ? String(deliveryError.message) : "reply_room_failed"
+                            );
+                        }
                     }
                 } catch (e) {
                     // 폴링 실패는 무시

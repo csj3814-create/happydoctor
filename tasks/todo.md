@@ -686,6 +686,20 @@
 - [ ] `backend`: `/api/messengerbot`에 `command=register_doctor_room` 요청 시 등록 응답이 오는지 확인
 - [ ] `backend`: `/api/messengerbot`에 `command=confirm_doctor_notifications` 요청 시 수동 조회 응답이 오는지 확인
 
+## 단계 50: 의료진 알림 유실 방지 (2026.04.06)
+
+### 목표
+- [ ] 의료진 알림이 공기계 폴링 시점에 바로 사라지지 않고, 카카오 전송 성공 후에만 최종 소비되도록 바꾼다.
+- [ ] 자동 푸시는 포털 확인용 간결한 요약 문구로 보내고, 상세 차트는 수동 조회/포털에서 보게 해 카카오 전송 실패 가능성을 줄인다.
+
+### 검증
+- [x] `backend`: 라우트/서비스 로드 확인
+- [ ] `/api/messengerbot/poll` 호출 시 `notificationId`가 내려오는지 확인
+- [ ] `/api/messengerbot/poll/ack` 호출 시 알림 ack가 성공하는지 확인
+
+### 결과 메모
+- [x] `notifyService`와 `messengerBot` 라우트가 로컬에서 정상 로드됐고, doctor notification claim/ack 경로를 코드 수준에서 연결했다.
+
 ## 다음 세션 우선순위
 
 - [ ] 공기계 MessengerBotR에 최신 [messengerbot_script.js](C:/SJ/antigravity/happydoctor/backend/messengerbot_script.js)를 반영한다.

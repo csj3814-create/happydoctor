@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const {
-    peekDoctorNotification,
+    claimDoctorNotification,
+    acknowledgeDoctorNotification,
     confirmDoctorNotifications,
     dequeueFUPush,
     dequeuePatientChannelPush,
@@ -11,6 +12,23 @@ const {
 } = require('../services/notifyService');
 
 const PORTAL_OPEN_IN_BROWSER_URL = 'https://portal.happydoctor.kr/open-browser?next=%2F';
+
+function buildDoctorAlertPreview(message, priority = 'normal') {
+    const headline = priority === 'urgent'
+        ? '🚨 의료진 확인이 필요한 상담이 도착했습니다.'
+        : '⏰ 의료진 답변이 아직 필요한 상담이 있습니다.';
+
+    const preview = (message || '')
+        .replace(/[*#`_>-]/g, '')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .slice(0, 6)
+        .join('\n')
+        .slice(0, 480);
+
+    return preview ? `${headline}\n\n${preview}` : headline;
+}
 
 // API Key 검사 미들웨어
 function checkApiKey(req, res, next) {
@@ -98,7 +116,7 @@ router.post('/', checkApiKey, async (req, res) => {
  * 신규 알림이 있으면 리턴 받아 카톡방에 자동으로 쏘기 위한 용도로 제공.
  */
 router.get('/poll', checkApiKey, async (req, res) => {
-    const chart = await peekDoctorNotification();
+    const chart = await claimDoctorNotification();
     if (chart) {
         const roomName = await getDoctorRoomName();
         const portalGuide =
@@ -113,11 +131,27 @@ router.get('/poll', checkApiKey, async (req, res) => {
             "※ 카카오톡 안에서 안 열리면 우측 상단 메뉴의 브라우저 열기를 사용해 주세요.";
         return res.status(200).json({
             hasNew: true,
+            notificationId: chart.notificationId,
+            leaseId: chart.leaseId,
             roomName,
-            reply: chart.message + portalGuide
+            reply: buildDoctorAlertPreview(chart.message, chart.priority) + portalGuide
         });
     }
     res.status(200).json({ hasNew: false });
+});
+
+router.post('/poll/ack', checkApiKey, async (req, res) => {
+    const notificationId = (req.body?.notificationId || '').toString().trim();
+    if (!notificationId) {
+        return res.status(400).json({ error: 'notificationId required' });
+    }
+
+    await acknowledgeDoctorNotification(notificationId, {
+        delivered: req.body?.delivered !== false,
+        error: typeof req.body?.error === 'string' ? req.body.error.slice(0, 240) : null,
+    });
+
+    return res.status(200).json({ ok: true });
 });
 
 /**

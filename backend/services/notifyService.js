@@ -7,6 +7,7 @@ const PATIENT_CHANNEL_PUSHES = 'patient_channel_pushes';
 const MESSENGER_ROOMS = 'messenger_rooms';
 const DELIVERY_ROOMS = 'delivery_rooms';
 const DOCTOR_ROOM_DOC_ID = 'doctor_room';
+const DOCTOR_NOTIFICATION_LEASE_MS = 60 * 1000;
 
 function getCollection(name) {
   const db = getDb();
@@ -32,6 +33,9 @@ async function enqueueDoctorNotification(message, patientId, options = {}) {
     type: options.type || 'triage',
     priority: options.priority || 'normal',
     status: 'pending',
+    leaseId: null,
+    leaseExpiresAt: null,
+    attemptCount: 0,
     createdAt: getAdmin().firestore.FieldValue.serverTimestamp(),
   });
 
@@ -39,9 +43,55 @@ async function enqueueDoctorNotification(message, patientId, options = {}) {
   return true;
 }
 
-async function peekDoctorNotification() {
+async function reclaimExpiredDoctorNotificationLeases() {
+  const collection = getCollection(DOCTOR_NOTIFICATIONS);
+  if (!collection) return 0;
+
+  const snapshot = await collection
+    .where('status', '==', 'leased')
+    .get();
+
+  if (snapshot.empty) return 0;
+
+  const now = Date.now();
+  const expiredDocs = snapshot.docs.filter((doc) => {
+    const data = doc.data() || {};
+    const leaseExpiresAt = data.leaseExpiresAt;
+    const expiry =
+      leaseExpiresAt instanceof Date
+        ? leaseExpiresAt
+        : typeof leaseExpiresAt?.toDate === 'function'
+          ? leaseExpiresAt.toDate()
+          : leaseExpiresAt
+            ? new Date(leaseExpiresAt)
+            : null;
+
+    return expiry && !Number.isNaN(expiry.getTime()) && expiry.getTime() <= now;
+  });
+
+  if (expiredDocs.length === 0) return 0;
+
+  const batch = getDb().batch();
+  const serverTimestamp = getAdmin().firestore.FieldValue.serverTimestamp();
+  expiredDocs.forEach((doc) => {
+    const data = doc.data() || {};
+    batch.update(doc.ref, {
+      status: 'pending',
+      leaseId: null,
+      leaseExpiresAt: null,
+      lastFailedAt: serverTimestamp,
+      lastFailureReason: data.lastFailureReason || 'lease_expired',
+    });
+  });
+  await batch.commit();
+  return expiredDocs.length;
+}
+
+async function claimDoctorNotification() {
   const collection = getCollection(DOCTOR_NOTIFICATIONS);
   if (!collection) return null;
+
+  await reclaimExpiredDoctorNotificationLeases();
 
   const snapshot = await collection
     .where('status', '==', 'pending')
@@ -51,13 +101,20 @@ async function peekDoctorNotification() {
   if (snapshot.empty) return null;
 
   const doc = snapshot.docs[0];
+  const leaseId = randomUUID();
+  const leaseExpiresAt = new Date(Date.now() + DOCTOR_NOTIFICATION_LEASE_MS);
   await doc.ref.update({
-    status: 'notified',
-    notifiedAt: getAdmin().firestore.FieldValue.serverTimestamp(),
+    status: 'leased',
+    leaseId,
+    leaseExpiresAt,
+    leasedAt: getAdmin().firestore.FieldValue.serverTimestamp(),
+    attemptCount: (doc.data()?.attemptCount || 0) + 1,
   });
 
   const data = doc.data();
   return {
+    notificationId: doc.id,
+    leaseId,
     message: data.message,
     patientId: data.patientId,
     type: data.type || 'triage',
@@ -65,10 +122,40 @@ async function peekDoctorNotification() {
   };
 }
 
+async function acknowledgeDoctorNotification(notificationId, payload = {}) {
+  const collection = getCollection(DOCTOR_NOTIFICATIONS);
+  if (!collection || !notificationId) return false;
+
+  const docRef = collection.doc(notificationId);
+  const snapshot = await docRef.get();
+  if (!snapshot.exists) return false;
+
+  const delivered = payload.delivered !== false;
+  const update = delivered
+    ? {
+        status: 'delivered',
+        deliveredAt: getAdmin().firestore.FieldValue.serverTimestamp(),
+        leaseId: null,
+        leaseExpiresAt: null,
+        lastFailureReason: null,
+      }
+    : {
+        status: 'pending',
+        leaseId: null,
+        leaseExpiresAt: null,
+        lastFailedAt: getAdmin().firestore.FieldValue.serverTimestamp(),
+        lastFailureReason: payload.error || 'delivery_failed',
+      };
+
+  await docRef.update(update);
+  return true;
+}
+
 async function confirmDoctorNotifications() {
   const collection = getCollection(DOCTOR_NOTIFICATIONS);
   if (!collection) return [];
 
+  await reclaimExpiredDoctorNotificationLeases();
   const pendingSnap = await collection.where('status', '==', 'pending').get();
   const docs = pendingSnap.docs;
   if (docs.length === 0) return [];
@@ -259,7 +346,8 @@ async function getQueueStatus() {
 
 module.exports = {
   enqueueDoctorNotification,
-  peekDoctorNotification,
+  claimDoctorNotification,
+  acknowledgeDoctorNotification,
   confirmDoctorNotifications,
   enqueueFUPush,
   dequeueFUPush,
