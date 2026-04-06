@@ -33,23 +33,25 @@ function checkApiKey(req, res, next) {
  * 앱에서 메세지 수신 시 HTTP POST를 날려 이리로 옵니다.
  */
 router.post('/', checkApiKey, async (req, res) => {
-    const { room, msg, sender, isGroupChat } = req.body;
+    const { room, msg, sender, isGroupChat, command } = req.body;
+    const normalizedMsg = typeof msg === 'string' ? msg.trim() : '';
+    const normalizedCommand = typeof command === 'string' ? command.trim().toLowerCase() : '';
 
-    if (!msg) {
+    if (!normalizedMsg && !normalizedCommand) {
         return res.status(400).json({ error: "No message provided" });
     }
 
-    console.log(`[MessengerBot R] Room: ${room}, Sender: ${sender}, Message: ${msg}`);
+    console.log(`[MessengerBot R] Room: ${room}, Sender: ${sender}, Message: ${normalizedMsg}, Command: ${normalizedCommand || '-'}`);
 
     // ===== 환자용 오픈채팅방 안내 (1:1 채널 유도) =====
     // 예시: 특정 방 이름이 "행복한 의사 (환자 소통방)" 일 때 작동하도록 거를 수 있습니다.
     const guideKeywords = ['~상담', '~진료', '아파요'];
-    if (guideKeywords.some(kw => msg.includes(kw))) {
+    if (guideKeywords.some(kw => normalizedMsg.includes(kw))) {
         const replyMsg = `안녕하세요, ${sender}님! 🩺\n\n'행복한 의사'는 의료 취약계층을\n위해 의사들이 자원봉사로 운영하는\n비영리단체입니다.\n\n증상 상담은 개인정보 보호를 위해\n1:1 챗봇을 통해 진행됩니다.\n\n아래 링크로 채팅을 시작해주세요!\n👉 http://pf.kakao.com/_PxaTxhX/chat`;
         return res.status(200).json({ reply: replyMsg });
     }
 
-    if (isGroupChat && msg.trim() === '~알림방등록') {
+    if (isGroupChat && (normalizedCommand === 'register_doctor_room' || normalizedMsg === '~알림방등록')) {
         await registerDoctorRoom(room);
         return res.status(200).json({
             reply: `이 방을 해피닥터 의료진 알림방으로 등록했습니다.\n이제 응급/협진 상담은 자동 푸시로 먼저 전달됩니다.`,
@@ -58,7 +60,7 @@ router.post('/', checkApiKey, async (req, res) => {
 
     // ===== 의료진 카톡 단체방 알림 수동 확인 =====
     // 자동 푸시가 기본이며, 이 명령은 수동 백업 용도로만 사용합니다.
-    if (msg.trim() === '~차트확인') {
+    if (normalizedCommand === 'confirm_doctor_notifications' || normalizedMsg === '~차트확인') {
         try {
             const charts = await confirmDoctorNotifications();
             if (charts.length > 0) {

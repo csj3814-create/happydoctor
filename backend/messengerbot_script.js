@@ -53,6 +53,16 @@ function postJson(path, payload) {
         .execute();
 }
 
+function callMessengerEndpoint(room, msg, sender, isGroupChat, command) {
+    return postJson("/api/messengerbot", {
+        room: room,
+        msg: msg,
+        sender: sender,
+        isGroupChat: isGroupChat,
+        command: command || null
+    });
+}
+
 function registerPatientRoom(userId, roomName) {
     try {
         postJson("/api/messengerbot/register-room", {
@@ -152,19 +162,7 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
     // [2] 의료진 단톡방 또는 실험방: 알림방 등록
     if (isGroupChat && msg.trim() === "~알림방등록") {
         try {
-            var registerConn = org.jsoup.Jsoup.connect(SERVER_URL + "/api/messengerbot")
-                .header("Content-Type", "application/json")
-                .header("x-api-key", API_KEY)
-                .requestBody(JSON.stringify({
-                    room: room,
-                    msg: msg.trim(),
-                    sender: sender,
-                    isGroupChat: isGroupChat
-                }))
-                .ignoreContentType(true)
-                .ignoreHttpErrors(true)
-                .method(org.jsoup.Connection.Method.POST)
-                .execute();
+            var registerConn = callMessengerEndpoint(room, msg.trim(), sender, isGroupChat, "register_doctor_room");
 
             var registerData = JSON.parse(registerConn.body());
             if (registerData.reply) {
@@ -179,19 +177,7 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
     // [3] 의료진 단톡방 또는 실험방: 차트 확인
     if (isGroupChat && msg.trim() === "~차트확인") {
         try {
-            var conn = org.jsoup.Jsoup.connect(SERVER_URL + "/api/messengerbot")
-                .header("Content-Type", "application/json")
-                .header("x-api-key", API_KEY)
-                .requestBody(JSON.stringify({
-                    room: room,
-                    msg: msg.trim(),
-                    sender: sender,
-                    isGroupChat: isGroupChat
-                }))
-                .ignoreContentType(true)
-                .ignoreHttpErrors(true)
-                .method(org.jsoup.Connection.Method.POST)
-                .execute();
+            var conn = callMessengerEndpoint(room, msg.trim(), sender, isGroupChat, "confirm_doctor_notifications");
 
             var status = conn.statusCode();
             var chartRes = conn.body();
