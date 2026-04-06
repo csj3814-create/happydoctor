@@ -8,6 +8,7 @@ const MESSENGER_ROOMS = 'messenger_rooms';
 const DELIVERY_ROOMS = 'delivery_rooms';
 const DOCTOR_ROOM_DOC_ID = 'doctor_room';
 const DOCTOR_NOTIFICATION_LEASE_MS = 60 * 1000;
+const DEFAULT_DOCTOR_REMINDER_DELAYS_MINUTES = Object.freeze([0, 5, 15]);
 
 function getCollection(name) {
   const db = getDb();
@@ -19,6 +20,50 @@ async function countDocuments(query) {
   return snapshot.size;
 }
 
+function normalizeReminderDelaysMinutes(delays = DEFAULT_DOCTOR_REMINDER_DELAYS_MINUTES) {
+  const values = Array.isArray(delays) ? delays : [delays];
+  const normalized = values
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value) && value >= 0)
+    .map((value) => Math.round(value));
+
+  if (normalized.length === 0) {
+    return [...DEFAULT_DOCTOR_REMINDER_DELAYS_MINUTES];
+  }
+
+  return [...new Set(normalized)].sort((a, b) => a - b);
+}
+
+function toDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value?.toDate === 'function') return value.toDate();
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+async function getDuePendingDoctorNotificationDocs(collection, limit = 20) {
+  const snapshot = await collection
+    .where('status', '==', 'pending')
+    .get();
+
+  if (snapshot.empty) return [];
+
+  const now = Date.now();
+  return snapshot.docs
+    .filter((doc) => {
+      const data = doc.data() || {};
+      const availableAt = toDate(data.availableAt);
+      return !availableAt || availableAt.getTime() <= now;
+    })
+    .sort((left, right) => {
+      const leftTime = toDate(left.data()?.availableAt)?.getTime() || 0;
+      const rightTime = toDate(right.data()?.availableAt)?.getTime() || 0;
+      return leftTime - rightTime;
+    })
+    .slice(0, limit);
+}
+
 async function enqueueDoctorNotification(message, patientId, options = {}) {
   const collection = getCollection(DOCTOR_NOTIFICATIONS);
   if (!collection) {
@@ -26,20 +71,32 @@ async function enqueueDoctorNotification(message, patientId, options = {}) {
     return false;
   }
 
-  await collection.add({
-    id: randomUUID(),
-    message,
-    patientId,
-    type: options.type || 'triage',
-    priority: options.priority || 'normal',
-    status: 'pending',
-    leaseId: null,
-    leaseExpiresAt: null,
-    attemptCount: 0,
-    createdAt: getAdmin().firestore.FieldValue.serverTimestamp(),
+  const reminderDelaysMinutes = normalizeReminderDelaysMinutes(options.reminderDelaysMinutes);
+  const now = Date.now();
+  const batch = getDb().batch();
+
+  reminderDelaysMinutes.forEach((delayMinutes, index) => {
+    const docRef = collection.doc();
+    batch.set(docRef, {
+      id: randomUUID(),
+      message,
+      patientId,
+      type: options.type || 'triage',
+      priority: options.priority || 'normal',
+      status: 'pending',
+      reminderDelayMinutes: delayMinutes,
+      reminderStage: index + 1,
+      availableAt: new Date(now + delayMinutes * 60 * 1000),
+      leaseId: null,
+      leaseExpiresAt: null,
+      attemptCount: 0,
+      createdAt: getAdmin().firestore.FieldValue.serverTimestamp(),
+    });
   });
 
-  console.log(`[Notification Enqueued] Patient: ${patientId}`);
+  await batch.commit();
+
+  console.log(`[Notification Enqueued] Patient: ${patientId}, schedule: ${reminderDelaysMinutes.join('/')}`);
   return true;
 }
 
@@ -92,15 +149,10 @@ async function claimDoctorNotification() {
   if (!collection) return null;
 
   await reclaimExpiredDoctorNotificationLeases();
+  const dueDocs = await getDuePendingDoctorNotificationDocs(collection, 1);
+  if (dueDocs.length === 0) return null;
 
-  const snapshot = await collection
-    .where('status', '==', 'pending')
-    .limit(1)
-    .get();
-
-  if (snapshot.empty) return null;
-
-  const doc = snapshot.docs[0];
+  const doc = dueDocs[0];
   const leaseId = randomUUID();
   const leaseExpiresAt = new Date(Date.now() + DOCTOR_NOTIFICATION_LEASE_MS);
   await doc.ref.update({
@@ -119,6 +171,8 @@ async function claimDoctorNotification() {
     patientId: data.patientId,
     type: data.type || 'triage',
     priority: data.priority || 'normal',
+    reminderDelayMinutes: data.reminderDelayMinutes || 0,
+    reminderStage: data.reminderStage || 1,
   };
 }
 
@@ -156,8 +210,7 @@ async function confirmDoctorNotifications() {
   if (!collection) return [];
 
   await reclaimExpiredDoctorNotificationLeases();
-  const pendingSnap = await collection.where('status', '==', 'pending').get();
-  const docs = pendingSnap.docs;
+  const docs = await getDuePendingDoctorNotificationDocs(collection);
   if (docs.length === 0) return [];
 
   const batch = getDb().batch();
@@ -176,8 +229,41 @@ async function confirmDoctorNotifications() {
       patientId: data.patientId,
       type: data.type || 'triage',
       priority: data.priority || 'normal',
+      reminderDelayMinutes: data.reminderDelayMinutes || 0,
+      reminderStage: data.reminderStage || 1,
     };
   });
+}
+
+async function clearDoctorNotifications(patientId) {
+  const collection = getCollection(DOCTOR_NOTIFICATIONS);
+  if (!collection || !patientId) return 0;
+
+  const snapshot = await collection
+    .where('patientId', '==', patientId)
+    .get();
+
+  const docs = snapshot.docs.filter((doc) => {
+    const data = doc.data() || {};
+    return data.status === 'pending' || data.status === 'leased';
+  });
+
+  if (docs.length === 0) return 0;
+
+  const batch = getDb().batch();
+  const now = getAdmin().firestore.FieldValue.serverTimestamp();
+  docs.forEach((doc) => {
+    batch.update(doc.ref, {
+      status: 'cancelled',
+      cancelledAt: now,
+      leaseId: null,
+      leaseExpiresAt: null,
+      lastFailureReason: null,
+    });
+  });
+  await batch.commit();
+
+  return docs.length;
 }
 
 async function enqueueFUPush(userId, message) {
@@ -349,6 +435,7 @@ module.exports = {
   claimDoctorNotification,
   acknowledgeDoctorNotification,
   confirmDoctorNotifications,
+  clearDoctorNotifications,
   enqueueFUPush,
   dequeueFUPush,
   enqueuePatientChannelPush,

@@ -8,6 +8,7 @@ const followUpService = require('../services/followUpService');
 const { analyzeAndRouteTriage } = require('../services/llmService');
 const {
   enqueueDoctorNotification,
+  clearDoctorNotifications,
   clearPatientChannelPushes,
 } = require('../services/notifyService');
 const { appSiteUrl } = require('../config');
@@ -121,16 +122,12 @@ router.post('/consultations', async (req, res) => {
       await enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId, {
         type: 'triage_initial',
         priority: 'urgent',
+        reminderDelaysMinutes: [0, 5, 15],
       });
-      await followUpService.scheduleFollowUpWithOptions(userId, analysisResult.soapChartForDoctor, 15, {
-        doctorReminderNeeded: true,
-        reminderIntervalMinutes: 15,
-      });
+      await followUpService.scheduleFollowUpWithOptions(userId, analysisResult.soapChartForDoctor, 15);
     } else {
       const fallbackChart = `[최초 자동 해결된 경증 환자]\n증상: ${patientData.cc}\n증상점수: ${patientData.nrs}`;
-      await followUpService.scheduleFollowUpWithOptions(userId, fallbackChart, 15, {
-        doctorReminderNeeded: false,
-      });
+      await followUpService.scheduleFollowUpWithOptions(userId, fallbackChart, 15);
     }
 
     const statusUrl = buildPublicStatusUrl(saved.trackingCode, saved.trackingToken);
@@ -188,6 +185,7 @@ router.post('/consultations/status/:lookup/close', async (req, res) => {
 
     if (closed.userId) {
       await followUpService.cancelFollowUp(closed.userId);
+      await clearDoctorNotifications(closed.userId);
       await clearPatientChannelPushes(closed.userId, 'doctor_reply');
     }
 
