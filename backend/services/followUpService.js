@@ -1,10 +1,13 @@
 const dbService = require('./dbService');
+const { enqueuePatientChannelPush } = require('./notifyService');
+
+const DEFAULT_FOLLOW_UP_REMINDER_DELAYS_MINUTES = Object.freeze([15, 180, 1440]);
 
 class FollowUpService {
   constructor() {
     this.timers = new Map();
-    this.sessionExpiryMs = 30 * 60 * 1000;
-    this.absoluteExpiryMs = 2 * 60 * 60 * 1000;
+    this.pendingMessageExpiryMs = 2 * 24 * 60 * 60 * 1000;
+    this.absoluteExpiryMs = 4 * 24 * 60 * 60 * 1000;
   }
 
   async initialize() {
@@ -43,18 +46,37 @@ class FollowUpService {
     this.timers.delete(userId);
   }
 
+  normalizeReminderDelaysMinutes(delays = DEFAULT_FOLLOW_UP_REMINDER_DELAYS_MINUTES) {
+    const values = Array.isArray(delays) ? delays : [delays];
+    const normalized = values
+      .map((value) => Number(value))
+      .filter((value) => Number.isFinite(value) && value > 0)
+      .map((value) => Math.round(value));
+
+    if (normalized.length === 0) {
+      return [...DEFAULT_FOLLOW_UP_REMINDER_DELAYS_MINUTES];
+    }
+
+    return [...new Set(normalized)];
+  }
+
   async scheduleFollowUp(userId, originalSoapChart, delayMinutes = 15) {
     return this.scheduleFollowUpWithOptions(userId, originalSoapChart, delayMinutes, {});
   }
 
-  async scheduleFollowUpWithOptions(userId, originalSoapChart, delayMinutes = 15) {
+  async scheduleFollowUpWithOptions(userId, originalSoapChart, delayMinutes = 15, options = {}) {
     const now = new Date();
-    const dueAt = new Date(now.getTime() + delayMinutes * 60 * 1000);
+    const reminderDelaysMinutes = this.normalizeReminderDelaysMinutes(
+      options.reminderDelaysMinutes || delayMinutes,
+    );
+    const dueAt = new Date(now.getTime() + reminderDelaysMinutes[0] * 60 * 1000);
 
     await dbService.saveFollowUpSession(userId, {
       chart: originalSoapChart,
       createdAt: now,
       lastActiveAt: now,
+      reminderDelaysMinutes,
+      nextReminderIndex: 0,
       dueAt,
       status: 'scheduled',
       pendingMessage: null,
@@ -75,6 +97,10 @@ class FollowUpService {
       lastActiveAt: this.toDate(persisted.lastActiveAt),
       dueAt: this.toDate(persisted.dueAt),
       pendingCreatedAt: this.toDate(persisted.pendingCreatedAt),
+      reminderDelaysMinutes: this.normalizeReminderDelaysMinutes(persisted.reminderDelaysMinutes),
+      nextReminderIndex: Number.isFinite(Number(persisted.nextReminderIndex))
+        ? Number(persisted.nextReminderIndex)
+        : 0,
     };
   }
 
@@ -83,11 +109,8 @@ class FollowUpService {
 
     const now = Date.now();
     const createdAt = this.toDate(session.createdAt);
-    const lastActiveAt = this.toDate(session.lastActiveAt);
-
-    if (!createdAt || !lastActiveAt) return true;
+    if (!createdAt) return true;
     if (now - createdAt.getTime() > this.absoluteExpiryMs) return true;
-    if (now - lastActiveAt.getTime() > this.sessionExpiryMs) return true;
 
     return false;
   }
@@ -114,17 +137,32 @@ class FollowUpService {
     ].join('\n');
 
     const now = new Date();
-    const hasPendingMessage = Boolean(session.pendingMessage);
+    const reminderDelaysMinutes = this.normalizeReminderDelaysMinutes(session.reminderDelaysMinutes);
+    const currentReminderIndex = Number.isFinite(Number(session.nextReminderIndex))
+      ? Number(session.nextReminderIndex)
+      : 0;
+    const nextReminderIndex = currentReminderIndex + 1;
+    const nextDelayMinutes = reminderDelaysMinutes[nextReminderIndex];
+    const nextDueAt = Number.isFinite(nextDelayMinutes)
+      ? new Date(now.getTime() + nextDelayMinutes * 60 * 1000)
+      : null;
+
+    await enqueuePatientChannelPush(userId, message, 'follow_up');
 
     await dbService.saveFollowUpSession(userId, {
       lastActiveAt: now,
-      pendingMessage: hasPendingMessage ? session.pendingMessage : message,
-      pendingCreatedAt: hasPendingMessage ? (session.pendingCreatedAt || now) : now,
-      dueAt: null,
-      status: 'pending',
+      pendingMessage: message,
+      pendingCreatedAt: now,
+      nextReminderIndex,
+      dueAt: nextDueAt,
+      status: nextDueAt ? 'scheduled' : 'pending',
     });
 
-    this.clearLocalTimer(userId);
+    if (nextDueAt) {
+      this.scheduleLocalTimer(userId, nextDueAt);
+    } else {
+      this.clearLocalTimer(userId);
+    }
   }
 
   async getOriginalChart(userId) {
@@ -143,7 +181,7 @@ class FollowUpService {
     if (!session || !session.pendingMessage) return null;
 
     const pendingCreatedAt = this.toDate(session.pendingCreatedAt);
-    if (!pendingCreatedAt || Date.now() - pendingCreatedAt.getTime() > this.sessionExpiryMs) {
+    if (!pendingCreatedAt || Date.now() - pendingCreatedAt.getTime() > this.pendingMessageExpiryMs) {
       await this.cancelFollowUp(userId);
       return null;
     }
@@ -153,7 +191,7 @@ class FollowUpService {
       lastActiveAt: new Date(),
       pendingMessage: null,
       pendingCreatedAt: null,
-      status: 'active',
+      status: session.dueAt ? 'scheduled' : 'active',
     });
 
     return message;
