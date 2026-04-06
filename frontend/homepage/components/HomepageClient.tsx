@@ -866,7 +866,7 @@ function CEOSection() {
             <div className="mt-8 rounded-[1.5rem] bg-slate-900 p-5 text-white">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/55">Message</p>
               <p className="mt-3 text-sm leading-7 text-white/78">
-                “의료가 정말 필요한 순간, 누군가에게 가장 먼저 닿는 입구가 되고 싶습니다.”
+                “도움이 정말 필요한 순간, 가장 먼저 닿는 손이 되고 싶습니다.”
               </p>
             </div>
           </div>
