@@ -13,6 +13,19 @@ export interface PublicDoctorReply {
   seenAt: string | null
 }
 
+export interface PublicConsultationMediaItem {
+  id: string | null
+  kind: 'image' | string
+  source: string | null
+  status: string
+  contentType: string | null
+  originalName: string | null
+  size: number | null
+  storagePath: string | null
+  createdAt: string | null
+  url: string | null
+}
+
 export type PublicConsultationStage =
   | 'guidance_delivered'
   | 'waiting_doctor'
@@ -32,6 +45,7 @@ export interface PublicConsultationStatus {
   followUpCount: number
   latestFollowUpAt: string | null
   doctorReplies: PublicDoctorReply[]
+  mediaItems: PublicConsultationMediaItem[]
   entryChannel: 'kakao' | 'web' | string
 }
 

@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
@@ -257,6 +258,7 @@ export default function PatientPage({ params }: PatientPageProps) {
       status: statusMeta(consultation),
     }
   }, [consultation])
+  const mediaItems = consultation?.mediaItems ?? []
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -402,6 +404,34 @@ export default function PatientPage({ params }: PatientPageProps) {
                 )}
               </div>
             </section>
+
+            {mediaItems.length > 0 && (
+              <section className="rounded-2xl bg-white border border-zinc-200 shadow-sm px-5 py-5">
+                <h2 className="text-sm font-bold text-zinc-800 mb-3">첨부 사진</h2>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {mediaItems
+                    .filter((item) => item.kind === 'image' && item.url)
+                    .map((item) => (
+                      <a
+                        key={item.id || item.url}
+                        href={item.url || '#'}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50"
+                      >
+                        <img
+                          src={item.url || ''}
+                          alt={item.originalName || '상담 첨부 사진'}
+                          className="h-56 w-full object-cover"
+                        />
+                        <div className="px-4 py-3 text-xs text-zinc-500">
+                          {item.createdAt ? formatDate(item.createdAt) : '등록 시각 없음'}
+                        </div>
+                      </a>
+                    ))}
+                </div>
+              </section>
+            )}
 
             {/* SOAP Chart Card */}
             {consultation.doctorChart && (

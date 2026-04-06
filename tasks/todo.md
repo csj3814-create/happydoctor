@@ -121,6 +121,47 @@
 - **Firebase**: happydoctor0 (Firestore logging active)
 - **Model**: gemini-2.5-flash (paid plan via 해빛스쿨)
 
+## Phase 60: 상담 미디어 업로드 설계 (2026.04.06)
+
+### 목표
+- [x] 카카오 상담에서 사진 업로드를 어떤 방식으로 받을 수 있는지 공식 문서와 현재 시나리오 기준으로 확인
+- [x] 웹앱 상담에서 사진/3분 이내 동영상 업로드를 받을 수 있는 구조 설계
+- [x] 동영상은 서버에서 경량본으로 변환 저장하고 원본 삭제하는 파이프라인 가능 여부 검토
+- [x] 현재 Render + Firebase 기반 인프라에서 가장 무리 없는 저장 전략과 구현 순서 정리
+
+### 확인 포인트
+- [x] 카카오 오픈빌더가 `sys.image.url` 기반 사진 입력을 계속 지원하는지 확인
+- [x] 카카오에서 사용자 동영상 입력을 직접 받을 수 있는 공식 경로가 있는지 확인
+- [x] 웹앱 업로드 API, 저장소, 압축 처리에 필요한 라이브러리/런타임 제약 정리
+- [x] 환자/의료진 화면에 어떤 형태로 미디어를 노출할지 데이터 모델 초안 정리
+
+## Phase 61: 웹앱 사진 업로드 1차 구현 (2026.04.07)
+
+### 목표
+- [x] 환자가 `app.happydoctor.kr/status` 화면에서 현재 상담에 사진을 첨부할 수 있게 한다.
+- [x] 첨부한 사진을 Firebase Storage에 저장하고 상담 문서에 메타데이터를 남긴다.
+- [x] 상태 화면과 의료진 포털 상세 화면에서 첨부 사진을 바로 확인할 수 있게 한다.
+- [x] 공개 링크/코드 기반 상담 흐름을 유지하면서 로그인 없이도 안전하게 현재 상담에만 사진을 추가할 수 있게 한다.
+
+### 구현 메모
+- [x] 카카오 링크 `https://open.kakao.com/me/csj3814` → `https://open.kakao.com/me/happydoctors` 전역 교체
+- [x] 백엔드에 사진 업로드용 public API 추가
+- [x] Firebase Storage 버킷 설정값(`FIREBASE_STORAGE_BUCKET`) 사용 준비
+- [x] 상담 문서 `mediaItems` 구조 추가
+- [x] 환자 앱 상태 화면 업로더 UI 추가
+- [x] 의료진 포털 상세 화면 사진 미리보기 추가
+
+### 검증
+- [x] `backend`: `node --check routes/public.js`
+- [x] `backend`: `node --check services/dbService.js`
+- [x] `backend`: `createApp()` 로드 확인
+- [x] `frontend/app`: `npm run lint`
+- [x] `frontend/app`: `npm run build`
+- [x] `frontend/portal`: `npm run lint`
+- [x] `frontend/portal`: `npm run build`
+- [x] `frontend/homepage`: `npm run lint`
+- [x] `frontend/homepage`: `npm run build`
+
 ## Phase 10: Code Review & Improvement Plan (2026.04.02)
 
 ### Review Summary

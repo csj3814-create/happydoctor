@@ -1,9 +1,11 @@
+/* eslint-disable @next/next/no-img-element */
 'use client'
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
+import ConsultationImageUploader from '@/components/ConsultationImageUploader'
 import StatusCloseActions from '@/components/StatusCloseActions'
 import {
   getActiveConsultationSession,
@@ -86,6 +88,7 @@ export default function StatusPageClient() {
   const [consultation, setConsultation] = useState<PublicConsultationStatus | null>(null)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
   const [restoredRecentSession, setRestoredRecentSession] = useState(false)
   const [checkingStoredSession, setCheckingStoredSession] = useState(true)
 
@@ -171,9 +174,10 @@ export default function StatusPageClient() {
     return () => {
       cancelled = true
     }
-  }, [resolvedLookup])
+  }, [resolvedLookup, refreshKey])
 
   const statusCopy = consultation ? getStatusCopy(consultation) : null
+  const mediaItems = consultation?.mediaItems ?? []
   const latestReply =
     consultation && consultation.doctorReplies.length > 0
       ? consultation.doctorReplies[consultation.doctorReplies.length - 1]
@@ -296,6 +300,51 @@ export default function StatusPageClient() {
                 <p className="text-sm font-semibold text-[var(--ink)]">최근 업데이트</p>
                 <p className="mt-3 text-sm leading-7 text-[var(--muted)]">{getLatestUpdate(consultation)}</p>
               </div>
+            </div>
+
+            <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+              <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
+                <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
+                  첨부 사진
+                </p>
+                {mediaItems.length > 0 ? (
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    {mediaItems
+                      .filter((item) => item.kind === 'image' && item.url)
+                      .map((item) => (
+                        <a
+                          key={item.id || item.url}
+                          href={item.url || '#'}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="overflow-hidden rounded-[1.4rem] border border-[var(--line)] bg-[var(--surface)]"
+                        >
+                          <img
+                            src={item.url || ''}
+                            alt={item.originalName || '상담 첨부 사진'}
+                            className="h-44 w-full object-cover"
+                          />
+                          <div className="px-4 py-3 text-xs leading-6 text-[var(--muted)]">
+                            {item.createdAt ? formatDateTime(item.createdAt) : '등록 시각 없음'}
+                          </div>
+                        </a>
+                      ))}
+                  </div>
+                ) : (
+                  <p className="mt-4 rounded-[1.4rem] bg-[var(--surface)] p-4 text-sm leading-7 text-[var(--muted)]">
+                    아직 첨부된 사진이 없습니다.
+                  </p>
+                )}
+              </div>
+
+              {resolvedLookup ? (
+                <ConsultationImageUploader
+                  lookup={resolvedLookup}
+                  disabled={consultation.status === 'closed'}
+                  existingCount={mediaItems.filter((item) => item.kind === 'image').length}
+                  onUploaded={() => setRefreshKey((current) => current + 1)}
+                />
+              ) : null}
             </div>
 
             <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
