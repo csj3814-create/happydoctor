@@ -42,6 +42,123 @@ function toDate(value) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function getDoctorNotificationPriorityWeight(priority) {
+  if (priority === 'urgent') return 2;
+  if (priority === 'high') return 1;
+  return 0;
+}
+
+function getDoctorNotificationInfo(doc) {
+  const data = typeof doc.data === 'function' ? (doc.data() || {}) : (doc.data || {});
+  return {
+    id: doc.id || data.id || '',
+    patientId: data.patientId || '',
+    priorityWeight: getDoctorNotificationPriorityWeight(data.priority),
+    availableAtMs: toDate(data.availableAt)?.getTime() || 0,
+    reminderStage: Number(data.reminderStage) || 0,
+    createdAtMs: toDate(data.createdAt)?.getTime() || 0,
+  };
+}
+
+function compareDoctorNotificationFreshness(left, right) {
+  const leftInfo = getDoctorNotificationInfo(left);
+  const rightInfo = getDoctorNotificationInfo(right);
+
+  if (leftInfo.priorityWeight !== rightInfo.priorityWeight) {
+    return leftInfo.priorityWeight - rightInfo.priorityWeight;
+  }
+
+  if (leftInfo.availableAtMs !== rightInfo.availableAtMs) {
+    return leftInfo.availableAtMs - rightInfo.availableAtMs;
+  }
+
+  if (leftInfo.reminderStage !== rightInfo.reminderStage) {
+    return leftInfo.reminderStage - rightInfo.reminderStage;
+  }
+
+  if (leftInfo.createdAtMs !== rightInfo.createdAtMs) {
+    return leftInfo.createdAtMs - rightInfo.createdAtMs;
+  }
+
+  return String(leftInfo.id).localeCompare(String(rightInfo.id));
+}
+
+function compareDoctorNotificationDueOrder(left, right) {
+  const leftInfo = getDoctorNotificationInfo(left);
+  const rightInfo = getDoctorNotificationInfo(right);
+
+  if (leftInfo.availableAtMs !== rightInfo.availableAtMs) {
+    return leftInfo.availableAtMs - rightInfo.availableAtMs;
+  }
+
+  if (leftInfo.priorityWeight !== rightInfo.priorityWeight) {
+    return rightInfo.priorityWeight - leftInfo.priorityWeight;
+  }
+
+  return compareDoctorNotificationFreshness(left, right);
+}
+
+function selectLatestDueDoctorNotifications(docs) {
+  const grouped = new Map();
+  docs.forEach((doc) => {
+    const { patientId, id } = getDoctorNotificationInfo(doc);
+    const key = patientId || id;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(doc);
+  });
+
+  const kept = [];
+  const superseded = [];
+
+  grouped.forEach((groupDocs) => {
+    if (groupDocs.length === 1) {
+      kept.push(groupDocs[0]);
+      return;
+    }
+
+    const sorted = [...groupDocs].sort(compareDoctorNotificationFreshness);
+    const keepDoc = sorted[sorted.length - 1];
+    kept.push(keepDoc);
+
+    sorted.slice(0, -1).forEach((doc) => {
+      superseded.push({
+        doc,
+        supersededById: keepDoc.id,
+      });
+    });
+  });
+
+  kept.sort(compareDoctorNotificationDueOrder);
+  return { kept, superseded };
+}
+
+async function coalesceDueDoctorNotifications(collection, dueDocs) {
+  if (!dueDocs || dueDocs.length <= 1) {
+    return dueDocs || [];
+  }
+
+  const { kept, superseded } = selectLatestDueDoctorNotifications(dueDocs);
+  if (superseded.length === 0) {
+    return kept;
+  }
+
+  const batch = getDb().batch();
+  const now = getAdmin().firestore.FieldValue.serverTimestamp();
+  superseded.forEach(({ doc, supersededById }) => {
+    batch.update(doc.ref, {
+      status: 'superseded',
+      supersededAt: now,
+      supersededById,
+      leaseId: null,
+      leaseExpiresAt: null,
+      lastFailureReason: null,
+    });
+  });
+
+  await batch.commit();
+  return kept;
+}
+
 async function getDuePendingDoctorNotificationDocs(collection, limit = 20) {
   const snapshot = await collection
     .where('status', '==', 'pending')
@@ -149,10 +266,11 @@ async function claimDoctorNotification() {
   if (!collection) return null;
 
   await reclaimExpiredDoctorNotificationLeases();
-  const dueDocs = await getDuePendingDoctorNotificationDocs(collection, 1);
-  if (dueDocs.length === 0) return null;
+  const dueDocs = await getDuePendingDoctorNotificationDocs(collection, 20);
+  const coalescedDocs = await coalesceDueDoctorNotifications(collection, dueDocs);
+  if (coalescedDocs.length === 0) return null;
 
-  const doc = dueDocs[0];
+  const doc = coalescedDocs[0];
   const leaseId = randomUUID();
   const leaseExpiresAt = new Date(Date.now() + DOCTOR_NOTIFICATION_LEASE_MS);
   await doc.ref.update({
@@ -210,7 +328,8 @@ async function confirmDoctorNotifications() {
   if (!collection) return [];
 
   await reclaimExpiredDoctorNotificationLeases();
-  const docs = await getDuePendingDoctorNotificationDocs(collection);
+  const dueDocs = await getDuePendingDoctorNotificationDocs(collection, 50);
+  const docs = await coalesceDueDoctorNotifications(collection, dueDocs);
   if (docs.length === 0) return [];
 
   const batch = getDb().batch();
@@ -446,4 +565,7 @@ module.exports = {
   getRoomName,
   getDoctorRoomName,
   getQueueStatus,
+  __test__: {
+    selectLatestDueDoctorNotifications,
+  },
 };
