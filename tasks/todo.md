@@ -222,6 +222,24 @@
 - [ ] 3) Homepage architecture and SEO/accessibility
 - [ ] 4) Automated tests and CI completion
 
+## Phase 62: 의료진 승인 대기/알림 안정화 (2026.04.07)
+
+### 목표
+- [x] 새 의료진이 포털 로그인 시 바로 접근하지 않고 `승인 대기`로 들어가게 유지
+- [x] 대표자가 포털 첫 화면에서 승인 대기 의료진을 승인할 수 있게 확인
+- [x] 의료진 단톡방 알림이 지연되더라도 과거 단계 알림이 한꺼번에 몰리지 않게 정리
+
+### 구현 메모
+- [x] 포털 승인 대기는 `/api/portal/auth/status`와 첫 화면 상단 승인 카드로 처리
+- [x] 대표자 승인은 `/api/portal/admin/doctor-requests/:email/approve` 경로로 처리
+- [x] 의료진 알림은 즉시/5분/15분 중 여러 단계가 동시에 due 되면 최신 단계 1건만 남기고 이전 단계는 `superseded` 처리
+
+### 검증
+- [x] `backend`: `node --check services/notifyService.js`
+- [x] `backend`: `node --check routes/portal.js`
+- [x] `backend`: `createApp()` 로드 확인
+- [ ] `backend`: Render `/api/version` 최신 반영 확인
+
 ## Phase 11: Homepage Design Refresh (2026.04.02)
 
 ### Goal
