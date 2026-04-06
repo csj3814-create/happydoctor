@@ -1,44 +1,29 @@
 /**
- * MessengerBot R 스크립트 — '해피닥터 행복한 의사' 채널용
+ * MessengerBot R 스크립트 for 해피닥터 카카오 운영
  *
- * 이 스크립트를 공기계의 MessengerBot R 앱에 등록합니다.
+ * 이 스크립트를 공기계 MessengerBot R 앱에 등록합니다.
  *
- * 기능 2가지:
- * 1) 오픈채팅방 안내: "~상담", "아파요" 등 키워드 → 1:1 채널 안내
- * 2) 의료진 단톡방 차트: 자동 푸시 + "~차트확인" 수동 백업
+ * 기능:
+ * 1) 환자 안내: 환자 오픈채팅방에서 1:1 카카오 채널로 안내
+ * 2) 의료진 알림: 신규 차트 자동 푸시 + 수동 확인 명령
+ * 3) 환자 채널 푸시: follow-up / 의사 답변 알림 전달
  *
- * ※ 명령어 접두사를 "!"가 아닌 "~"로 사용합니다.
- *    같은 기기에서 구동 중인 해빛스쿨 봇과 충돌 방지용입니다.
- *
- * [설정 방법]
- * 1. MessengerBot R 앱에서 새 봇 생성
- * 2. 아래 스크립트를 복붙
- * 3. SERVER_URL과 API_KEY를 실제 값으로 변경
- * 4. 컴파일 → 활성화
- *
- * [배포 전 확인사항 체크리스트]
- * □ SERVER_URL이 실제 Render 배포 URL과 일치하는지 확인
- * □ API_KEY가 서버 .env의 MESSENGER_API_KEY와 동일한지 확인
- * □ DOCTOR_ROOM 이름이 실제 카카오톡 의료진 단톡방 이름과 정확히 일치하는지 확인
- * □ PATIENT_ROOM 이름이 실제 카카오톡 환자 오픈채팅방 이름과 정확히 일치하는지 확인
- * □ CHANNEL_LINK가 실제 카카오 채널 1:1 채팅 링크와 일치하는지 확인
- * □ MessengerBot R 앱에서 카카오톡 알림 접근 권한이 활성화되어 있는지 확인
+ * 설정 체크:
+ * - SERVER_URL 은 실제 Render 배포 URL과 같아야 합니다.
+ * - API_KEY 는 서버의 MESSENGER_API_KEY 와 같아야 합니다.
+ * - DOCTOR_ROOM 은 기본적으로 비워 두고 `~알림방등록`으로 등록하는 것을 권장합니다.
+ * - 정말 fallback 이 필요할 때만 `~방이름`으로 확인한 의료진 단톡방 식별자를 직접 넣으세요.
+ * - 개인톡 식별자를 넣으면 의료진 알림이 개인톡으로 갈 수 있습니다.
  */
 
 // ===== 설정 =====
-const SERVER_URL = "https://happydoctor.onrender.com"; // Render 배포 URL
-const API_KEY = "happydoctor_bot_2026_secret"; // .env의 MESSENGER_API_KEY와 동일하게
-const CHANNEL_LINK = "http://pf.kakao.com/_PxaTxhX/chat"; // 카카오 채널 1:1 채팅 링크
+const SERVER_URL = "https://happydoctor.onrender.com";
+const API_KEY = "happydoctor_bot_2026_secret";
+const CHANNEL_LINK = "http://pf.kakao.com/_PxaTxhX/chat";
 
-// 의료진 단톡방 식별자 (MessengerBotR이 반환하는 실제 값)
-// ※ "2기 행복한 의사 의료봉사방"과 "2기 행복한 의사 운영위"가 동일 식별자를 가짐
-const DOCTOR_ROOM = "최석재 진료교수(가톨릭대학교 여의도성";
-// 환자 오픈채팅방 식별자
-// ※ "행복한 의사의 응급상담방" 실제 식별자
+// 기본 fallback 은 비워 둡니다. 우선은 `~알림방등록`을 사용하세요.
+const DOCTOR_ROOM = "";
 const PATIENT_ROOM = "행복한의사";
-// 실험방 식별자
-// ※ MessengerBotR은 오픈채팅방 이름("해피닥터 AI 인턴 보듬 실험방") 대신
-//    "최석재"를 room 식별자로 사용합니다. (오픈채팅 특성상 고정값)
 const EXPERIMENT_ROOM = "최석재";
 const PATIENT_PUSH_POLL_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -73,7 +58,7 @@ function acknowledgeDoctorNotification(notificationId, delivered, errorMessage) 
             error: errorMessage || null
         });
     } catch (e) {
-        // ack 실패는 다음 lease 만료 후 재전송될 수 있으므로 무시
+        // ack 실패는 lease 만료 후 재시도 경로가 있으므로 무시
     }
 }
 
@@ -84,7 +69,7 @@ function registerPatientRoom(userId, roomName) {
             roomName: roomName
         });
     } catch (e) {
-        // 등록 실패는 무시하고 다음 메시지에서 다시 시도
+        // 방 등록 실패는 다음 메시지에서 다시 시도
     }
 }
 
@@ -93,91 +78,89 @@ function isPatientConversation(room, isGroupChat) {
     return room === PATIENT_ROOM || room.indexOf("행복한 의사") !== -1 || room.indexOf("행복한의사") !== -1;
 }
 
+function buildDoctorHelp() {
+    return (
+        "🤖 해피닥터 봇 도움말 (의료진/운영)\n" +
+        "━━━━━━━━━━━━━━━\n" +
+        "[의료진]\n" +
+        "~차트확인   대기 중인 신규/미전달 차트 수동 조회\n" +
+        "~알림방등록 현재 방을 자동 알림방으로 등록\n" +
+        "~알림방확인 현재 등록된 자동 알림방 확인\n" +
+        "※ 신규 차트는 10초마다 자동으로도 전송됩니다.\n\n" +
+        "[공통]\n" +
+        "~도움말    이 도움말 표시\n" +
+        "━━━━━━━━━━━━━━━\n" +
+        "👉 1:1 상담: " + CHANNEL_LINK
+    );
+}
+
+function buildPatientHelp() {
+    return (
+        "🤖 해피닥터 봇 도움말 (환자 안내)\n" +
+        "━━━━━━━━━━━━━━━\n" +
+        "아파요 / 통증 / 복통 같은 증상 키워드를 쓰면\n" +
+        "1:1 카카오 채널로 먼저 안내해 드립니다.\n\n" +
+        "~상담  ~진료  직접 채널 안내 받기\n" +
+        "~도움말 도움말 다시 보기\n" +
+        "━━━━━━━━━━━━━━━\n" +
+        "👉 1:1 상담: " + CHANNEL_LINK
+    );
+}
+
 // ===== 메시지 수신 핸들러 =====
 function response(room, msg, sender, isGroupChat, replier, imageDB, packageName) {
+    var trimmedMsg = (msg || "").trim();
 
     if (isPatientConversation(room, isGroupChat) && sender) {
         registerPatientRoom(sender, room);
     }
 
-    // [디버그] 실제 room 식별자 확인용 — 작동 확인 후 삭제 가능
-    if (msg.trim() === "~방이름") {
+    if (trimmedMsg === "~방이름") {
         replier.reply("📍 room: " + room);
         return;
     }
 
-    // [0] 모든 방: ~도움말 명령어
-    if (msg.trim() === "~도움말") {
-        var helpMsg;
-        if (room === DOCTOR_ROOM) {
-            helpMsg =
-                "🤖 해피닥터 봇 도움말 (의료진/운영위)\n" +
-                "━━━━━━━━━━━━━━━\n" +
-                "[의료진]\n" +
-                "~차트확인   대기 중인 신규/미전달 차트 수동 조회\n" +
-                "~알림방등록 현재 방을 자동 알림방으로 등록\n" +
-                "※ 신규 차트는 10초마다 자동으로도 전송됩니다.\n\n" +
-                "[공통]\n" +
-                "~도움말    이 도움말 표시\n" +
-                "━━━━━━━━━━━━━━━\n" +
-                "👉 1:1 상담: " + CHANNEL_LINK;
-        } else if (room === PATIENT_ROOM) {
-            helpMsg =
-                "🤖 해피닥터 봇 도움말 (환자 안내)\n" +
-                "━━━━━━━━━━━━━━━\n" +
-                "아파요 / 통증 / 두통 등 증상 관련 단어를\n" +
-                "입력하시면 1:1 상담 채널로 안내해 드려요.\n\n" +
-                "~상담  ~진료  직접 채널 안내 받기\n" +
-                "~도움말  이 도움말 표시\n" +
-                "━━━━━━━━━━━━━━━\n" +
-                "👉 1:1 상담: " + CHANNEL_LINK;
-        } else if (room === EXPERIMENT_ROOM) {
-            helpMsg =
-                "🤖 해피닥터 봇 도움말 (실험방)\n" +
-                "━━━━━━━━━━━━━━━\n" +
-                "[의료진]\n" +
-                "~차트확인   대기 차트 조회\n" +
-                "~알림방등록 현재 방을 자동 알림방으로 등록\n\n" +
-                "[공통]\n" +
-                "~도움말    이 도움말 표시\n" +
-                "━━━━━━━━━━━━━━━\n" +
-                "👉 1:1 상담: " + CHANNEL_LINK;
+    if (trimmedMsg === "~도움말") {
+        if (room === PATIENT_ROOM || isPatientConversation(room, isGroupChat)) {
+            replier.reply(buildPatientHelp());
+        } else if (room === EXPERIMENT_ROOM || room === DOCTOR_ROOM || isGroupChat) {
+            replier.reply(buildDoctorHelp());
         } else {
-            helpMsg = "🤖 이 방은 해피닥터 봇 지원 대상이 아닙니다.";
+            replier.reply("🤖 이 방에서는 해피닥터 봇 명령이 제한적으로 동작합니다.\n\n" + buildPatientHelp());
         }
-        replier.reply(helpMsg);
         return;
     }
 
-    // [1] 환자 오픈채팅방("행복한 의사의 응급상담방")에서만 의료 키워드 → 1:1 채널 안내
     if (room === PATIENT_ROOM) {
         var guideKeywords = [
             "~상담", "~진료", "아파요", "아픈데", "아프다", "아픕니다",
-            "통증", "두통", "복통", "열이", "기침", "설사", "구토",
-            "다쳤", "다쳐", "피가", "출혈", "어지러", "숨이",
-            "도와주세요", "도와줘"
+            "두통", "요통", "복통", "배아파", "기침", "설사", "구토",
+            "가려", "가래", "열나", "출혈", "어지러", "호흡이",
+            "진료주세요", "진료좀"
         ];
         for (var i = 0; i < guideKeywords.length; i++) {
             if (msg.indexOf(guideKeywords[i]) !== -1) {
                 replier.reply(
-                    "🩺 " + sender + "님, 안녕하세요!\n\n" +
+                    "🙂 " + sender + "님 안녕하세요.\n\n" +
                     "증상 상담은 개인정보 보호를 위해\n" +
-                    "아래 1:1 채팅에서 진행됩니다.\n\n" +
+                    "아래 1:1 채널에서 진행합니다.\n\n" +
                     "👉 " + CHANNEL_LINK + "\n\n" +
-                    "링크를 누르시면 AI 인턴 보듬이가\n" +
-                    "증상을 여쭤보고, 필요하면 전문의\n" +
-                    "선생님께 바로 연결해 드립니다. 😊"
+                    "링크를 누르면 AI 인턴 보듬이가 먼저 도와드리고,\n" +
+                    "필요하면 의료진 확인으로 이어집니다."
                 );
                 return;
             }
         }
     }
 
-    // [2] 의료진 단톡방 또는 실험방: 알림방 등록
-    if (isGroupChat && msg.trim() === "~알림방등록") {
-        try {
-            var registerConn = callMessengerEndpoint(room, msg.trim(), sender, isGroupChat, "register_doctor_room");
+    if (trimmedMsg === "~알림방등록") {
+        if (isPatientConversation(room, isGroupChat)) {
+            replier.reply("⚠️ 환자 안내 채널에서는 알림방 등록을 사용할 수 없습니다.");
+            return;
+        }
 
+        try {
+            var registerConn = callMessengerEndpoint(room, trimmedMsg, sender, isGroupChat, "register_doctor_room");
             var registerData = JSON.parse(registerConn.body());
             if (registerData.reply) {
                 replier.reply(registerData.reply);
@@ -188,11 +171,32 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
         return;
     }
 
-    // [3] 의료진 단톡방 또는 실험방: 차트 확인
-    if (isGroupChat && msg.trim() === "~차트확인") {
-        try {
-            var conn = callMessengerEndpoint(room, msg.trim(), sender, isGroupChat, "confirm_doctor_notifications");
+    if (trimmedMsg === "~알림방확인") {
+        if (isPatientConversation(room, isGroupChat)) {
+            replier.reply("⚠️ 환자 안내 채널에서는 알림방 확인을 사용할 수 없습니다.");
+            return;
+        }
 
+        try {
+            var roomInfoConn = callMessengerEndpoint(room, trimmedMsg, sender, isGroupChat, "show_doctor_room");
+            var roomInfoData = JSON.parse(roomInfoConn.body());
+            if (roomInfoData.reply) {
+                replier.reply(roomInfoData.reply);
+            }
+        } catch (e) {
+            replier.reply("⚠️ 알림방 확인 중 오류: " + e.message);
+        }
+        return;
+    }
+
+    if (trimmedMsg === "~차트확인") {
+        if (isPatientConversation(room, isGroupChat)) {
+            replier.reply("⚠️ 환자 안내 채널에서는 차트 확인을 사용할 수 없습니다.");
+            return;
+        }
+
+        try {
+            var conn = callMessengerEndpoint(room, trimmedMsg, sender, isGroupChat, "confirm_doctor_notifications");
             var status = conn.statusCode();
             var chartRes = conn.body();
 
@@ -212,7 +216,7 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
     }
 }
 
-// ===== 의료진 차트 폴링 (10초마다) =====
+// ===== 의료진 차트 폴링 (10초) =====
 var doctorPollTimer = null;
 var patientPushPollTimer = null;
 
@@ -233,8 +237,13 @@ function startDoctorPolling() {
                     var data = JSON.parse(pollRes);
                     if (data.hasNew && data.reply) {
                         try {
-                            // 서버가 기억한 알림방을 우선 사용하고, 없으면 기본값으로 전송
-                            Api.replyRoom(data.roomName || DOCTOR_ROOM, data.reply);
+                            var targetRoom = data.roomName || DOCTOR_ROOM;
+                            if (!targetRoom) {
+                                java.lang.Thread.sleep(1000);
+                                continue;
+                            }
+
+                            Api.replyRoom(targetRoom, data.reply);
                             acknowledgeDoctorNotification(data.notificationId, true, null);
                         } catch (deliveryError) {
                             acknowledgeDoctorNotification(
@@ -245,10 +254,10 @@ function startDoctorPolling() {
                         }
                     }
                 } catch (e) {
-                    // 폴링 실패는 무시
+                    // 폴링 실패는 무시하고 다음 주기로 재시도
                 }
 
-                java.lang.Thread.sleep(10000); // 10초 대기
+                java.lang.Thread.sleep(10000);
             }
         }
     }));
@@ -275,7 +284,7 @@ function startPatientPushPolling() {
                         Api.replyRoom(data.roomName, data.message);
                     }
                 } catch (e) {
-                    // 폴링 실패는 무시
+                    // 폴링 실패는 무시하고 다음 주기로 재시도
                 }
 
                 java.lang.Thread.sleep(PATIENT_PUSH_POLL_INTERVAL_MS);
@@ -286,6 +295,5 @@ function startPatientPushPolling() {
     patientPushPollTimer.start();
 }
 
-// 봇 시작 시 폴링 시작
 startDoctorPolling();
 startPatientPushPolling();
