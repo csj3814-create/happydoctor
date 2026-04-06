@@ -119,6 +119,30 @@ export interface DoctorStats {
   email: string; name: string; hdt: number; totalReplies: number;
 }
 
+export interface DoctorAccessRequest {
+  id: string
+  email: string
+  name: string
+  status: 'pending' | 'approved' | string
+  requestedAt?: string | null
+  approvedAt?: string | null
+  lastLoginAt?: string | null
+  approvedByEmail?: string | null
+  approvedByName?: string | null
+}
+
+export interface PortalAuthStatus {
+  doctor: {
+    uid: string
+    email: string
+    name: string
+  }
+  accessStatus: 'approved' | 'pending'
+  isAdmin: boolean
+  request: DoctorAccessRequest | null
+  pendingRequests: DoctorAccessRequest[]
+}
+
 export async function getMyHDT(): Promise<DoctorStats> {
   const headers = await authHeader();
   const res = await fetch(`${BASE}/api/portal/hdt/me`, { headers });
@@ -132,4 +156,25 @@ export async function getLeaderboard(): Promise<DoctorStats[]> {
   if (!res.ok) throw new Error(await parseError(res));
   const data = await res.json();
   return data.leaderboard;
+}
+
+export async function getPortalAuthStatus(): Promise<PortalAuthStatus> {
+  const headers = await authHeader();
+  const res = await fetch(`${BASE}/api/portal/auth/status`, { headers });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
+export async function approveDoctorRequest(email: string): Promise<{
+  ok: boolean
+  approved: DoctorAccessRequest
+  pendingRequests: DoctorAccessRequest[]
+}> {
+  const headers = await authHeader();
+  const res = await fetch(`${BASE}/api/portal/admin/doctor-requests/${encodeURIComponent(email)}/approve`, {
+    method: 'POST',
+    headers,
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
 }

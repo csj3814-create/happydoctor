@@ -3,6 +3,7 @@ const crypto = require('crypto');
 
 const PUBLIC_STATS_PATH = ['system', 'public_stats'];
 const FOLLOW_UP_SESSIONS = 'follow_up_sessions';
+const DOCTOR_ACCESS_REQUESTS = 'doctor_access_requests';
 const SHORT_TRACKING_CODE_LENGTH = 6;
 const LEGACY_TRACKING_CODE_LENGTH = 8;
 const SHORT_TRACKING_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -148,6 +149,147 @@ function toIsoString(value) {
   }
 
   return null;
+}
+
+function normalizeDoctorEmail(email) {
+  if (typeof email !== 'string') return '';
+  return email.trim().toLowerCase();
+}
+
+function getDoctorAccessRequestRef(email) {
+  if (!db) return null;
+  const normalizedEmail = normalizeDoctorEmail(email);
+  if (!normalizedEmail) return null;
+  return db.collection(DOCTOR_ACCESS_REQUESTS).doc(normalizedEmail);
+}
+
+function mapDoctorAccessRecord(snapshot) {
+  if (!snapshot || !snapshot.exists) return null;
+  const data = snapshot.data() || {};
+  return {
+    id: snapshot.id,
+    email: data.email || snapshot.id,
+    name: data.name || data.email || snapshot.id,
+    status: data.status || 'pending',
+    requestedAt: toIsoString(data.requestedAt),
+    approvedAt: toIsoString(data.approvedAt),
+    lastLoginAt: toIsoString(data.lastLoginAt),
+    updatedAt: toIsoString(data.updatedAt),
+    approvedByEmail: data.approvedByEmail || null,
+    approvedByName: data.approvedByName || null,
+    latestUid: data.latestUid || null,
+  };
+}
+
+async function getDoctorAccessRecordByEmail(email) {
+  const ref = getDoctorAccessRequestRef(email);
+  if (!ref) return null;
+
+  try {
+    const snapshot = await ref.get();
+    return mapDoctorAccessRecord(snapshot);
+  } catch (error) {
+    console.error('[DB DoctorAccess Get Error]', error);
+    return null;
+  }
+}
+
+async function upsertDoctorAccessRequest(profile = {}) {
+  const normalizedEmail = normalizeDoctorEmail(profile.email);
+  if (!db || !normalizedEmail) return null;
+
+  const ref = getDoctorAccessRequestRef(normalizedEmail);
+  if (!ref) return null;
+
+  try {
+    const snapshot = await ref.get();
+    const current = snapshot.exists ? snapshot.data() || {} : {};
+    const alreadyApproved = current.status === 'approved';
+
+    const payload = {
+      email: normalizedEmail,
+      name: profile.name || current.name || normalizedEmail,
+      latestUid: profile.uid || current.latestUid || null,
+      lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    if (!snapshot.exists) {
+      payload.status = 'pending';
+      payload.requestedAt = admin.firestore.FieldValue.serverTimestamp();
+    } else if (!alreadyApproved) {
+      payload.status = 'pending';
+    }
+
+    await ref.set(payload, { merge: true });
+    return getDoctorAccessRecordByEmail(normalizedEmail);
+  } catch (error) {
+    console.error('[DB DoctorAccess Upsert Error]', error);
+    return null;
+  }
+}
+
+async function ensureApprovedDoctorAccess(profile = {}, approver = null) {
+  const normalizedEmail = normalizeDoctorEmail(profile.email);
+  if (!db || !normalizedEmail) return null;
+
+  const ref = getDoctorAccessRequestRef(normalizedEmail);
+  if (!ref) return null;
+
+  try {
+    const snapshot = await ref.get();
+    const current = snapshot.exists ? snapshot.data() || {} : {};
+    const approvedByEmail = normalizeDoctorEmail(approver?.email) || current.approvedByEmail || 'system';
+    const approvedByName = approver?.name || current.approvedByName || 'System';
+
+    await ref.set({
+      email: normalizedEmail,
+      name: profile.name || current.name || normalizedEmail,
+      latestUid: profile.uid || current.latestUid || null,
+      status: 'approved',
+      requestedAt: current.requestedAt || admin.firestore.FieldValue.serverTimestamp(),
+      approvedAt: current.approvedAt || admin.firestore.FieldValue.serverTimestamp(),
+      approvedByEmail,
+      approvedByName,
+      lastLoginAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    return getDoctorAccessRecordByEmail(normalizedEmail);
+  } catch (error) {
+    console.error('[DB DoctorAccess Approve Error]', error);
+    return null;
+  }
+}
+
+async function approveDoctorAccessRequest(email, approver = null) {
+  const existing = await getDoctorAccessRecordByEmail(email);
+  if (!existing || existing.status !== 'pending') {
+    return null;
+  }
+
+  return ensureApprovedDoctorAccess({
+    email,
+    name: existing.name || email,
+  }, approver);
+}
+
+async function listPendingDoctorAccessRequests() {
+  if (!db) return [];
+
+  try {
+    const snapshot = await db.collection(DOCTOR_ACCESS_REQUESTS)
+      .where('status', '==', 'pending')
+      .get();
+
+    return snapshot.docs
+      .map(mapDoctorAccessRecord)
+      .filter(Boolean)
+      .sort((left, right) => getTimestampMs(right?.requestedAt) - getTimestampMs(left?.requestedAt));
+  } catch (error) {
+    console.error('[DB DoctorAccess Pending Error]', error);
+    return [];
+  }
 }
 
 function mapDoctorReplyForPatient(reply) {
@@ -894,6 +1036,11 @@ module.exports = {
   awardHDT,
   getHDTLeaderboard,
   getDoctorStats,
+  getDoctorAccessRecordByEmail,
+  upsertDoctorAccessRequest,
+  ensureApprovedDoctorAccess,
+  approveDoctorAccessRequest,
+  listPendingDoctorAccessRequests,
   getPublicStats,
   rebuildPublicStats,
   saveFollowUpSession,

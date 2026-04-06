@@ -9,12 +9,16 @@ const {
   awardHDT,
   getHDTLeaderboard,
   getDoctorStats,
+  getDoctorAccessRecordByEmail,
+  upsertDoctorAccessRequest,
+  ensureApprovedDoctorAccess,
+  approveDoctorAccessRequest,
+  listPendingDoctorAccessRequests,
   HDT_REPLY,
   getAdmin,
 } = require('../services/dbService');
 const { enqueuePatientChannelPush, clearDoctorNotifications } = require('../services/notifyService');
-const { appSiteUrl } = require('../config');
-const { getAllowedDoctorEmails } = require('../config');
+const { appSiteUrl, getAllowedDoctorEmails, getPortalAdminEmails } = require('../config');
 const followUpService = require('../services/followUpService');
 
 const router = express.Router();
@@ -34,39 +38,8 @@ function parseListQuery(query = {}) {
   };
 }
 
-async function requireDoctorAuth(req, res, next) {
-  const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith('Bearer ')) {
-    return res.status(401).json({ error: '인증 토큰이 없습니다.' });
-  }
-
-  const admin = getAdmin();
-  if (!admin) {
-    return res.status(503).json({ error: '인증 서비스가 아직 준비되지 않았습니다.' });
-  }
-
-  const idToken = auth.slice(7);
-
-  try {
-    const decoded = await admin.auth().verifyIdToken(idToken);
-    const email = (decoded.email || '').toLowerCase();
-    const allowedEmails = getAllowedDoctorEmails();
-
-    if (allowedEmails.length > 0 && !allowedEmails.includes(email)) {
-      return res.status(403).json({ error: '접근 권한이 없습니다.' });
-    }
-
-    req.doctor = {
-      uid: decoded.uid,
-      email,
-      name: decoded.name || email,
-    };
-
-    return next();
-  } catch (error) {
-    console.error('[Portal Auth Error]', error.message);
-    return res.status(401).json({ error: '유효하지 않은 토큰입니다.' });
-  }
+function normalizeEmail(email) {
+  return typeof email === 'string' ? email.trim().toLowerCase() : '';
 }
 
 function serializeTimestamps(value) {
@@ -105,19 +78,160 @@ function buildPatientReplyPushMessage({
   return [
     '의료진 답변이 도착했습니다.',
     '',
-    `👨‍⚕️ ${doctorName || '해피닥터 의료진'}`,
+    `${doctorName || '해피닥터 의료진'} 선생님의 답변`,
     '',
     message,
     '',
     statusUrl ? `상태 확인: ${statusUrl}` : null,
     trackingCode ? `직접 입력 코드: ${trackingCode}` : null,
     '',
-    '도움이 충분했다면 이 채널에 상담종료라고 보내 상담을 마무리해 주세요.',
-    '추가로 설명이 필요하면 상태 확인 화면이나 채널에서 다시 이어서 말씀하셔도 됩니다.',
+    '답변을 충분히 확인하셨다면 카카오톡에서 상담종료라고 보내 상담을 마무리해 주세요.',
+    '추가 설명이 필요하면 상태 확인 화면이나 채널에서 다시 이어서 문의하실 수 있습니다.',
   ]
     .filter(Boolean)
     .join('\n');
 }
+
+async function resolveDoctorAccessContext(decoded) {
+  const doctor = {
+    uid: decoded.uid,
+    email: normalizeEmail(decoded.email),
+    name: decoded.name || normalizeEmail(decoded.email),
+  };
+
+  const adminEmails = getPortalAdminEmails();
+  const allowedEmails = getAllowedDoctorEmails();
+  const isAdmin = adminEmails.includes(doctor.email);
+
+  let accessRecord = await getDoctorAccessRecordByEmail(doctor.email);
+  const isBootstrapApproved = allowedEmails.includes(doctor.email);
+  const isApproved = isAdmin || isBootstrapApproved || accessRecord?.status === 'approved';
+
+  if (isApproved) {
+    accessRecord = await ensureApprovedDoctorAccess(doctor, isAdmin ? doctor : null) || accessRecord;
+    return {
+      doctor,
+      isAdmin,
+      accessStatus: 'approved',
+      accessRecord,
+    };
+  }
+
+  accessRecord = await upsertDoctorAccessRequest(doctor);
+  return {
+    doctor,
+    isAdmin: false,
+    accessStatus: 'pending',
+    accessRecord,
+  };
+}
+
+async function authenticateDoctor(req, res) {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith('Bearer ')) {
+    res.status(401).json({ error: '인증 토큰이 없습니다.' });
+    return null;
+  }
+
+  const admin = getAdmin();
+  if (!admin) {
+    res.status(503).json({ error: '인증 서비스가 아직 준비되지 않았습니다.' });
+    return null;
+  }
+
+  const idToken = auth.slice(7);
+
+  try {
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    return resolveDoctorAccessContext(decoded);
+  } catch (error) {
+    console.error('[Portal Auth Error]', error.message);
+    res.status(401).json({ error: '유효하지 않은 토큰입니다.' });
+    return null;
+  }
+}
+
+async function requireDoctorAuth(req, res, next) {
+  const context = await authenticateDoctor(req, res);
+  if (!context) return;
+
+  if (context.accessStatus !== 'approved') {
+    return res.status(403).json({
+      error: '의사 포털 접근은 대표자 승인 후 가능합니다.',
+      code: 'approval_pending',
+      request: serializeTimestamps(context.accessRecord),
+    });
+  }
+
+  req.doctor = context.doctor;
+  req.portalAccess = context;
+  return next();
+}
+
+async function requireAdminAuth(req, res, next) {
+  const context = await authenticateDoctor(req, res);
+  if (!context) return;
+
+  if (context.accessStatus !== 'approved') {
+    return res.status(403).json({
+      error: '대표자 승인 후에만 이 기능을 사용할 수 있습니다.',
+      code: 'approval_pending',
+      request: serializeTimestamps(context.accessRecord),
+    });
+  }
+
+  if (!context.isAdmin) {
+    return res.status(403).json({
+      error: '대표자 권한이 필요합니다.',
+      code: 'admin_only',
+    });
+  }
+
+  req.doctor = context.doctor;
+  req.portalAccess = context;
+  return next();
+}
+
+router.get('/auth/status', async (req, res) => {
+  const context = await authenticateDoctor(req, res);
+  if (!context) return;
+
+  const pendingRequests = context.isAdmin
+    ? await listPendingDoctorAccessRequests()
+    : [];
+
+  return res.json({
+    doctor: context.doctor,
+    accessStatus: context.accessStatus,
+    isAdmin: context.isAdmin,
+    request: serializeTimestamps(context.accessRecord),
+    pendingRequests: pendingRequests.map(serializeTimestamps),
+  });
+});
+
+router.post('/admin/doctor-requests/:email/approve', requireAdminAuth, async (req, res) => {
+  try {
+    const email = normalizeEmail(req.params.email);
+    if (!email) {
+      return res.status(400).json({ error: '승인할 이메일을 다시 확인해 주세요.' });
+    }
+
+    const approved = await approveDoctorAccessRequest(email, req.doctor);
+    if (!approved) {
+      return res.status(404).json({ error: '승인 대기 중인 의료진을 찾지 못했습니다.' });
+    }
+
+    const pendingRequests = await listPendingDoctorAccessRequests();
+    return res.json({
+      ok: true,
+      approved: serializeTimestamps(approved),
+      pendingRequests: pendingRequests.map(serializeTimestamps),
+    });
+  } catch (error) {
+    console.error('[Portal Approve Error]', error);
+    return res.status(500).json({ error: '의료진 승인 처리에 실패했습니다.' });
+  }
+});
 
 router.get('/consultations', requireDoctorAuth, async (req, res) => {
   try {

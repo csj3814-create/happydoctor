@@ -1,22 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+
 import type { PublicConsultationCreateResponse } from '@/lib/status'
+import {
+  ActiveConsultationSession,
+  WebConsultationDraft,
+  clearWebConsultationDraft,
+  getActiveConsultationSession,
+  getWebConsultationDraft,
+  saveActiveConsultationSession,
+  saveWebConsultationDraft,
+} from '@/lib/consultation-session'
 
 type WebConsultationStartFormProps = {
   entrySurface: string
 }
 
-type ConsultationFormState = {
-  age: string
-  gender: string
-  chiefComplaint: string
-  onset: string
-  symptomDetail: string
-  nrs: string
-  associatedSymptom: string
-  pastMedicalHistory: string
-}
+type ConsultationFormState = WebConsultationDraft
 
 const INITIAL_FORM_STATE: ConsultationFormState = {
   age: '',
@@ -29,20 +30,49 @@ const INITIAL_FORM_STATE: ConsultationFormState = {
   pastMedicalHistory: '',
 }
 
+function isEmptyFormState(formState: ConsultationFormState) {
+  return Object.values(formState).every((value) => !value.trim())
+}
+
 export default function WebConsultationStartForm({
   entrySurface,
 }: WebConsultationStartFormProps) {
   const [formState, setFormState] = useState(INITIAL_FORM_STATE)
+  const [draftReady, setDraftReady] = useState(false)
+  const [restoredDraft, setRestoredDraft] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [result, setResult] = useState<PublicConsultationCreateResponse | null>(null)
-  const [copied, setCopied] = useState(false)
+  const [activeSession, setActiveSession] = useState<ActiveConsultationSession | null>(null)
+
+  useEffect(() => {
+    const draft = getWebConsultationDraft()
+    if (draft) {
+      setFormState({
+        ...INITIAL_FORM_STATE,
+        ...draft,
+      })
+      setRestoredDraft(true)
+    }
+
+    setActiveSession(getActiveConsultationSession())
+    setDraftReady(true)
+  }, [])
+
+  useEffect(() => {
+    if (!draftReady) return
+
+    if (isEmptyFormState(formState)) {
+      clearWebConsultationDraft()
+      return
+    }
+
+    saveWebConsultationDraft(formState)
+  }, [draftReady, formState])
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setSubmitting(true)
     setError(null)
-    setCopied(false)
 
     try {
       const response = await fetch('/api/public/consultations', {
@@ -62,39 +92,62 @@ export default function WebConsultationStartForm({
 
       if (!response.ok) {
         const errorMessage = 'error' in payload ? payload.error : undefined
-        setResult(null)
         setError(errorMessage || '상담을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.')
         return
       }
 
-      setResult(payload as PublicConsultationCreateResponse)
+      const consultation = payload as PublicConsultationCreateResponse
+      saveActiveConsultationSession({
+        consultationId: consultation.consultationId,
+        lookup: consultation.trackingCode || '',
+        trackingCode: consultation.trackingCode || null,
+        statusUrl: consultation.statusUrl,
+      })
+      clearWebConsultationDraft()
       setFormState(INITIAL_FORM_STATE)
+      window.location.assign(consultation.statusUrl)
     } catch {
-      setResult(null)
       setError('상담을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.')
     } finally {
       setSubmitting(false)
     }
   }
 
-  async function handleCopyCode() {
-    if (!result?.trackingCode) return
-
-    try {
-      await navigator.clipboard.writeText(result.trackingCode)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1600)
-    } catch {
-      setCopied(false)
-    }
-  }
-
   return (
     <div className="space-y-6">
+      {activeSession && (
+        <section className="rounded-[1.6rem] border border-[var(--line)] bg-white px-5 py-4 shadow-[0_18px_40px_rgba(8,34,55,0.06)]">
+          <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
+            최근 상담
+          </p>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="text-sm leading-7 text-[var(--muted)]">
+              최근 시작한 상담이 1시간 동안 유지됩니다.
+              <br />
+              코드 <span className="font-semibold text-[var(--navy)]">{activeSession.trackingCode || activeSession.lookup}</span> 로
+              바로 이어서 확인할 수 있습니다.
+            </div>
+            <a
+              href={activeSession.statusUrl}
+              className="rounded-[1.1rem] bg-[var(--navy)] px-5 py-3 text-sm font-semibold text-white visited:text-white transition hover:bg-[#123c67]"
+              style={{ color: '#ffffff' }}
+            >
+              최근 상담 이어보기
+            </a>
+          </div>
+        </section>
+      )}
+
       <form
         onSubmit={handleSubmit}
         className="rounded-[2rem] border border-[var(--line)] bg-white p-5 shadow-[0_24px_60px_rgba(8,34,55,0.08)] sm:p-7"
       >
+        {restoredDraft && (
+          <div className="mb-5 rounded-[1.4rem] bg-[var(--soft-blue)] px-4 py-4 text-sm leading-7 text-[var(--ink)]">
+            방금 입력하던 내용을 다시 불러왔습니다. 이어서 작성한 뒤 상담을 시작할 수 있습니다.
+          </div>
+        )}
+
         <div className="grid gap-5 md:grid-cols-2">
           <label className="block">
             <span className="text-sm font-semibold text-[var(--ink)]">나이 또는 연령대</span>
@@ -124,7 +177,7 @@ export default function WebConsultationStartForm({
 
         <div className="mt-5 space-y-5">
           <label className="block">
-            <span className="text-sm font-semibold text-[var(--ink)]">가장 불편한 점</span>
+            <span className="text-sm font-semibold text-[var(--ink)]">가장 불편한 증상</span>
             <input
               type="text"
               required
@@ -200,7 +253,7 @@ export default function WebConsultationStartForm({
               onChange={(event) =>
                 setFormState((current) => ({ ...current, pastMedicalHistory: event.target.value }))
               }
-              placeholder="알고 있는 질환, 복용 중인 약이 있으면 적어 주세요."
+              placeholder="앓고 있는 질환, 복용 중인 약이 있으면 적어 주세요."
               rows={3}
               className="mt-3 w-full rounded-[1.1rem] border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm leading-7 text-[var(--ink)] outline-none transition focus:border-[var(--blue)] focus:bg-white"
             />
@@ -208,8 +261,8 @@ export default function WebConsultationStartForm({
         </div>
 
         <div className="mt-6 rounded-[1.4rem] bg-[var(--soft-blue)] px-4 py-4 text-xs leading-6 text-[var(--muted)]">
-          응급 상황이 의심되면 이 폼보다 119 또는 가까운 응급실 이용이 우선입니다. 해피닥터는 응급실을 대신하는
-          서비스가 아니라, 의료가 멀게 느껴질 때 먼저 연결되는 무료 온라인 의료상담입니다.
+          응급 상황이 의심되면 앱보다 119 또는 가까운 응급실 이용이 우선입니다. 해피닥터는 응급실을 대신하는 서비스가 아니라,
+          의료가 멀게 느껴지는 분들이 온라인으로 먼저 도움을 청할 수 있게 돕는 상담 서비스입니다.
         </div>
 
         {error ? (
@@ -226,57 +279,6 @@ export default function WebConsultationStartForm({
           {submitting ? '보듬이가 내용을 정리하고 있습니다...' : '웹으로 상담 시작'}
         </button>
       </form>
-
-      {result ? (
-        <section className="rounded-[2rem] border border-[var(--line)] bg-white p-5 shadow-[0_24px_60px_rgba(8,34,55,0.08)] sm:p-7">
-          <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
-            Consultation Started
-          </p>
-          <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-[var(--ink)]">
-            상담 접수가 완료되었습니다
-          </h2>
-          <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
-            아래는 보듬이의 첫 안내입니다.
-          </p>
-
-          <div className="mt-6 rounded-[1.6rem] bg-[var(--surface)] p-5">
-            <p className="text-sm font-semibold text-[var(--ink)]">보듬이 첫 답변</p>
-            <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--muted)]">
-              {result.replyToPatient}
-            </p>
-          </div>
-
-          <div className="mt-5 grid gap-4 md:grid-cols-[1fr_auto]">
-            <div className="rounded-[1.6rem] border border-[var(--line)] p-5">
-              <p className="text-sm font-semibold text-[var(--ink)]">직접 입력 코드</p>
-              <p className="mt-3 text-3xl font-semibold tracking-[0.14em] text-[var(--navy)]">
-                {result.trackingCode || '생성 중'}
-              </p>
-              <p className="mt-2 text-xs leading-6 text-[var(--muted)]">
-                링크 대신 이 코드만 저장해 두셔도 됩니다.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleCopyCode}
-              className="rounded-[1.2rem] border border-[var(--line)] bg-white px-5 py-3 text-sm font-semibold text-[var(--ink)] transition hover:bg-[var(--soft-blue)]"
-            >
-              {copied ? '코드 복사됨' : '코드 복사'}
-            </button>
-          </div>
-
-          <div className="mt-5 flex flex-wrap gap-3">
-            <a
-              href={result.statusUrl}
-              className="rounded-[1.2rem] bg-[var(--navy)] px-5 py-3 text-sm font-semibold text-white visited:text-white transition hover:bg-[#123c67]"
-              style={{ color: '#ffffff' }}
-            >
-              상태 확인
-            </a>
-          </div>
-        </section>
-      ) : null}
     </div>
   )
 }
