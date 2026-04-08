@@ -2,7 +2,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 import ConsultationImageUploader from '@/components/ConsultationImageUploader'
@@ -22,6 +22,8 @@ const timeFormatter = new Intl.DateTimeFormat('ko-KR', {
   timeStyle: 'short',
   timeZone: 'Asia/Seoul',
 })
+
+const LIVE_STATUS_POLL_INTERVAL_MS = 15 * 1000
 
 function formatDateTime(value: string | null) {
   if (!value) return '아직 기록이 없습니다.'
@@ -91,6 +93,9 @@ export default function StatusPageClient() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [restoredRecentSession, setRestoredRecentSession] = useState(false)
   const [checkingStoredSession, setCheckingStoredSession] = useState(true)
+  const [liveUpdateMessage, setLiveUpdateMessage] = useState<string | null>(null)
+  const latestReplyIdRef = useRef<string | null>(null)
+  const replyBaselineReadyRef = useRef(false)
 
   useEffect(() => {
     setLookupValue(rawLookup)
@@ -98,6 +103,7 @@ export default function StatusPageClient() {
 
   useEffect(() => {
     const normalizedLookup = normalizeStatusLookup(rawLookup)
+    setLiveUpdateMessage(null)
 
     if (rawLookup && !normalizedLookup) {
       setResolvedLookup(null)
@@ -175,6 +181,70 @@ export default function StatusPageClient() {
       cancelled = true
     }
   }, [resolvedLookup, refreshKey])
+
+  useEffect(() => {
+    if (!consultation) {
+      latestReplyIdRef.current = null
+      replyBaselineReadyRef.current = false
+      return
+    }
+
+    const latestReplyId =
+      consultation.doctorReplies.length > 0
+        ? consultation.doctorReplies[consultation.doctorReplies.length - 1]?.id || null
+        : null
+
+    if (
+      replyBaselineReadyRef.current
+      && latestReplyId
+      && latestReplyIdRef.current !== latestReplyId
+    ) {
+      setLiveUpdateMessage('새로운 의료진 답변이 도착했습니다. 아래 최신 답변을 확인해 주세요.')
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      }
+    }
+
+    latestReplyIdRef.current = latestReplyId
+    replyBaselineReadyRef.current = true
+  }, [consultation])
+
+  useEffect(() => {
+    if (!resolvedLookup) return
+    if (!consultation || consultation.status === 'closed') return
+
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        setRefreshKey((current) => current + 1)
+      }
+    }, LIVE_STATUS_POLL_INTERVAL_MS)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [resolvedLookup, consultation?.status])
+
+  useEffect(() => {
+    if (!resolvedLookup) return
+
+    function refreshStatus() {
+      setRefreshKey((current) => current + 1)
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        refreshStatus()
+      }
+    }
+
+    window.addEventListener('focus', refreshStatus)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener('focus', refreshStatus)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [resolvedLookup])
 
   const statusCopy = consultation ? getStatusCopy(consultation) : null
   const mediaItems = consultation?.mediaItems ?? []
@@ -269,6 +339,12 @@ export default function StatusPageClient() {
 
         {consultation && statusCopy ? (
           <section className="mt-6 space-y-5">
+            {liveUpdateMessage ? (
+              <div className="rounded-[1.8rem] border border-[#d4eadb] bg-[#f4fbf6] px-5 py-4 text-sm leading-7 text-[#2f6b45]">
+                {liveUpdateMessage}
+              </div>
+            ) : null}
+
             <div className="rounded-[2rem] bg-[var(--navy)] p-6 text-white shadow-[0_24px_60px_rgba(7,28,49,0.18)]">
               <p className="display-face text-xs font-semibold uppercase tracking-[0.24em] text-white/66">
                 {statusCopy.badge}
@@ -378,6 +454,8 @@ export default function StatusPageClient() {
                     lookup={resolvedLookup}
                     canClose={canCloseConsultation}
                     isClosed={consultation.status === 'closed'}
+                    allowFollowUp={Boolean(latestReply) && consultation.status !== 'closed'}
+                    onUpdated={() => setRefreshKey((current) => current + 1)}
                   />
                 ) : null}
 

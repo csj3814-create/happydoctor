@@ -7,14 +7,64 @@ const PATIENT_CHANNEL_PUSHES = 'patient_channel_pushes';
 const MESSENGER_ROOMS = 'messenger_rooms';
 const DELIVERY_ROOMS = 'delivery_rooms';
 const DOCTOR_ROOM_DOC_ID = 'doctor_room';
+const DOCTOR_ROOM_KIND = 'doctor_group';
 const DOCTOR_NOTIFICATION_LEASE_MS = 60 * 1000;
 const DEFAULT_DOCTOR_REMINDER_DELAYS_MINUTES = Object.freeze([0, 5, 15]);
 const DOCTOR_NOTIFICATION_DUPLICATE_WINDOW_MS = 20 * 60 * 1000;
 const DOCTOR_NOTIFICATION_CATCHUP_GAP_MS = 5 * 60 * 1000;
+const DOCTOR_ROOM_BLOCKED_PATTERNS = Object.freeze([
+  /운영위/,
+  /운영위원/,
+  /운영위원회/,
+]);
 
 function getCollection(name) {
   const db = getDb();
   return db ? db.collection(name) : null;
+}
+
+function normalizeRoomName(value) {
+  if (typeof value !== 'string') return '';
+  return value.trim().replace(/\s+/g, ' ').slice(0, 120);
+}
+
+function isExplicitGroupChat(value) {
+  return value === true || value === 'true' || value === 1 || value === '1';
+}
+
+function validateDoctorRoomCandidate(roomName, options = {}) {
+  const normalizedRoomName = normalizeRoomName(roomName);
+  const isGroupChat = isExplicitGroupChat(options.isGroupChat);
+
+  if (!normalizedRoomName) {
+    return {
+      ok: false,
+      code: 'ROOM_REQUIRED',
+      roomName: '',
+    };
+  }
+
+  if (!isGroupChat) {
+    return {
+      ok: false,
+      code: 'GROUP_CHAT_REQUIRED',
+      roomName: normalizedRoomName,
+    };
+  }
+
+  if (DOCTOR_ROOM_BLOCKED_PATTERNS.some((pattern) => pattern.test(normalizedRoomName))) {
+    return {
+      ok: false,
+      code: 'BLOCKED_ROOM',
+      roomName: normalizedRoomName,
+    };
+  }
+
+  return {
+    ok: true,
+    code: 'OK',
+    roomName: normalizedRoomName,
+  };
 }
 
 async function countDocuments(query) {
@@ -422,28 +472,49 @@ async function claimDoctorNotification() {
   const coalescedDocs = await normalizeDueDoctorNotifications(collection, dueDocs);
   if (coalescedDocs.length === 0) return null;
 
-  const doc = coalescedDocs[0];
-  const leaseId = randomUUID();
-  const leaseExpiresAt = new Date(Date.now() + DOCTOR_NOTIFICATION_LEASE_MS);
-  await doc.ref.update({
-    status: 'leased',
-    leaseId,
-    leaseExpiresAt,
-    leasedAt: getAdmin().firestore.FieldValue.serverTimestamp(),
-    attemptCount: (doc.data()?.attemptCount || 0) + 1,
-  });
+  for (const doc of coalescedDocs) {
+    const leaseId = randomUUID();
+    const leaseExpiresAt = new Date(Date.now() + DOCTOR_NOTIFICATION_LEASE_MS);
+    const claimed = await getDb().runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(doc.ref);
+      if (!snapshot.exists) return null;
 
-  const data = doc.data();
-  return {
-    notificationId: doc.id,
-    leaseId,
-    message: data.message,
-    patientId: data.patientId,
-    type: data.type || 'triage',
-    priority: data.priority || 'normal',
-    reminderDelayMinutes: data.reminderDelayMinutes || 0,
-    reminderStage: data.reminderStage || 1,
-  };
+      const data = snapshot.data() || {};
+      if (data.status !== 'pending') {
+        return null;
+      }
+
+      const availableAt = toDate(data.availableAt);
+      if (availableAt && availableAt.getTime() > Date.now()) {
+        return null;
+      }
+
+      transaction.update(doc.ref, {
+        status: 'leased',
+        leaseId,
+        leaseExpiresAt,
+        leasedAt: getAdmin().firestore.FieldValue.serverTimestamp(),
+        attemptCount: (data.attemptCount || 0) + 1,
+      });
+
+      return {
+        notificationId: snapshot.id,
+        leaseId,
+        message: data.message,
+        patientId: data.patientId,
+        type: data.type || 'triage',
+        priority: data.priority || 'normal',
+        reminderDelayMinutes: data.reminderDelayMinutes || 0,
+        reminderStage: data.reminderStage || 1,
+      };
+    });
+
+    if (claimed) {
+      return claimed;
+    }
+  }
+
+  return null;
 }
 
 async function acknowledgeDoctorNotification(notificationId, payload = {}) {
@@ -563,6 +634,7 @@ async function enqueuePatientChannelPush(userId, message, type = 'general') {
     message,
     type,
     status: 'pending',
+    attemptCount: 0,
     createdAt: getAdmin().firestore.FieldValue.serverTimestamp(),
   });
 
@@ -580,18 +652,46 @@ async function dequeuePatientChannelPush() {
 
   const snapshot = await collection
     .where('status', '==', 'pending')
-    .limit(1)
+    .limit(20)
     .get();
 
   if (snapshot.empty) return null;
 
-  const doc = snapshot.docs[0];
-  await doc.ref.update({
-    status: 'delivered',
-    deliveredAt: getAdmin().firestore.FieldValue.serverTimestamp(),
-  });
+  const docs = snapshot.docs
+    .sort((left, right) => {
+      const leftTime = toDate(left.data()?.createdAt)?.getTime() || 0;
+      const rightTime = toDate(right.data()?.createdAt)?.getTime() || 0;
+      return leftTime - rightTime;
+    });
 
-  return doc.data();
+  for (const doc of docs) {
+    const claimed = await getDb().runTransaction(async (transaction) => {
+      const current = await transaction.get(doc.ref);
+      if (!current.exists) return null;
+
+      const data = current.data() || {};
+      if (data.status !== 'pending') {
+        return null;
+      }
+
+      transaction.update(doc.ref, {
+        status: 'delivered',
+        deliveredAt: getAdmin().firestore.FieldValue.serverTimestamp(),
+        attemptCount: (data.attemptCount || 0) + 1,
+      });
+
+      return {
+        ...data,
+        queueId: current.id,
+      };
+    });
+
+    if (claimed) {
+      return claimed;
+    }
+  }
+
+  return null;
 }
 
 async function clearPatientChannelPushes(userId, type = null) {
@@ -641,19 +741,38 @@ async function registerRoom(userId, roomName) {
   return true;
 }
 
-async function registerDoctorRoom(roomName) {
+async function registerDoctorRoom(roomName, options = {}) {
   const db = getDb();
-  if (!db || !roomName) {
-    return false;
+  const validation = validateDoctorRoomCandidate(roomName, {
+    isGroupChat: options.isGroupChat,
+  });
+
+  if (!db) {
+    return {
+      ok: false,
+      code: 'DB_UNAVAILABLE',
+      roomName: validation.roomName,
+    };
+  }
+
+  if (!validation.ok) {
+    return validation;
   }
 
   await db.collection(DELIVERY_ROOMS).doc(DOCTOR_ROOM_DOC_ID).set({
-    roomName,
+    roomName: validation.roomName,
+    kind: DOCTOR_ROOM_KIND,
+    isGroupChat: true,
+    registeredBy: options.registeredBy || null,
     updatedAt: getAdmin().firestore.FieldValue.serverTimestamp(),
   }, { merge: true });
 
-  console.log(`[Doctor Room Registered] ${roomName}`);
-  return true;
+  console.log(`[Doctor Room Registered] ${validation.roomName}`);
+  return {
+    ok: true,
+    code: 'OK',
+    roomName: validation.roomName,
+  };
 }
 
 async function getDoctorRoomName() {
@@ -662,7 +781,16 @@ async function getDoctorRoomName() {
 
   const snapshot = await db.collection(DELIVERY_ROOMS).doc(DOCTOR_ROOM_DOC_ID).get();
   if (!snapshot.exists) return null;
-  return snapshot.data()?.roomName || null;
+
+  const data = snapshot.data() || {};
+  if (data.kind !== DOCTOR_ROOM_KIND) {
+    return null;
+  }
+
+  const validation = validateDoctorRoomCandidate(data.roomName, {
+    isGroupChat: data.isGroupChat,
+  });
+  return validation.ok ? validation.roomName : null;
 }
 
 async function getRoomName(userId) {
@@ -717,8 +845,10 @@ module.exports = {
   getRoomName,
   getDoctorRoomName,
   getQueueStatus,
+  validateDoctorRoomCandidate,
   __test__: {
     splitDueDoctorNotifications,
     buildDoctorNotificationGroupKey,
+    validateDoctorRoomCandidate,
   },
 };

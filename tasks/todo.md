@@ -902,3 +902,303 @@
 - [ ] 포털 상세 화면에서 업로드 이미지 표시 확인
 - [ ] 웹앱 동영상 업로드 1차 설계 시작
 - [ ] 카카오 상담에서 사진 첨부 경로 연결 방식 정리
+
+## 단계 59: 매니저용 해피닥터 소개 브리프 작성 (2026.04.07)
+
+### 목표
+- [x] 해피닥터가 어떤 의의에서 시작된 단체인지 한눈에 설명하는 소개 문서를 만든다.
+- [x] 지금까지의 주요 사업, 협력, 운영 성과를 대외 커뮤니케이션 관점에서 정리한다.
+- [x] 현재 서비스가 어느 단계에 와 있는지 최신 내부 문서와 라이브 상태 기준으로 정리한다.
+
+### 검증
+- [x] `README.md`, `docs/project_plan.md`, `docs/service_launch_checklist.md`, `docs/session_handoff_2026-04-07.md`를 근거로 서술했는지 확인
+- [x] 홈페이지 소스와 라이브 백엔드 통계(`/api/stats`, `/api/version`) 기준 최신 수치를 반영했는지 확인
+- [x] 문서가 언론/SNS/매니저 공유용으로 바로 읽히는 톤과 구조인지 확인
+
+### 진행 메모 (2026.04.07 - 매니저 브리프)
+- [x] 설립 배경, 대상, 비영리 성격 정리
+- [x] 주요 사업 및 연혁 요약
+- [x] 현재 단계 및 남은 관문 정리
+- [x] 짧은 소개 문구까지 포함
+
+### 리뷰
+- [x] 결과 문서: `docs/happydoctor_manager_brief.md`
+- [x] 라이브 통계 확인: `/api/stats` 응답 `total=382`, `doctorReplied=326`
+- [x] 라이브 버전 확인: `/api/version` 응답 기준 2026-04-07 리비전 정상 응답
+- [x] 현재 단계 표현은 “정식 홍보 직전 운영 안정화 단계”로 정리
+
+## 단계 60: 해피닥터 보도자료 초안 작성 (2026.04.07)
+
+### 목표
+- [x] 매니저 브리프를 바탕으로 언론 배포용 한국어 보도자료 초안을 만든다.
+- [x] 과장 없이 현재 단계에 맞는 표현으로 제목, 리드, 본문, 단체 소개를 정리한다.
+- [x] 해피닥터의 설립 취지, 협력 구조, 운영 현황, 현재 수치를 자연스럽게 녹인다.
+
+### 검증
+- [x] `docs/happydoctor_manager_brief.md`와 `docs/service_launch_checklist.md` 기준으로 톤과 단계 표현을 맞췄는지 확인
+- [x] 라이브 통계(`/api/stats`)와 라이브 버전(`/api/version`) 확인 결과를 반영했는지 확인
+- [x] “정식 병원” 또는 “대면진료 대체”로 오해될 표현이 없는지 확인
+
+### 진행 메모 (2026.04.07 - 보도자료)
+- [x] 제목/부제 초안 작성
+- [x] 리드 문단 작성
+- [x] 본문 구조화
+- [x] 단체 소개 문안 정리
+
+### 리뷰
+- [x] 결과 문서: `docs/happydoctor_press_release_draft.md`
+- [x] 표현 톤은 “정식 출시”보다 “운영 본격화/운영 안정화 단계” 중심으로 정리
+- [x] 라이브 통계 확인: `/api/stats` 응답 `total=382`, `doctorReplied=326`
+- [x] 라이브 버전 확인: `/api/version` 2026-04-07 정상 응답 확인
+
+## 단계 61: 농아인협회 인사위원 위촉 반영 보도자료/워드 작성 (2026.04.07)
+
+### 목표
+- [x] 기존 보도자료 초안에 최석재 대표의 한국농아인협회 서울특별시협회 인사위원 위촉 사실을 반영한다.
+- [x] 위촉일, 임기, 2026-04-06 위촉장 전달 및 차담 사실을 정확한 날짜로 반영한다.
+- [x] 사진 자료를 포함한 Word 문서를 생성한다.
+
+### 검증
+- [x] 위촉 정보가 사용자 제공 내용과 사진 속 위촉장 정보에 맞는지 확인
+- [x] 해피닥터의 기존 청각장애인 접근성 협력 맥락과 무리 없이 연결되는지 확인
+- [x] `.docx` 파일이 실제로 생성되고 열 수 있는 형태인지 확인
+
+### 진행 메모 (2026.04.07 - 농아인협회 위촉 보도자료)
+- [x] 새 제목/부제 작성
+- [x] 위촉 사실과 해피닥터 사업 내용을 통합한 본문 작성
+- [x] 삽입 가능한 사진 자산 정리
+- [x] 워드 파일 생성
+
+### 리뷰
+- [x] 결과 원문: `docs/happydoctor_press_release_deaf_committee_draft.md`
+- [x] 결과 워드: `docs/happydoctor_press_release_deaf_committee_2026-04-07.docx`
+- [x] 이미지 자산: 사용자 제공 위촉장 이미지 마스킹본 + 기존 `lecture-deaf.jpg`
+- [x] `.docx` 내부 media 확인: `word/media/image1.png`, `word/media/image2.jpg`
+
+## 단계 62: 원본 사진 4장 반영 최종 보도자료 재생성 (2026.04.07)
+
+### 목표
+- [x] 다운로드 폴더 원본 사진 4장을 모두 반영한 최종 보도자료를 만든다.
+- [x] 사용자가 민감정보 삭제가 필요 없다고 확인한 사항을 반영해 마스킹 없이 원본을 사용한다.
+- [x] 최종 Word 문서를 다시 생성한다.
+
+### 검증
+- [x] `C:\Users\user\Downloads\260406서울시농아인협회인사위원위촉1.jpg`
+- [x] `C:\Users\user\Downloads\260406서울시농아인협회인사위원위촉2.jpg`
+- [x] `C:\Users\user\Downloads\260406서울시농아인협회인사위원위촉3.jpg`
+- [x] `C:\Users\user\Downloads\260406서울시농아인협회인사위원위촉장.jpg`
+- [x] 최종 `.docx` 안에 사진 4장이 들어갔는지 확인
+
+### 진행 메모 (2026.04.07 - 원본 사진 반영)
+- [x] 문서 사진 섹션 교체
+- [x] Word 생성 스크립트 수정
+- [x] 최종 Word 재생성
+
+### 리뷰
+- [x] 최종 원문: `docs/happydoctor_press_release_deaf_committee_draft.md`
+- [x] 최종 워드: `docs/happydoctor_press_release_deaf_committee_2026-04-07.docx`
+- [x] 원본 사진 4장 복사본 생성: `docs/assets/deaf_committee_photo1.jpg`, `docs/assets/deaf_committee_photo2.jpg`, `docs/assets/deaf_committee_certificate.jpg`, `docs/assets/deaf_committee_photo3.jpg`
+- [x] `.docx` 내부 media 확인: `image1.jpg`, `image2.jpg`, `image3.jpg`, `image4.jpg`
+
+## 단계 63: 배포용 최종 문안 및 언론사 메일 초안 작성 (2026.04.07)
+
+### 목표
+- [x] 보도자료를 실제 배포용 톤으로 한 번 더 다듬는다.
+- [x] 최종 Word 파일도 같은 문안 기준으로 다시 만든다.
+- [x] 언론사 메일 제목/본문 초안을 함께 만든다.
+
+### 검증
+- [x] 보도자료 final 원문 생성
+- [x] final 기준 `.docx` 생성
+- [x] 언론사 메일 초안 문서 생성
+- [x] 기존 수치와 날짜가 그대로 유지되는지 확인
+
+### 진행 메모 (2026.04.07 - 배포 직전 다듬기)
+- [x] 제목/리드 압축
+- [x] 문단 흐름 정리
+- [x] 메일 제목 옵션 작성
+- [x] 메일 본문 작성
+
+### 리뷰
+- [x] final 원문: `docs/happydoctor_press_release_deaf_committee_final.md`
+- [x] final 워드: `docs/happydoctor_press_release_deaf_committee_final_2026-04-07.docx`
+- [x] 메일 초안: `docs/happydoctor_press_email_draft.md`
+- [x] final `.docx` 내부 media 확인: 사진 4장 포함
+
+## 단계 64: 비공개 정보 제거 및 협력 중심 공개본 재작성 (2026.04.07)
+
+### 목표
+- [x] 비공개 요청에 따라 인사위원/위촉 관련 공개 문구를 모두 제거한다.
+- [x] 보도자료와 메일 초안을 단체 간 협력 중심으로 다시 쓴다.
+- [x] 위촉장 단독 사진은 제외하고, 현장 사진의 문서 노출 부분만 블러 처리한 공개용 자산으로 교체한다.
+
+### 검증
+- [x] `docs/*.md` 기준 `인사위원`, `위촉`, `위촉장` 공개 문구 제거 확인
+- [x] 최종 `.docx` 2종 모두 사진 3장 포함 확인
+- [x] `docs/assets`에는 공개용 블러 사진 3장만 남겨둠
+
+### 진행 메모 (2026.04.07 - 공개본 재작성)
+- [x] 보도자료 제목/리드/본문을 협력 논의 중심으로 재작성
+- [x] 메일 제목/본문 초안 재작성
+- [x] 공개용 블러 사진 생성
+- [x] 기존 중간 자산 정리
+
+### 리뷰
+- [x] 공개용 draft: `docs/happydoctor_press_release_deaf_committee_draft.md`
+- [x] 공개용 final: `docs/happydoctor_press_release_deaf_committee_final.md`
+- [x] 공개용 메일 초안: `docs/happydoctor_press_email_draft.md`
+- [x] 공개용 사진: `docs/assets/deaf_collab_public1.jpg`, `docs/assets/deaf_collab_public2.jpg`, `docs/assets/deaf_collab_public3.jpg`
+
+## 단계 65: 사용자 수정본 사진 반영 재생성 (2026.04.07)
+
+### 목표
+- [x] 사용자가 다시 수정해 전달한 공개용 사진 3장을 기준으로 보도자료 자산을 교체한다.
+- [x] Word 생성 스크립트가 이전 자동 블러 규칙이 아니라 사용자 수정본 사진을 그대로 반영하도록 정리한다.
+- [x] 보도자료 문안의 사진 처리 메모를 현재 자산 기준으로 갱신한다.
+
+### 검증
+- [x] `docs/assets/deaf_collab_public1.jpg`, `docs/assets/deaf_collab_public2.jpg`, `docs/assets/deaf_collab_public3.jpg` 재생성
+- [x] `docs/happydoctor_press_release_deaf_committee_2026-04-07.docx` 재생성
+- [x] `docs/happydoctor_press_release_deaf_committee_final_2026-04-07.docx` 재생성
+- [x] `.docx` 이미지 개수와 비공개 표현 미포함 여부 재확인
+
+### 진행 메모 (2026.04.07 - 수정본 사진 반영)
+- [x] `scripts/generate_press_release_docx.py`에서 자동 블러 처리 제거
+- [x] 보도자료 draft/final의 작성 기준을 `사용자 제공 수정본 사진 3장 사용`으로 갱신
+
+### 리뷰
+- [x] 공개용 사진 3장 재생성 시각: 2026-04-07 13:51
+- [x] draft `.docx` 재생성 완료: `docs/happydoctor_press_release_deaf_committee_2026-04-07.docx`
+- [x] final `.docx` 재생성 완료: `docs/happydoctor_press_release_deaf_committee_final_2026-04-07.docx`
+- [x] 보도자료/메일 문서 기준 `인사위원`, `위촉`, `위촉장`, `블러 처리` 검색 결과 없음
+
+## 단계 66: 공식 단체명 반영 (2026.04.07)
+
+### 목표
+- [x] 보도자료 문안의 단체 표기를 공식 명칭 `행복한 의사 Happy Doctor`로 통일한다.
+- [x] 언론사 메일 초안의 단체 표기도 같은 기준으로 정리한다.
+- [x] 공식 명칭 반영본 기준으로 워드 파일을 다시 생성한다.
+
+### 검증
+- [x] `docs/happydoctor_press_release_deaf_committee_draft.md`와 `docs/happydoctor_press_release_deaf_committee_final.md`에서 공식 명칭 반영 확인
+- [x] `docs/happydoctor_press_email_draft.md`에서 공식 명칭 반영 확인
+- [x] `docs/happydoctor_press_release_deaf_committee_2026-04-07.docx` 재생성
+- [x] `docs/happydoctor_press_release_deaf_committee_final_2026-04-07.docx` 재생성
+
+### 진행 메모 (2026.04.07 - 공식명 반영)
+- [x] 제목, 부제, 리드, 본문, 단체 소개의 단체명 통일
+- [x] 메일 제목 후보와 본문 단체명 통일
+
+### 리뷰
+- [x] 보도자료 title/subtitle/lead 첫 표기 모두 `행복한 의사 Happy Doctor` 반영
+- [x] 메일 초안 제목 후보와 본문 첫 문단 반영
+- [x] 워드 2종 재생성 완료 시각: 2026-04-07 14:29
+
+## 단계 67: 환자 상태 조회 프록시 복구 및 사진 업로드 1차 점검 (2026.04.08)
+
+### 목표
+- [x] 환자 웹앱 상태 화면이 브라우저에서 직접 Render 백엔드를 조회하다 실패하는 문제를 복구한다.
+- [x] 상태 조회를 앱 내부 API 프록시 경로로 통일해 사진 업로더가 실제로 렌더되도록 만든다.
+- [x] 라이브 사진 업로드 엔드포인트의 현재 실패 여부를 1차 확인한다.
+
+### 검증
+- [x] `frontend/app`: `npm run build`
+- [x] 새 라우트 `app/api/public/consultations/status/[lookup]` 생성 확인
+- [x] `frontend/app/lib/status.ts`가 앱 내부 `/api/public/consultations/status/:lookup` 경로를 사용하도록 반영 확인
+- [x] 라이브 백엔드 `GET /api/public/consultations/status/TXN3TV` 정상 응답 확인
+- [x] 라이브 백엔드 `POST /api/public/consultations/status/TXN3TV/images` 1차 호출 결과 generic 저장 오류 확인
+
+### 진행 메모 (2026.04.08 - 상태/사진 점검)
+- [x] 상태 조회 CORS 원인 확인: Render 응답 헤더에 `Access-Control-Allow-Origin` 없음
+- [x] 생성/종료/이미지와 동일한 패턴의 상태 조회 프록시 라우트 추가
+- [x] 상태 조회 클라이언트 fetch를 직접 백엔드 호출에서 앱 프록시 호출로 변경
+
+### 리뷰
+- [x] 상태 화면 에러 문구는 백엔드 미응답이 아니라 브라우저 직접 호출 경로 문제였음
+- [x] 프런트 수정 후 빌드는 통과했지만, 라이브 반영 전까지 실제 앱 화면은 기존과 동일함
+- [x] 사진 저장은 별도로 Firebase Storage 설정/권한 또는 버킷 설정 점검이 추가 필요함
+
+## 단계 68: 의료진 알림방 오발송 및 중복 전송 차단 (2026.04.08)
+
+### 목표
+- [x] 운영위원회 방이 의료진 알림방으로 등록되거나 상담 내용을 받지 못하도록 서버에서 차단한다.
+- [x] 개인톡을 의료진 알림방으로 등록하지 못하게 하고, 스크립트의 개인톡 fallback 경로를 제거한다.
+- [x] 여러 MessengerBotR 인스턴스가 같은 pending 알림을 동시에 가져가 중복 발송하는 경쟁 상태를 줄인다.
+
+### 검증
+- [x] `backend/services/notifyService.js`: `node --check`
+- [x] `backend/routes/messengerBot.js`: `node --check`
+- [x] `backend/messengerbot_script.js`: `node --check`
+- [x] `notifyService.__test__.validateDoctorRoomCandidate()`로 운영위 차단 / 개인톡 차단 / 의료진 단톡방 허용 / group flag 누락 차단 확인
+
+### 진행 메모 (2026.04.08 - 알림 라우팅 수정)
+- [x] 의료진 알림방 등록 시 `kind`, `isGroupChat`, `registeredBy` 메타데이터를 함께 저장하도록 변경
+- [x] 기존 legacy doctor room 문서는 재등록 전까지 유효하지 않게 처리
+- [x] `~차트확인`은 등록된 의료진 알림방에서만 사용 가능하도록 제한
+- [x] `/api/messengerbot/poll`은 유효한 의료진 알림방이 없으면 claim 자체를 하지 않도록 변경
+- [x] 의료진 알림 claim과 환자 채널 push dequeue를 Firestore transaction 기반으로 바꿔 동시 폴링 중복을 줄임
+
+### 리뷰
+- [x] 운영위원회 방 오발송 원인은 잘못 저장된 doctor room 값과 방 검증 부재가 결합된 문제였음
+- [x] 개인톡 다중 발송은 stale 스크립트 fallback 가능성과 함께 non-atomic queue claim 구조가 중복을 키우는 원인이었음
+- [x] 실제 운영 반영에는 백엔드 배포와 공기계 MessengerBotR 스크립트 업데이트, 의료진 단톡방에서 `~알림방등록` 재실행이 필요함
+
+## 단계 69: 상태 조회 프록시 라이브 배포 및 재검증 (2026.04.08)
+
+### 목표
+- [x] 상태 조회 프록시 코드가 로컬 빌드에만 있고 라이브 앱에는 반영되지 않은 상태를 바로잡는다.
+- [x] `app.happydoctor.kr`의 상태 조회 API가 실제로 `404`가 아닌 `200`으로 응답하도록 앱 프로젝트를 프로덕션 배포한다.
+- [x] 로컬 빌드 통과와 별개로 라이브 앱 도메인 기준 재검증 절차를 남긴다.
+
+### 검증
+- [x] `frontend/app`: `npm run build`
+- [x] 로컬 빌드 산출물에 `/api/public/consultations/status/[lookup]` 포함 확인
+- [x] 배포 전 `https://app.happydoctor.kr/api/public/consultations/status/TXN3TV` 가 `404`였음을 확인
+- [x] `npx vercel --prod --yes` 로 `happydoctor-app` 프로덕션 배포
+- [x] 배포 후 `https://app.happydoctor.kr/api/public/consultations/status/TXN3TV` 가 `200`으로 응답하는 것 확인
+
+### 진행 메모 (2026.04.08 - 상태 조회 라이브 반영)
+- [x] 원인 재확인: Render 백엔드는 정상 응답했지만 앱 도메인 프록시 라우트가 라이브 배포본에 없어서 상태 화면이 계속 실패함
+- [x] `frontend/app/.vercel/project.json` 기준 앱 프로젝트 식별
+- [x] 저장소 루트가 포털 프로젝트에 링크되어 있어 앱 프로젝트 링크를 임시 전환해 배포 후 원복
+
+### 리뷰
+- [x] “코드는 고쳤지만 라이브가 아직 안 바뀐 상태”였고, 사용자 화면 에러는 그 미반영 상태를 그대로 보여준 것
+- [x] 상태 조회 문제는 이제 라이브 앱 도메인 기준으로도 API 응답이 정상화됨
+
+## 단계 70: 사진 업로드 복구 및 답변 후속 흐름 확장 (2026.04.08)
+
+### 목표
+- [ ] Firebase Storage 버킷 해석과 업로드 경로를 점검해 사진 저장 실패를 복구한다.
+- [ ] 웹 상담 시작 화면에서도 사진 1~3장을 함께 받을 수 있게 만든다.
+- [ ] 카카오 상담의 `symptom_image`를 상담 미디어로 저장해 포털/상태 화면에서 이어서 볼 수 있게 만든다.
+- [ ] 상태 화면이 의료진 답변을 주기적으로 확인하고, 답변 뒤에는 `추가 질문하기`를 같은 상담 흐름 안에서 제공한다.
+- [ ] 환자 채널 답변 전달 폴링 간격을 실시간에 가깝게 줄인다.
+
+### 검증
+- [ ] `backend`: `node --check services/dbService.js`
+- [ ] `backend`: `node --check routes/public.js`
+- [ ] `backend`: `node --check routes/kakaoWebhook.js`
+- [ ] `backend`: `node --check messengerbot_script.js`
+- [ ] `frontend/app`: `npm run build`
+- [ ] `frontend/portal`: `npm run build`
+- [ ] 로컬/라이브 업로드 및 상태 갱신 흐름 재확인
+### 진행 메모 (2026.04.08 - 사진/후속 흐름 확장)
+- [x] `dbService.js`에 Firebase Storage 버킷 후보 탐색과 `firebasestorage.app` fallback, 외부 이미지 저장 경로를 추가했다.
+- [x] `public.js`에 첫 상담 화면 multipart 업로드와 `status/:lookup/follow-up` 추가 질문 라우트를 연결했다.
+- [x] `kakaoWebhook.js`에서 `symptom_image`를 상담 `mediaItems`에도 저장하도록 연결했다.
+- [x] `WebConsultationStartForm.tsx`에 첫 화면 이미지 업로드를 붙이고 JSON 제출을 multipart 제출로 바꿨다.
+- [x] `StatusPageClient.tsx`에 15초 주기 실시간 새로고침, 포커스 복귀 갱신, 새 의료진 답변 배너를 추가했다.
+- [x] `StatusCloseActions.tsx`에 답변 후 추가 질문하기 흐름을 추가했다.
+- [x] `messengerbot_script.js` 환자 알림 폴링 간격을 5분에서 20초로 줄였다.
+
+### 리뷰
+- [x] `backend/services/dbService.js`: `node --check`
+- [x] `backend/routes/public.js`: `node --check`
+- [x] `backend/routes/kakaoWebhook.js`: `node --check`
+- [x] `backend/messengerbot_script.js`: `node --check`
+- [x] `backend/services/notifyService.js`: `node --check`
+- [x] `backend/routes/messengerBot.js`: `node --check`
+- [x] `frontend/app`: `npm run build`
+- [x] `frontend/portal`: `npm run build`
+- [ ] 라이브 사진 업로드 성공과 Render 반영 확인은 아직 남음

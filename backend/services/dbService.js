@@ -25,16 +25,25 @@ const CONSULTATION_IMAGE_EXTENSIONS = {
 
 let db = null;
 let storageBucketName = '';
+let resolvedStorageBucketName = '';
+let storageBucketCandidates = [];
 
 try {
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-    storageBucketName = (
-      process.env.FIREBASE_STORAGE_BUCKET
-      || serviceAccount.storageBucket
-      || serviceAccount.project_id && `${serviceAccount.project_id}.appspot.com`
-      || ''
-    ).trim();
+    storageBucketCandidates = Array.from(
+      new Set(
+        [
+          process.env.FIREBASE_STORAGE_BUCKET,
+          serviceAccount.storageBucket,
+          serviceAccount.project_id && `${serviceAccount.project_id}.firebasestorage.app`,
+          serviceAccount.project_id && `${serviceAccount.project_id}.appspot.com`,
+        ]
+          .map((value) => (typeof value === 'string' ? value.trim() : ''))
+          .filter(Boolean),
+      ),
+    );
+    storageBucketName = storageBucketCandidates[0] || '';
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
       ...(storageBucketName ? { storageBucket: storageBucketName } : {}),
@@ -53,11 +62,44 @@ function getPublicStatsRef() {
   return db.collection(PUBLIC_STATS_PATH[0]).doc(PUBLIC_STATS_PATH[1]);
 }
 
-function getStorageBucket() {
-  if (!storageBucketName) return null;
+function getStorageBucketCandidateList(preferredBucketName = '') {
+  return Array.from(
+    new Set(
+      [
+        preferredBucketName,
+        resolvedStorageBucketName,
+        ...storageBucketCandidates,
+      ].filter(Boolean),
+    ),
+  );
+}
+
+async function resolveStorageBucketName(preferredBucketName = '') {
+  const candidates = getStorageBucketCandidateList(preferredBucketName);
+  if (candidates.length === 0) return '';
+
+  for (const candidate of candidates) {
+    try {
+      const bucket = admin.storage().bucket(candidate);
+      const [exists] = await bucket.exists();
+      if (exists) {
+        resolvedStorageBucketName = candidate;
+        return candidate;
+      }
+    } catch (error) {
+      console.error(`[Firebase Storage Bucket Probe Error] ${candidate}`, error);
+    }
+  }
+
+  return '';
+}
+
+async function getStorageBucket(preferredBucketName = '') {
+  const bucketName = await resolveStorageBucketName(preferredBucketName);
+  if (!bucketName) return null;
 
   try {
-    return admin.storage().bucket(storageBucketName);
+    return admin.storage().bucket(bucketName);
   } catch (error) {
     console.error('[Firebase Storage Bucket Error]', error);
     return null;
@@ -82,8 +124,15 @@ function normalizeConsultationMediaItems(items) {
   return Array.isArray(items) ? items.filter(Boolean) : [];
 }
 
-async function createSignedMediaUrl(storagePath, expiresMinutes = 60) {
-  const bucket = getStorageBucket();
+function normalizeExternalMediaUrl(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!/^https?:\/\//i.test(trimmed)) return null;
+  return trimmed;
+}
+
+async function createSignedMediaUrl(storagePath, bucketName = '', expiresMinutes = 60) {
+  const bucket = await getStorageBucket(bucketName);
   if (!bucket || !storagePath) return null;
 
   try {
@@ -111,7 +160,9 @@ async function mapConsultationMediaItem(item) {
     size: typeof item.size === 'number' ? item.size : null,
     storagePath: item.storagePath || null,
     createdAt: toIsoString(item.createdAt),
-    url: await createSignedMediaUrl(item.storagePath),
+    url:
+      normalizeExternalMediaUrl(item.externalUrl)
+      || await createSignedMediaUrl(item.storagePath, item.bucketName || ''),
   };
 }
 
@@ -911,6 +962,152 @@ async function resolvePublicConsultationDocByLookup(trackingLookup) {
   return null;
 }
 
+async function getConsultationDocById(consultationId) {
+  if (!db || !consultationId) return null;
+
+  const snapshot = await db.collection('consultations').doc(consultationId).get();
+  return snapshot.exists ? snapshot : null;
+}
+
+function ensureConsultationCanAcceptUpdates(consultationData = {}) {
+  if (consultationData.status === 'COMPLETED' || consultationData.closedAt) {
+    throw new Error('CONSULTATION_CLOSED');
+  }
+}
+
+function sanitizeFollowUpQuestion(value) {
+  if (typeof value !== 'string') return '';
+  return value.trim().replace(/\r\n/g, '\n').slice(0, 1200);
+}
+
+function buildDoctorFollowUpNotificationMessage(consultationData = {}, question = '') {
+  const patientData = consultationData.patientData || {};
+
+  return [
+    '📩 환자 추가 질문이 도착했습니다.',
+    '',
+    `주요 증상: ${patientData.cc || '미상'}`,
+    patientData.symptom ? `기존 설명: ${patientData.symptom}` : null,
+    patientData.associated ? `동반 증상: ${patientData.associated}` : null,
+    consultationData.doctorRepliedAt
+      ? `직전 의료진 답변 시각: ${toIsoString(consultationData.doctorRepliedAt) || '기록 없음'}`
+      : '직전 의료진 답변: 아직 없음',
+    '',
+    '[환자 메시지]',
+    question,
+    consultationData.doctorChart
+      ? `\n[기존 차트]\n${consultationData.doctorChart}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+async function appendConsultationMediaItems(consultationDoc, nextItems = []) {
+  const consultationData = consultationDoc.data() || {};
+  const existingMedia = normalizeConsultationMediaItems(consultationData.mediaItems);
+  const existingImages = existingMedia.filter((item) => item.kind === 'image');
+
+  if ((existingImages.length + nextItems.length) > CONSULTATION_MEDIA_LIMIT) {
+    throw new Error('MEDIA_LIMIT_EXCEEDED');
+  }
+
+  await consultationDoc.ref.set({
+    mediaItems: [...existingMedia, ...nextItems],
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+
+  return mapConsultationMediaItems(nextItems);
+}
+
+async function addConsultationImagesByDoc(consultationDoc, files = [], options = {}) {
+  const bucket = await getStorageBucket();
+  if (!bucket) {
+    throw new Error('STORAGE_NOT_CONFIGURED');
+  }
+
+  const normalizedFiles = Array.isArray(files) ? files.filter(Boolean) : [];
+  if (normalizedFiles.length === 0) {
+    throw new Error('NO_FILES');
+  }
+
+  const consultationData = consultationDoc.data() || {};
+  ensureConsultationCanAcceptUpdates(consultationData);
+
+  const uploadedItems = [];
+
+  for (const file of normalizedFiles) {
+    if (!CONSULTATION_IMAGE_CONTENT_TYPES.has(file.mimetype)) {
+      throw new Error('UNSUPPORTED_MEDIA_TYPE');
+    }
+
+    const extension = CONSULTATION_IMAGE_EXTENSIONS[file.mimetype] || 'jpg';
+    const mediaId = createConsultationMediaId();
+    const safeName = sanitizeFilename(file.originalname, mediaId);
+    const storagePath = `consultations/${consultationDoc.id}/images/${mediaId}-${safeName}.${extension}`;
+
+    await bucket.file(storagePath).save(file.buffer, {
+      resumable: false,
+      metadata: {
+        contentType: file.mimetype,
+        cacheControl: 'private, max-age=3600',
+        metadata: {
+          consultationId: consultationDoc.id,
+          uploadedBy: options.uploadedBy || 'public',
+          originalName: file.originalname || '',
+        },
+      },
+    });
+
+    uploadedItems.push({
+      id: mediaId,
+      kind: 'image',
+      source: options.source || 'web',
+      status: 'ready',
+      contentType: file.mimetype,
+      originalName: file.originalname || null,
+      size: typeof file.size === 'number' ? file.size : null,
+      storagePath,
+      bucketName: bucket.name || resolvedStorageBucketName || storageBucketName || null,
+      createdAt: admin.firestore.Timestamp.now(),
+    });
+  }
+
+  return appendConsultationMediaItems(consultationDoc, uploadedItems);
+}
+
+async function addRemoteConsultationImagesByDoc(consultationDoc, urls = [], options = {}) {
+  const normalizedUrls = Array.from(
+    new Set(
+      (Array.isArray(urls) ? urls : [urls])
+        .map(normalizeExternalMediaUrl)
+        .filter(Boolean),
+    ),
+  );
+
+  if (normalizedUrls.length === 0) {
+    throw new Error('NO_FILES');
+  }
+
+  const consultationData = consultationDoc.data() || {};
+  ensureConsultationCanAcceptUpdates(consultationData);
+
+  const remoteItems = normalizedUrls.map((url) => ({
+    id: createConsultationMediaId(),
+    kind: 'image',
+    source: options.source || 'kakao',
+    status: 'external',
+    contentType: null,
+    originalName: options.originalName || null,
+    size: null,
+    storagePath: null,
+    externalUrl: url,
+    createdAt: admin.firestore.Timestamp.now(),
+  }));
+
+  return appendConsultationMediaItems(consultationDoc, remoteItems);
+}
+
 async function markUnseenDoctorRepliesAsSeen(consultationId) {
   if (!db || !consultationId) return 0;
 
@@ -1008,19 +1205,45 @@ async function closePublicConsultationByLookup(trackingLookup, reason) {
   }
 }
 
+async function addConsultationImagesById(consultationId, files = [], options = {}) {
+  const consultationDoc = await getConsultationDocById(consultationId);
+  if (!consultationDoc) {
+    throw new Error('CONSULTATION_NOT_FOUND');
+  }
+
+  return addConsultationImagesByDoc(consultationDoc, files, options);
+}
+
 async function addPublicConsultationImagesByLookup(trackingLookup, files = [], options = {}) {
   if (!db || !trackingLookup) {
     throw new Error('CONSULTATION_NOT_FOUND');
   }
 
-  const bucket = getStorageBucket();
-  if (!bucket) {
-    throw new Error('STORAGE_NOT_CONFIGURED');
+  const consultationDoc = await resolvePublicConsultationDocByLookup(trackingLookup);
+  if (!consultationDoc) {
+    throw new Error('CONSULTATION_NOT_FOUND');
   }
 
-  const normalizedFiles = Array.isArray(files) ? files.filter(Boolean) : [];
-  if (normalizedFiles.length === 0) {
-    throw new Error('NO_FILES');
+  return addConsultationImagesByDoc(consultationDoc, files, options);
+}
+
+async function addConsultationRemoteImagesById(consultationId, urls = [], options = {}) {
+  const consultationDoc = await getConsultationDocById(consultationId);
+  if (!consultationDoc) {
+    throw new Error('CONSULTATION_NOT_FOUND');
+  }
+
+  return addRemoteConsultationImagesByDoc(consultationDoc, urls, options);
+}
+
+async function appendPublicFollowUpQuestionByLookup(trackingLookup, question, options = {}) {
+  if (!db || !trackingLookup) {
+    throw new Error('CONSULTATION_NOT_FOUND');
+  }
+
+  const normalizedQuestion = sanitizeFollowUpQuestion(question);
+  if (normalizedQuestion.length < 2) {
+    throw new Error('FOLLOW_UP_REQUIRED');
   }
 
   const consultationDoc = await resolvePublicConsultationDocByLookup(trackingLookup);
@@ -1029,60 +1252,26 @@ async function addPublicConsultationImagesByLookup(trackingLookup, files = [], o
   }
 
   const consultationData = consultationDoc.data() || {};
-  if (consultationData.status === 'COMPLETED' || consultationData.closedAt) {
-    throw new Error('CONSULTATION_CLOSED');
-  }
+  ensureConsultationCanAcceptUpdates(consultationData);
 
-  const existingMedia = normalizeConsultationMediaItems(consultationData.mediaItems);
-  const existingImages = existingMedia.filter((item) => item.kind === 'image');
-  if ((existingImages.length + normalizedFiles.length) > CONSULTATION_MEDIA_LIMIT) {
-    throw new Error('MEDIA_LIMIT_EXCEEDED');
-  }
-
-  const uploadedItems = [];
-
-  for (const file of normalizedFiles) {
-    if (!CONSULTATION_IMAGE_CONTENT_TYPES.has(file.mimetype)) {
-      throw new Error('UNSUPPORTED_MEDIA_TYPE');
-    }
-
-    const extension = CONSULTATION_IMAGE_EXTENSIONS[file.mimetype] || 'jpg';
-    const mediaId = createConsultationMediaId();
-    const safeName = sanitizeFilename(file.originalname, mediaId);
-    const storagePath = `consultations/${consultationDoc.id}/images/${mediaId}-${safeName}.${extension}`;
-
-    await bucket.file(storagePath).save(file.buffer, {
-      resumable: false,
-      metadata: {
-        contentType: file.mimetype,
-        cacheControl: 'private, max-age=3600',
-        metadata: {
-          consultationId: consultationDoc.id,
-          uploadedBy: options.uploadedBy || 'public',
-          originalName: file.originalname || '',
-        },
-      },
-    });
-
-    uploadedItems.push({
-      id: mediaId,
-      kind: 'image',
-      source: options.source || 'web',
-      status: 'ready',
-      contentType: file.mimetype,
-      originalName: file.originalname || null,
-      size: typeof file.size === 'number' ? file.size : null,
-      storagePath,
-      createdAt: admin.firestore.Timestamp.now(),
-    });
-  }
+  const logEntry = {
+    action: 'PATIENT_FOLLOW_UP_QUESTION',
+    timestamp: admin.firestore.Timestamp.now(),
+    alertMessage: normalizedQuestion,
+    source: options.source || 'web_status',
+  };
 
   await consultationDoc.ref.set({
-    mediaItems: [...existingMedia, ...uploadedItems],
+    followUpLogs: admin.firestore.FieldValue.arrayUnion(logEntry),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   }, { merge: true });
 
-  return mapConsultationMediaItems(uploadedItems);
+  return {
+    consultationId: consultationDoc.id,
+    userId: consultationData.userId || null,
+    question: normalizedQuestion,
+    doctorNotificationMessage: buildDoctorFollowUpNotificationMessage(consultationData, normalizedQuestion),
+  };
 }
 
 const HDT_REPLY = 100;
@@ -1207,6 +1396,9 @@ module.exports = {
   getPublicConsultationStatusByLookup,
   getPublicConsultationStatusByToken: getPublicConsultationStatusByLookup,
   closePublicConsultationByLookup,
+  appendPublicFollowUpQuestionByLookup,
+  addConsultationImagesById,
+  addConsultationRemoteImagesById,
   addPublicConsultationImagesByLookup,
   awardHDT,
   getHDTLeaderboard,
@@ -1226,5 +1418,6 @@ module.exports = {
   HDT_SEEN,
   getDb: () => db,
   getAdmin: () => admin,
-  getStorageBucketName: () => storageBucketName,
+  getStorageBucketName: () => resolvedStorageBucketName || storageBucketName,
+  getStorageBucketCandidates: () => [...storageBucketCandidates],
 };

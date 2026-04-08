@@ -36,6 +36,33 @@ function sanitizeMultiline(value, maxLength = 1200) {
   return value.trim().replace(/\r\n/g, '\n').slice(0, maxLength);
 }
 
+function handleConsultationImageUpload(req, res, next) {
+  const contentType = (req.headers['content-type'] || '').toString().toLowerCase();
+  if (!contentType.includes('multipart/form-data')) {
+    return next();
+  }
+
+  return consultationImageUpload.array('images', 3)(req, res, (uploadError) => {
+    if (!uploadError) {
+      return next();
+    }
+
+    console.error('[Public Consultation Upload Middleware Error]', uploadError);
+
+    if (uploadError instanceof multer.MulterError) {
+      if (uploadError.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: '사진은 한 장당 10MB 이하로 올려 주세요.' });
+      }
+
+      if (uploadError.code === 'LIMIT_FILE_COUNT') {
+        return res.status(400).json({ error: '사진은 한 번에 최대 3장까지 올릴 수 있습니다.' });
+      }
+    }
+
+    return res.status(400).json({ error: '사진 업로드를 다시 시도해 주세요.' });
+  });
+}
+
 function sanitizeNrs(value) {
   const sanitized = sanitizeSingleLine(value, 8);
   if (!sanitized) return '미상';
@@ -99,7 +126,7 @@ function buildInitialReply(analysisResult) {
   return analysisResult.replyToPatient;
 }
 
-router.post('/consultations', async (req, res) => {
+router.post('/consultations', handleConsultationImageUpload, async (req, res) => {
   try {
     if (!isPlainObject(req.body)) {
       return res.status(400).json({ error: '상담 정보를 다시 입력해 주세요.' });
@@ -125,6 +152,14 @@ router.post('/consultations', async (req, res) => {
 
     if (!saved?.consultationId) {
       throw new Error('Consultation was not persisted');
+    }
+
+    const files = Array.isArray(req.files) ? req.files : [];
+    if (files.length > 0) {
+      await dbService.addConsultationImagesById(saved.consultationId, files, {
+        source: 'web_start',
+        uploadedBy: 'public',
+      });
     }
 
     if (analysisResult.action === 'ESCALATE') {
@@ -242,6 +277,47 @@ router.post('/consultations/status/:lookup/images', (req, res) => {
       }
     }
   });
+});
+
+router.post('/consultations/status/:lookup/follow-up', async (req, res) => {
+  try {
+    const lookup = (req.params.lookup || '').toString().trim();
+    const question = sanitizeMultiline(req.body?.question, 1200);
+
+    if (!lookup) {
+      return res.status(404).json({ error: '상담 상태를 찾을 수 없습니다.' });
+    }
+
+    const followUp = await dbService.appendPublicFollowUpQuestionByLookup(lookup, question, {
+      source: 'web_status',
+    });
+
+    await enqueueDoctorNotification(followUp.doctorNotificationMessage, followUp.userId, {
+      type: 'patient_follow_up_question',
+      priority: 'high',
+      reminderDelaysMinutes: [0, 5, 15],
+    });
+
+    const consultation = await dbService.getPublicConsultationStatusByLookup(lookup);
+    res.set('Cache-Control', 'no-store');
+    return res.json({
+      ok: true,
+      consultation,
+    });
+  } catch (error) {
+    console.error('[Public Consultation Follow-Up Error]', error);
+
+    switch (error.message) {
+      case 'CONSULTATION_NOT_FOUND':
+        return res.status(404).json({ error: '상담 상태를 찾을 수 없습니다.' });
+      case 'CONSULTATION_CLOSED':
+        return res.status(400).json({ error: '종료된 상담에는 추가 질문을 남길 수 없습니다.' });
+      case 'FOLLOW_UP_REQUIRED':
+        return res.status(400).json({ error: '추가 질문 내용을 조금 더 적어 주세요.' });
+      default:
+        return res.status(500).json({ error: '추가 질문을 보내지 못했습니다. 잠시 후 다시 시도해 주세요.' });
+    }
+  }
 });
 
 router.post('/consultations/status/:lookup/close', async (req, res) => {
