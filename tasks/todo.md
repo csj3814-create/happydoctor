@@ -183,6 +183,20 @@
 ### Notes
 - [x] `main` and the old temporary deploy branch pointed to the same commit before cleanup.
 - [ ] Render dashboard setting still needs to be changed from the old temporary deploy branch to `main`.
+
+## Stage 73: wrap-up and deploy blocker note (2026.04.09)
+
+### Done
+- [x] Portal follow-up tab UI shipped to production.
+- [x] Summary card shortcut buttons shipped to production.
+- [x] Legacy temporary deploy branch removed from the remote repository.
+- [x] New handoff note added for the next session.
+
+### Blocked
+- [ ] Render backend deploy is not yet live.
+  - Live `/api/version` is still on `8003c29`.
+  - Expected next live revision is `eda0c36` or newer.
+  - Render UI stayed on `Building` / `Awaiting build logs...` during repeated deploy attempts.
 - [x] `frontend/homepage`: `npm run lint`
 - [x] `frontend/homepage`: `npm run build`
 
