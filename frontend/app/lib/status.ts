@@ -1,6 +1,3 @@
-const BACKEND_BASE_URL =
-  process.env.HAPPYDOCTOR_BACKEND_URL || 'https://happydoctor.onrender.com'
-
 export const PUBLIC_STATUS_CODE_LENGTH = 6
 const LEGACY_STATUS_CODE_LENGTH = 8
 
@@ -101,12 +98,9 @@ export const normalizeStatusToken = normalizeStatusLookup
 export async function fetchConsultationStatus(
   token: string,
 ): Promise<PublicConsultationStatus | null> {
-  const response = await fetch(
-    `${BACKEND_BASE_URL}/api/public/consultations/status/${encodeURIComponent(token)}`,
-    {
-      cache: 'no-store',
-    },
-  )
+  const response = await fetch(`/api/public/consultations/status/${encodeURIComponent(token)}`, {
+    cache: 'no-store',
+  })
 
   if (response.status === 404) {
     return null

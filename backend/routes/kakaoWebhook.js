@@ -25,9 +25,54 @@ function buildStatusLinkText(trackingInfo) {
     return `\n\n앱에서 진행 상태 확인하기\n${statusUrl}${directCodeLine}`;
 }
 
+function collectKakaoImageUrls(value) {
+    const collected = [];
+
+    function visit(candidate) {
+        if (!candidate) return;
+
+        if (typeof candidate === 'string') {
+            const normalized = candidate.trim();
+            if (normalized) {
+                collected.push(normalized);
+            }
+            return;
+        }
+
+        if (Array.isArray(candidate)) {
+            candidate.forEach(visit);
+            return;
+        }
+
+        if (typeof candidate === 'object') {
+            visit(candidate.url);
+            visit(candidate.value);
+            visit(candidate.originalUrl);
+            visit(candidate.imageUrl);
+            visit(candidate.urls);
+        }
+    }
+
+    visit(value);
+    return [...new Set(collected)];
+}
+
 async function logConsultationAndGetStatusLink(userId, patientData, analysisResult) {
     try {
         const saved = await dbService.logConsultation(userId, patientData, analysisResult);
+        const symptomImageUrls = collectKakaoImageUrls(patientData?.symptomImage);
+
+        if (saved?.consultationId && symptomImageUrls.length > 0) {
+            try {
+                await dbService.addConsultationRemoteImagesById(saved.consultationId, symptomImageUrls, {
+                    source: 'kakao_start',
+                    originalName: 'kakao-symptom-image',
+                });
+            } catch (imageError) {
+                console.error('[Kakao Consultation Image Save Error]', imageError);
+            }
+        }
+
         return buildStatusLinkText(saved);
     } catch (error) {
         console.error('[Status Link Logging Error]', error);
@@ -194,7 +239,7 @@ router.post('/triage-complete', async (req, res) => {
             nrs: sanitize(merged.nrs, '0'),
             associated: sanitize(merged.associated_symptom, '없음'),
             pmhx: sanitize(merged.past_medical_history, '특이사항 없음'),
-            symptomImage: merged.symptom_image || null
+            symptomImage: merged.symptom_image || merged.image_url || null
         };
 
         // 슬롯필링이 완료되지 않은 premature 호출 감지

@@ -11,9 +11,8 @@
  * 설정 체크:
  * - SERVER_URL 은 실제 Render 배포 URL과 같아야 합니다.
  * - API_KEY 는 서버의 MESSENGER_API_KEY 와 같아야 합니다.
- * - DOCTOR_ROOM 은 기본적으로 비워 두고 `~알림방등록`으로 등록하는 것을 권장합니다.
- * - 정말 fallback 이 필요할 때만 `~방이름`으로 확인한 의료진 단톡방 식별자를 직접 넣으세요.
- * - 개인톡 식별자를 넣으면 의료진 알림이 개인톡으로 갈 수 있습니다.
+ * - 의료진 알림방은 반드시 의료진 단톡방에서 `~알림방등록`으로 등록하세요.
+ * - 개인톡 fallback 은 사용하지 않습니다.
  */
 
 // ===== 설정 =====
@@ -21,11 +20,8 @@ const SERVER_URL = "https://happydoctor.onrender.com";
 const API_KEY = "happydoctor_bot_2026_secret";
 const CHANNEL_LINK = "http://pf.kakao.com/_PxaTxhX/chat";
 
-// 기본 fallback 은 비워 둡니다. 우선은 `~알림방등록`을 사용하세요.
-const DOCTOR_ROOM = "";
 const PATIENT_ROOM = "행복한의사";
-const EXPERIMENT_ROOM = "최석재";
-const PATIENT_PUSH_POLL_INTERVAL_MS = 5 * 60 * 1000;
+const PATIENT_PUSH_POLL_INTERVAL_MS = 20 * 1000;
 
 function postJson(path, payload) {
     return org.jsoup.Jsoup.connect(SERVER_URL + path)
@@ -123,7 +119,7 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
     if (trimmedMsg === "~도움말") {
         if (room === PATIENT_ROOM || isPatientConversation(room, isGroupChat)) {
             replier.reply(buildPatientHelp());
-        } else if (room === EXPERIMENT_ROOM || room === DOCTOR_ROOM || isGroupChat) {
+        } else if (isGroupChat) {
             replier.reply(buildDoctorHelp());
         } else {
             replier.reply("🤖 이 방에서는 해피닥터 봇 명령이 제한적으로 동작합니다.\n\n" + buildPatientHelp());
@@ -237,7 +233,7 @@ function startDoctorPolling() {
                     var data = JSON.parse(pollRes);
                     if (data.hasNew && data.reply) {
                         try {
-                            var targetRoom = data.roomName || DOCTOR_ROOM;
+                            var targetRoom = data.roomName;
                             if (!targetRoom) {
                                 java.lang.Thread.sleep(1000);
                                 continue;

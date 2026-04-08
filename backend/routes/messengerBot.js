@@ -45,6 +45,21 @@ function buildPortalGuide() {
     );
 }
 
+function normalizeDoctorRoomName(room) {
+    return typeof room === 'string' ? room.trim().replace(/\s+/g, ' ').slice(0, 120) : '';
+}
+
+function buildDoctorRoomRegistrationErrorReply(validation) {
+    switch (validation?.code) {
+        case 'GROUP_CHAT_REQUIRED':
+            return '개인톡은 의료진 자동 알림방으로 등록할 수 없습니다.\n의료진 단톡방에서 `~알림방등록`을 보내 주세요.';
+        case 'BLOCKED_ROOM':
+            return '운영위원회 방에는 상담 내용을 보내지 않습니다.\n의료진 단톡방에서 `~알림방등록`을 보내 다시 등록해 주세요.';
+        default:
+            return '알림방 이름을 다시 확인해 주세요.\n의료진 단톡방에서 `~알림방등록`을 다시 보내 주세요.';
+    }
+}
+
 function checkApiKey(req, res, next) {
     const apiKey = req.headers['x-api-key'];
     const validKey = process.env.MESSENGER_API_KEY;
@@ -83,9 +98,19 @@ router.post('/', checkApiKey, async (req, res) => {
     }
 
     if (normalizedCommand === 'register_doctor_room' || normalizedMsg === '~알림방등록') {
-        await registerDoctorRoom(room);
+        const registration = await registerDoctorRoom(room, {
+            isGroupChat,
+            registeredBy: sender,
+        });
+
+        if (!registration?.ok) {
+            return res.status(200).json({
+                reply: buildDoctorRoomRegistrationErrorReply(registration),
+            });
+        }
+
         return res.status(200).json({
-            reply: `이 방을 해피닥터 의료진 알림방으로 등록했습니다.\n현재 등록 방: ${room}\n이제 응급/협진 상담이 이 방으로 먼저 전달됩니다.`,
+            reply: `이 방을 해피닥터 의료진 알림방으로 등록했습니다.\n현재 등록 방: ${registration.roomName}\n이제 응급/협진 상담이 이 방으로 먼저 전달됩니다.`,
         });
     }
 
@@ -104,6 +129,19 @@ router.post('/', checkApiKey, async (req, res) => {
 
     if (normalizedCommand === 'confirm_doctor_notifications' || normalizedMsg === '~차트확인') {
         try {
+            const doctorRoomName = await getDoctorRoomName();
+            if (!doctorRoomName) {
+                return res.status(200).json({
+                    reply: '아직 유효한 의료진 자동 알림방이 없습니다.\n의료진 단톡방에서 `~알림방등록`을 먼저 보내 주세요.',
+                });
+            }
+
+            if (normalizeDoctorRoomName(room) !== doctorRoomName) {
+                return res.status(200).json({
+                    reply: `차트 확인은 등록된 의료진 알림방에서만 사용할 수 있습니다.\n현재 등록 방: ${doctorRoomName}`,
+                });
+            }
+
             const charts = await confirmDoctorNotifications();
             if (charts.length > 0) {
                 return res.status(200).json({
@@ -126,12 +164,16 @@ router.post('/', checkApiKey, async (req, res) => {
 });
 
 router.get('/poll', checkApiKey, async (req, res) => {
+    const roomName = await getDoctorRoomName();
+    if (!roomName) {
+        return res.status(200).json({ hasNew: false, reason: 'doctor_room_not_registered' });
+    }
+
     const chart = await claimDoctorNotification();
     if (!chart) {
         return res.status(200).json({ hasNew: false });
     }
 
-    const roomName = await getDoctorRoomName();
     return res.status(200).json({
         hasNew: true,
         notificationId: chart.notificationId,

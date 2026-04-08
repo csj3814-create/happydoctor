@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import type { PublicConsultationCreateResponse } from '@/lib/status'
 import {
@@ -34,6 +34,14 @@ function isEmptyFormState(formState: ConsultationFormState) {
   return Object.values(formState).every((value) => !value.trim())
 }
 
+function formatFileSize(bytes: number) {
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
+  }
+
+  return `${Math.max(1, Math.round(bytes / 1024))}KB`
+}
+
 export default function WebConsultationStartForm({
   entrySurface,
 }: WebConsultationStartFormProps) {
@@ -43,6 +51,7 @@ export default function WebConsultationStartForm({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeSession, setActiveSession] = useState<ActiveConsultationSession | null>(null)
+  const [files, setFiles] = useState<File[]>([])
 
   useEffect(() => {
     const draft = getWebConsultationDraft()
@@ -69,34 +78,44 @@ export default function WebConsultationStartForm({
     saveWebConsultationDraft(formState)
   }, [draftReady, formState])
 
+  const selectedSummary = useMemo(() => {
+    return files.map((file) => `${file.name} (${formatFileSize(file.size)})`)
+  }, [files])
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setSubmitting(true)
     setError(null)
 
     try {
+      const formData = new FormData()
+      formData.append('age', formState.age)
+      formData.append('gender', formState.gender)
+      formData.append('chiefComplaint', formState.chiefComplaint)
+      formData.append('onset', formState.onset)
+      formData.append('symptomDetail', formState.symptomDetail)
+      formData.append('nrs', formState.nrs)
+      formData.append('associatedSymptom', formState.associatedSymptom)
+      formData.append('pastMedicalHistory', formState.pastMedicalHistory)
+      formData.append('entrySurface', entrySurface)
+      files.forEach((file) => formData.append('images', file))
+
       const response = await fetch('/api/public/consultations', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...formState,
-          entrySurface,
-        }),
+        body: formData,
       })
 
-      const payload = (await response.json()) as
+      const responsePayload = (await response.json()) as
         | PublicConsultationCreateResponse
         | { error?: string }
 
       if (!response.ok) {
-        const errorMessage = 'error' in payload ? payload.error : undefined
+        const errorMessage = 'error' in responsePayload ? responsePayload.error : undefined
         setError(errorMessage || '상담을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.')
         return
       }
 
-      const consultation = payload as PublicConsultationCreateResponse
+      const consultation = responsePayload as PublicConsultationCreateResponse
       saveActiveConsultationSession({
         consultationId: consultation.consultationId,
         lookup: consultation.trackingCode || '',
@@ -105,6 +124,7 @@ export default function WebConsultationStartForm({
       })
       clearWebConsultationDraft()
       setFormState(INITIAL_FORM_STATE)
+      setFiles([])
       window.location.assign(consultation.statusUrl)
     } catch {
       setError('상담을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.')
@@ -258,6 +278,35 @@ export default function WebConsultationStartForm({
               className="mt-3 w-full rounded-[1.1rem] border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm leading-7 text-[var(--ink)] outline-none transition focus:border-[var(--blue)] focus:bg-white"
             />
           </label>
+
+          <label className="block">
+            <span className="text-sm font-semibold text-[var(--ink)]">사진 첨부</span>
+            <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
+              상처, 피부, 복용 중인 약 포장처럼 사진이 있으면 처음 상담을 더 정확하게 이어갈 수 있습니다.
+              <br />
+              최대 3장, 장당 10MB 이하 사진을 함께 올릴 수 있습니다.
+            </p>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              disabled={submitting}
+              onChange={(event) => {
+                const nextFiles = Array.from(event.target.files || []).slice(0, 3)
+                setFiles(nextFiles)
+                setError(null)
+              }}
+              className="mt-3 block w-full rounded-[1.1rem] border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--ink)] file:mr-4 file:rounded-full file:border-0 file:bg-[var(--navy)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+            />
+          </label>
+
+          {selectedSummary.length > 0 ? (
+            <ul className="rounded-[1.4rem] bg-[var(--surface)] px-4 py-4 text-sm leading-7 text-[var(--ink)]">
+              {selectedSummary.map((label) => (
+                <li key={label}>{label}</li>
+              ))}
+            </ul>
+          ) : null}
         </div>
 
         <div className="mt-6 rounded-[1.4rem] bg-[var(--soft-blue)] px-4 py-4 text-xs leading-6 text-[var(--muted)]">

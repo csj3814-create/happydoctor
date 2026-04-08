@@ -7,15 +7,37 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(request: Request) {
   try {
-    const rawBody = await request.text()
-    const response = await fetch(`${BACKEND_BASE_URL}/api/public/consultations`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: rawBody,
-      cache: 'no-store',
-    })
+    const contentType = request.headers.get('content-type') || ''
+    let response: Response
+
+    if (contentType.includes('multipart/form-data')) {
+      const incoming = await request.formData()
+      const payload = new FormData()
+
+      for (const [key, value] of incoming.entries()) {
+        if (typeof value === 'string') {
+          payload.append(key, value)
+        } else {
+          payload.append(key, value, value.name)
+        }
+      }
+
+      response = await fetch(`${BACKEND_BASE_URL}/api/public/consultations`, {
+        method: 'POST',
+        body: payload,
+        cache: 'no-store',
+      })
+    } else {
+      const rawBody = await request.text()
+      response = await fetch(`${BACKEND_BASE_URL}/api/public/consultations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: rawBody,
+        cache: 'no-store',
+      })
+    }
 
     const text = await response.text()
 
