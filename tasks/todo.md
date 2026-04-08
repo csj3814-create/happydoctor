@@ -159,6 +159,18 @@
 - [x] `frontend/app`: `npm run build`
 - [x] `frontend/portal`: `npm run lint`
 - [x] `frontend/portal`: `npm run build`
+
+## Stage 71: portal follow-up tab and quick links (2026.04.09)
+
+### Goals
+- [x] Add a dedicated `follow-up` tab to the portal consultation inbox.
+- [x] Add quick-link buttons on the summary cards for pending, follow-up, replied, and closed.
+- [x] Keep tab counts, search, and pagination aligned with the new follow-up view.
+
+### Verification
+- [x] `frontend/portal`: `npm run build`
+- [x] Manual check: summary card quick links switch tabs correctly
+- [x] Manual check: follow-up tab lists consultations with follow-up logs
 - [x] `frontend/homepage`: `npm run lint`
 - [x] `frontend/homepage`: `npm run build`
 

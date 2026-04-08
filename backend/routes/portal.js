@@ -22,7 +22,7 @@ const { appSiteUrl, getAllowedDoctorEmails, getPortalAdminEmails } = require('..
 const followUpService = require('../services/followUpService');
 
 const router = express.Router();
-const ALLOWED_LIST_STATUS = new Set(['all', 'active', 'replied', 'closed']);
+const ALLOWED_LIST_STATUS = new Set(['all', 'active', 'followup', 'replied', 'closed']);
 
 function parseListQuery(query = {}) {
   const status = (query.status || 'all').toString().trim().toLowerCase();
