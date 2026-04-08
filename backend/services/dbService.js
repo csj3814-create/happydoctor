@@ -707,6 +707,8 @@ function applyConsultationViewOptions(docs, options = {}) {
 
   if (status === 'active') {
     filtered = filtered.filter((doc) => doc.status === 'ACTIVE' && !doc.doctorRepliedAt);
+  } else if (status === 'followup') {
+    filtered = filtered.filter((doc) => Array.isArray(doc.followUpLogs) && doc.followUpLogs.length > 0);
   } else if (status === 'replied') {
     filtered = filtered.filter((doc) => doc.status === 'ACTIVE' && !!doc.doctorRepliedAt);
   } else if (status === 'closed') {
@@ -731,8 +733,8 @@ function applyConsultationViewOptions(docs, options = {}) {
   }
 
   filtered.sort((a, b) => {
-    const ta = a.createdAt?.toMillis?.() ?? 0;
-    const tb = b.createdAt?.toMillis?.() ?? 0;
+    const ta = getConsultationSortTimestamp(a, status);
+    const tb = getConsultationSortTimestamp(b, status);
     return tb - ta;
   });
 
@@ -743,6 +745,28 @@ function applyConsultationViewOptions(docs, options = {}) {
     total: filtered.length,
     consultations: filtered.slice(offset, offset + limit),
   };
+}
+
+function getFollowUpSortTimestamp(doc) {
+  const logs = Array.isArray(doc?.followUpLogs) ? doc.followUpLogs : [];
+  const latest = logs
+    .map((log) => {
+      if (log?.timestamp?.toMillis) return log.timestamp.toMillis();
+
+      const parsed = log?.timestamp ? new Date(log.timestamp).getTime() : NaN;
+      return Number.isNaN(parsed) ? 0 : parsed;
+    })
+    .reduce((max, current) => Math.max(max, current), 0);
+
+  return latest || doc?.createdAt?.toMillis?.() || 0;
+}
+
+function getConsultationSortTimestamp(doc, status) {
+  if (status === 'followup') {
+    return getFollowUpSortTimestamp(doc);
+  }
+
+  return doc?.createdAt?.toMillis?.() || 0;
 }
 
 async function getActiveConsultations(options = {}) {

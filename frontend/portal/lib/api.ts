@@ -61,7 +61,7 @@ export interface Consultation {
   mediaItems?: ConsultationMediaItem[];
 }
 
-export type ConsultationStatus = 'all' | 'active' | 'replied' | 'closed';
+export type ConsultationStatus = 'all' | 'active' | 'followup' | 'replied' | 'closed';
 
 export interface ConsultationQueryOptions {
   status?: ConsultationStatus;
