@@ -35,7 +35,7 @@
   - `frontend/homepage`, `frontend/app`, `frontend/portal` 모두 라이브 표면이 살아 있음
   - `app.happydoctor.kr`는 `main` 푸시 시 자동 배포
 - Render
-  - 배포 브랜치는 계속 `claude/upbeat-tharp`
+  - 당시 배포 브랜치는 임시 작업 브랜치
   - 오늘 기준 라이브 `/api/version` 리비전: `b4b58e4`
 - MessengerBotR
   - 서버 코드는 `~알림방등록`과 서버 저장 알림방 기반 자동 푸시를 지원함

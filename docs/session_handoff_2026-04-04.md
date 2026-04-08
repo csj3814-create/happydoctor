@@ -46,10 +46,8 @@
   - 홈페이지, 포털, 앱 모두 커스텀 도메인 사용 중
   - `frontend/app`은 Git 연동된 Vercel 프로젝트로 `main` 푸시 시 자동 배포됨
 - Render
-  - 배포 브랜치는 계속 `claude/upbeat-tharp`
-  - 백엔드 변경은 아래 두 곳에 함께 push해야 함
-    - `main`
-    - `main:claude/upbeat-tharp`
+  - 당시 배포 브랜치는 임시 작업 브랜치
+  - 현재는 `main` 단일 브랜치 기준으로 정리하는 것이 맞음
 - 백엔드 관측성
   - `/healthz`, `/api/version`가 라이브에서 동작함
   - 라이브에서 확인된 최신 Render 리비전은 `835675a`

@@ -31,8 +31,8 @@
   - `frontend/homepage`, `frontend/app`, `frontend/portal` 모두 라이브 반영 중
   - `app.happydoctor.kr`는 `main` 푸시 시 자동 배포
 - Render
-  - 백엔드 자동 배포 브랜치는 `claude/upbeat-tharp`
-  - 백엔드 변경은 `main`과 `main:claude/upbeat-tharp`를 함께 푸시해야 함
+  - 당시 백엔드 자동 배포 브랜치는 임시 작업 브랜치
+  - 현재는 `main` 하나만 자동 배포 브랜치로 두는 구성이 더 단순함
 - Firebase
   - Firestore는 이미 사용 중
   - Storage 사용을 위해 `FIREBASE_STORAGE_BUCKET` 환경변수 추가 필요

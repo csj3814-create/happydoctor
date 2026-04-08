@@ -41,8 +41,8 @@
   - `main` 푸시 시 자동 배포
   - `vercel.json`으로 `framework: nextjs` 고정
 - 백엔드
-  - Render 배포 브랜치: `claude/upbeat-tharp`
-  - Render 반영을 위해서는 `main`과 배포 브랜치를 함께 push해야 함
+  - 당시 Render 배포 브랜치: 임시 작업 브랜치
+  - 현재는 `main` 하나만 배포 기준 브랜치로 유지하는 방향으로 정리 중
 - 환자 상태 추적
   - Firestore `consultations`에 `publicTrackingToken` 발급
   - 공개 상태 조회 API: `/api/public/consultations/status/:token`

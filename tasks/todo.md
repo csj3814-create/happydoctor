@@ -41,7 +41,7 @@
 
 ## Phase 6: Deployment & Polish ✅
 - [x] Initialize Git repository & Push to GitHub (csj3814-create/happydoctor)
-- [x] Connect repository to Render (auto-deploy from claude/upbeat-tharp branch)
+- [x] Connect repository to Render
 - [x] Set up Environment Variables on Render (GEMINI_API_KEY, MESSENGER_API_KEY)
 - [x] Gemini API: paid plan confirmed (via 해빛스쿨)
 - [x] Firebase Firestore: set up FIREBASE_SERVICE_ACCOUNT for persistent logging
@@ -171,6 +171,18 @@
 - [x] `frontend/portal`: `npm run build`
 - [x] Manual check: summary card quick links switch tabs correctly
 - [x] Manual check: follow-up tab lists consultations with follow-up logs
+
+## Stage 72: deploy branch cleanup (2026.04.09)
+
+### Goals
+- [x] Confirm the old temporary deploy branch was only a legacy Git branch used by Render auto-deploy.
+- [x] Update repository notes to treat `main` as the only long-term deploy branch.
+- [ ] Switch Render auto-deploy branch to `main` in the dashboard.
+- [x] Remove the obsolete remote branch once `main` matches it.
+
+### Notes
+- [x] `main` and the old temporary deploy branch pointed to the same commit before cleanup.
+- [ ] Render dashboard setting still needs to be changed from the old temporary deploy branch to `main`.
 - [x] `frontend/homepage`: `npm run lint`
 - [x] `frontend/homepage`: `npm run build`
 
