@@ -288,7 +288,7 @@ export default function WebConsultationStartForm({
             </p>
             <input
               type="file"
-              accept="image/jpeg,image/png,image/webp"
+              accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
               multiple
               disabled={submitting}
               onChange={(event) => {

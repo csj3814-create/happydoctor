@@ -96,7 +96,7 @@ export default function ConsultationImageUploader({
             </span>
             <input
               type="file"
-              accept="image/jpeg,image/png,image/webp"
+              accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
               multiple
               disabled={submitting || !canUpload}
               onChange={(event) => {
