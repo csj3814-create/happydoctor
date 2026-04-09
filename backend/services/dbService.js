@@ -554,6 +554,12 @@ async function logConsultation(userId, patientData, analysisResult, options = {}
   try {
     const docRef = db.collection('consultations').doc();
     const { trackingToken, trackingCode } = await createTrackingIdentifiers();
+    const patientNotificationContact = options.patientNotificationContact
+      ? {
+          ...options.patientNotificationContact,
+          consentedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }
+      : null;
 
     await docRef.set({
       userId,
@@ -571,6 +577,7 @@ async function logConsultation(userId, patientData, analysisResult, options = {}
       publicTrackingCodeIssuedAt: admin.firestore.FieldValue.serverTimestamp(),
       entryChannel: options.entryChannel || 'kakao',
       entrySurface: options.entrySurface || null,
+      patientNotificationContact,
     });
 
     await updatePublicStats({ consultationCount: 1 });
@@ -734,6 +741,8 @@ function applyConsultationViewOptions(docs, options = {}) {
         doc.patientData?.cc,
         doc.patientData?.symptom,
         doc.patientData?.associated,
+        doc.patientNotificationContact?.phone,
+        doc.patientNotificationContact?.normalizedPhone,
       ]
         .filter(Boolean)
         .join(' ')

@@ -1428,3 +1428,11 @@
   - Result: `backend/routes/kakaoWebhook.js` now clears queued `doctor_reply` reminders when the patient checks a pending doctor reply inside Kakao, so reminder pushes stop once the reply is actually opened.
   - Result: `backend/services/notifyService.js` now supports scheduled patient reply reminders via `availableAt`, and `backend/routes/portal.js` uses that to enqueue doctor replies with an immediate + 5 minute + 15 minute reminder cadence for Kakao-linked patients.
   - Result: `backend/tests/notifyService.patientPush.test.js` and `backend/tests/publicPortal.routes.integration.test.js` now cover scheduled doctor-reply reminders and public-status acknowledgement cleanup.
+- [x] Stage 96 optional consent-based patient contact capture (2026-04-10)
+  - Add an optional reply-notification consent step to the public web consultation start form so patients can share a contact number only when they explicitly want follow-up alerts.
+  - Persist the consented phone number on the consultation record, surface it in the portal detail view, and include it in consultation search so operations can find opted-in patients without treating the field as mandatory.
+  - Reject partial contact capture (`consent` without a phone number or a phone number without `consent`) at both the form and route level, and lock the contract down with route integration tests.
+  - Verification: `backend npm run verify:ci`, `frontend/app npm run verify:ci`, `frontend/portal npm run verify:ci`.
+  - Result: `frontend/app/components/WebConsultationStartForm.tsx` now captures optional consent + phone input, clears the field when consent is turned off, and shows a direct validation error before submit if the contact data is incomplete.
+  - Result: `backend/routes/public.js` and `backend/services/dbService.js` now normalize/store only explicit opt-in contact info via `patientNotificationContact`, and the create route returns `400` instead of `500` for consent validation errors.
+  - Result: `frontend/portal/app/patient/[id]/page.tsx` now shows the consented alert phone and consent timestamp in the doctor portal detail view, and `backend/tests/publicPortal.routes.integration.test.js` covers the multipart web start route for both valid opt-in and invalid missing-phone cases.

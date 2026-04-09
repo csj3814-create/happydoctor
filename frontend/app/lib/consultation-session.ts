@@ -12,6 +12,8 @@ export type WebConsultationDraft = {
   nrs: string
   associatedSymptom: string
   pastMedicalHistory: string
+  replyNotificationConsent: boolean
+  replyNotificationPhone: string
 }
 
 export type ActiveConsultationSession = {
