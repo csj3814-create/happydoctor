@@ -1383,3 +1383,8 @@
   - Keep the workflow verification-only: lint/build checks, no deployment side effects.
   - Follow-up hardening: keep the portal workspace buildable even when CI does not inject Firebase public env vars, so static prerender does not fail before the runtime login screen loads.
   - Verification: `frontend/app npm run verify:ci`, `frontend/portal npm run verify:ci`, `frontend/homepage npm run verify:ci`, `frontend/portal npm run build` with Firebase env vars blanked, inspect `.github/workflows/frontend-ci.yml`.
+- [x] Stage 90 CI path-filter tightening (2026-04-09)
+  - Add `paths` filters to `backend-ci.yml` so backend verification runs only for backend changes or backend-workflow edits.
+  - Add `paths` filters to `frontend-ci.yml` so frontend verification runs only for the three frontend workspaces or frontend-workflow edits.
+  - Keep `workflow_dispatch` available so either workflow can still be run manually even when the filtered paths do not match.
+  - Verification: inspect `.github/workflows/backend-ci.yml`, inspect `.github/workflows/frontend-ci.yml`, confirm the new GitHub Actions runs for the workflow-update commit succeed.
