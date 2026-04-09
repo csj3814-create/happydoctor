@@ -1,0 +1,46 @@
+name: Frontend CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frontend-verify:
+    name: Frontend Verify (${{ matrix.workspace }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - workspace: app
+            path: frontend/app
+            lockfile: frontend/app/package-lock.json
+          - workspace: portal
+            path: frontend/portal
+            lockfile: frontend/portal/package-lock.json
+          - workspace: homepage
+            path: frontend/homepage
+            lockfile: frontend/homepage/package-lock.json
+    defaults:
+      run:
+        working-directory: ${{ matrix.path }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: ${{ matrix.lockfile }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run frontend verification
+        run: npm run verify:ci
