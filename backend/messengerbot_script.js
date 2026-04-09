@@ -58,6 +58,20 @@ function acknowledgeDoctorNotification(notificationId, delivered, errorMessage) 
     }
 }
 
+function acknowledgePatientChannelPush(queueId, delivered, errorMessage) {
+    if (!queueId) return;
+
+    try {
+        postJson("/api/messengerbot/patient-push-poll/ack", {
+            queueId: queueId,
+            delivered: delivered !== false,
+            error: errorMessage || null
+        });
+    } catch (e) {
+        // ack 실패는 lease 만료 후 재시도 경로가 있으므로 무시
+    }
+}
+
 function registerPatientRoom(userId, roomName) {
     try {
         postJson("/api/messengerbot/register-room", {
@@ -276,8 +290,23 @@ function startPatientPushPolling() {
                         .body();
 
                     var data = JSON.parse(pollRes);
-                    if (data.hasNew && data.roomName && data.message) {
-                        Api.replyRoom(data.roomName, data.message);
+                    if (data.hasNew) {
+                        if (!data.queueId || !data.roomName || !data.message) {
+                            acknowledgePatientChannelPush(data.queueId, false, "invalid_payload");
+                            java.lang.Thread.sleep(PATIENT_PUSH_POLL_INTERVAL_MS);
+                            continue;
+                        }
+
+                        try {
+                            Api.replyRoom(data.roomName, data.message);
+                            acknowledgePatientChannelPush(data.queueId, true, null);
+                        } catch (deliveryError) {
+                            acknowledgePatientChannelPush(
+                                data.queueId,
+                                false,
+                                deliveryError && deliveryError.message ? String(deliveryError.message) : "reply_room_failed"
+                            );
+                        }
                     }
                 } catch (e) {
                     // 폴링 실패는 무시하고 다음 주기로 재시도

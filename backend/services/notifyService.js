@@ -9,6 +9,7 @@ const DELIVERY_ROOMS = 'delivery_rooms';
 const DOCTOR_ROOM_DOC_ID = 'doctor_room';
 const DOCTOR_ROOM_KIND = 'doctor_group';
 const DOCTOR_NOTIFICATION_LEASE_MS = 60 * 1000;
+const PATIENT_PUSH_LEASE_MS = 60 * 1000;
 const DEFAULT_DOCTOR_REMINDER_DELAYS_MINUTES = Object.freeze([0, 5, 15]);
 const DOCTOR_NOTIFICATION_DUPLICATE_WINDOW_MS = 20 * 60 * 1000;
 const DOCTOR_NOTIFICATION_CATCHUP_GAP_MS = 5 * 60 * 1000;
@@ -642,29 +643,67 @@ async function enqueuePatientChannelPush(userId, message, type = 'general') {
   return true;
 }
 
-async function dequeueFUPush() {
-  return dequeuePatientChannelPush();
+async function getDuePendingPatientPushDocs(collection, limit = 20) {
+  const snapshot = await collection
+    .where('status', '==', 'pending')
+    .limit(Math.max(limit, 20))
+    .get();
+
+  return snapshot.docs.sort((left, right) => {
+    const leftTime = toDate(left.data()?.createdAt)?.getTime() || 0;
+    const rightTime = toDate(right.data()?.createdAt)?.getTime() || 0;
+    return leftTime - rightTime;
+  });
 }
 
-async function dequeuePatientChannelPush() {
+async function reclaimExpiredPatientPushLeases() {
+  const collection = getCollection(PATIENT_CHANNEL_PUSHES);
+  if (!collection) return 0;
+
+  const snapshot = await collection
+    .where('status', '==', 'leased')
+    .limit(50)
+    .get();
+
+  if (snapshot.empty) return 0;
+
+  const now = Date.now();
+  const expiredDocs = snapshot.docs.filter((doc) => {
+    const data = doc.data() || {};
+    const leaseExpiresAt = toDate(data.leaseExpiresAt);
+    return leaseExpiresAt && leaseExpiresAt.getTime() <= now;
+  });
+
+  if (expiredDocs.length === 0) return 0;
+
+  const batch = getDb().batch();
+  const serverTimestamp = getAdmin().firestore.FieldValue.serverTimestamp();
+  expiredDocs.forEach((doc) => {
+    const data = doc.data() || {};
+    batch.update(doc.ref, {
+      status: 'pending',
+      leaseId: null,
+      leaseExpiresAt: null,
+      lastFailedAt: serverTimestamp,
+      lastFailureReason: data.lastFailureReason || 'lease_expired',
+    });
+  });
+  await batch.commit();
+
+  return expiredDocs.length;
+}
+
+async function claimPatientChannelPush() {
   const collection = getCollection(PATIENT_CHANNEL_PUSHES);
   if (!collection) return null;
 
-  const snapshot = await collection
-    .where('status', '==', 'pending')
-    .limit(20)
-    .get();
-
-  if (snapshot.empty) return null;
-
-  const docs = snapshot.docs
-    .sort((left, right) => {
-      const leftTime = toDate(left.data()?.createdAt)?.getTime() || 0;
-      const rightTime = toDate(right.data()?.createdAt)?.getTime() || 0;
-      return leftTime - rightTime;
-    });
+  await reclaimExpiredPatientPushLeases();
+  const docs = await getDuePendingPatientPushDocs(collection, 20);
+  if (docs.length === 0) return null;
 
   for (const doc of docs) {
+    const leaseId = randomUUID();
+    const leaseExpiresAt = new Date(Date.now() + PATIENT_PUSH_LEASE_MS);
     const claimed = await getDb().runTransaction(async (transaction) => {
       const current = await transaction.get(doc.ref);
       if (!current.exists) return null;
@@ -675,14 +714,17 @@ async function dequeuePatientChannelPush() {
       }
 
       transaction.update(doc.ref, {
-        status: 'delivered',
-        deliveredAt: getAdmin().firestore.FieldValue.serverTimestamp(),
+        status: 'leased',
+        leaseId,
+        leaseExpiresAt,
+        leasedAt: getAdmin().firestore.FieldValue.serverTimestamp(),
         attemptCount: (data.attemptCount || 0) + 1,
       });
 
       return {
         ...data,
         queueId: current.id,
+        leaseId,
       };
     });
 
@@ -692,6 +734,43 @@ async function dequeuePatientChannelPush() {
   }
 
   return null;
+}
+
+async function acknowledgePatientChannelPush(queueId, payload = {}) {
+  const collection = getCollection(PATIENT_CHANNEL_PUSHES);
+  if (!collection || !queueId) return false;
+
+  const docRef = collection.doc(queueId);
+  const snapshot = await docRef.get();
+  if (!snapshot.exists) return false;
+
+  const delivered = payload.delivered !== false;
+  const update = delivered
+    ? {
+        status: 'delivered',
+        deliveredAt: getAdmin().firestore.FieldValue.serverTimestamp(),
+        leaseId: null,
+        leaseExpiresAt: null,
+        lastFailureReason: null,
+      }
+    : {
+        status: 'pending',
+        leaseId: null,
+        leaseExpiresAt: null,
+        lastFailedAt: getAdmin().firestore.FieldValue.serverTimestamp(),
+        lastFailureReason: payload.error || 'delivery_failed',
+      };
+
+  await docRef.update(update);
+  return true;
+}
+
+async function dequeueFUPush() {
+  return claimPatientChannelPush();
+}
+
+async function dequeuePatientChannelPush() {
+  return claimPatientChannelPush();
 }
 
 async function clearPatientChannelPushes(userId, type = null) {
@@ -704,7 +783,7 @@ async function clearPatientChannelPushes(userId, type = null) {
 
   const docs = snapshot.docs.filter((doc) => {
     const data = doc.data() || {};
-    if (data.status !== 'pending') return false;
+    if (data.status !== 'pending' && data.status !== 'leased') return false;
     if (type && data.type !== type) return false;
     return true;
   });
@@ -717,6 +796,9 @@ async function clearPatientChannelPushes(userId, type = null) {
     batch.update(doc.ref, {
       status: 'cancelled',
       cancelledAt: now,
+      leaseId: null,
+      leaseExpiresAt: null,
+      lastFailureReason: null,
     });
   });
   await batch.commit();
@@ -838,6 +920,8 @@ module.exports = {
   enqueueFUPush,
   dequeueFUPush,
   enqueuePatientChannelPush,
+  claimPatientChannelPush,
+  acknowledgePatientChannelPush,
   dequeuePatientChannelPush,
   clearPatientChannelPushes,
   registerRoom,
