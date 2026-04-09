@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { onAuthStateChanged, User } from 'firebase/auth'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { auth } from '@/lib/firebase'
+import { auth, firebaseConfigError } from '@/lib/firebase'
 import { Consultation, FollowUpLog, getConsultation, getConsultations, postReply } from '@/lib/api'
 
 function formatDate(iso: string): string {
@@ -180,6 +180,12 @@ export default function PatientPage({ params }: PatientPageProps) {
   }, [params])
 
   useEffect(() => {
+    if (!auth) {
+      setAuthLoading(false)
+      setFetchError(firebaseConfigError)
+      router.replace('/')
+      return
+    }
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u)
       setAuthLoading(false)

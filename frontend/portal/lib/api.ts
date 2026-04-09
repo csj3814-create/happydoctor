@@ -1,8 +1,9 @@
-import { auth } from './firebase';
+import { auth, firebaseConfigError } from './firebase';
 
 const BASE = process.env.NEXT_PUBLIC_PORTAL_API_BASE || '';
 
 async function authHeader() {
+  if (!auth) throw new Error(firebaseConfigError);
   const user = auth.currentUser;
   if (!user) throw new Error('로그인이 필요합니다.');
   const token = await user.getIdToken();

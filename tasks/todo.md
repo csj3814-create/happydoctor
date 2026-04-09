@@ -1381,4 +1381,5 @@
   - Add reusable `verify:ci` scripts to the `frontend/app`, `frontend/portal`, and `frontend/homepage` workspaces so the same checks run locally and in CI.
   - Add a GitHub Actions workflow that installs dependencies and runs each frontend workspace in a separate matrix job on push, pull request, and manual dispatch.
   - Keep the workflow verification-only: lint/build checks, no deployment side effects.
-  - Verification: `frontend/app npm run verify:ci`, `frontend/portal npm run verify:ci`, `frontend/homepage npm run verify:ci`, inspect `.github/workflows/frontend-ci.yml`.
+  - Follow-up hardening: keep the portal workspace buildable even when CI does not inject Firebase public env vars, so static prerender does not fail before the runtime login screen loads.
+  - Verification: `frontend/app npm run verify:ci`, `frontend/portal npm run verify:ci`, `frontend/homepage npm run verify:ci`, `frontend/portal npm run build` with Firebase env vars blanked, inspect `.github/workflows/frontend-ci.yml`.
