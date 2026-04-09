@@ -165,6 +165,37 @@ function getFollowUpRuntimeConfig() {
   };
 }
 
+function getPatientSmsRuntimeConfig() {
+  return {
+    leaseMs: getNumberEnv('PATIENT_SMS_LEASE_MS', 60 * 1000, { min: 1000, integer: true }),
+    pollIntervalMs: getNumberEnv('PATIENT_SMS_POLL_INTERVAL_MS', 30 * 1000, { min: 1000, integer: true }),
+    batchSize: getNumberEnv('PATIENT_SMS_PROCESS_BATCH_SIZE', 10, { min: 1, integer: true }),
+  };
+}
+
+function getSolapiSmsConfig() {
+  const apiKey = getEnv('SOLAPI_API_KEY');
+  const apiSecret = getEnv('SOLAPI_API_SECRET');
+  const sender = getEnv('SOLAPI_SENDER');
+
+  const configuredCount = [apiKey, apiSecret, sender].filter(Boolean).length;
+  if (configuredCount === 0) {
+    return null;
+  }
+
+  if (!apiKey || !apiSecret || !sender) {
+    throw new ConfigurationError(
+      '[Config] SOLAPI_API_KEY, SOLAPI_API_SECRET, and SOLAPI_SENDER must all be set together.',
+    );
+  }
+
+  return {
+    apiKey,
+    apiSecret,
+    sender,
+  };
+}
+
 function isKeepAliveDisabled() {
   return getBooleanEnv('DISABLE_KEEP_ALIVE', false);
 }
@@ -173,6 +204,8 @@ function validateStartupConfig() {
   getGeminiApiKey();
   getMessengerApiKey();
   getFollowUpRuntimeConfig();
+  getPatientSmsRuntimeConfig();
+  getSolapiSmsConfig();
   getFirebaseServiceAccount();
 
   return true;
@@ -196,6 +229,8 @@ module.exports = {
   getFirebaseServiceAccount,
   getFirebaseStorageBucket,
   getFollowUpRuntimeConfig,
+  getPatientSmsRuntimeConfig,
+  getSolapiSmsConfig,
   isKeepAliveDisabled,
   validateStartupConfig,
   port: getEnv('PORT', '3000'),

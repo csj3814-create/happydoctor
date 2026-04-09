@@ -11,6 +11,7 @@ const {
   enqueueDoctorNotification,
   clearDoctorNotifications,
   clearPatientChannelPushes,
+  clearPatientSmsNotifications,
 } = require('../services/notifyService');
 const { appSiteUrl } = require('../config');
 
@@ -288,6 +289,14 @@ router.get('/consultations/status/:lookup', async (req, res) => {
           clearError.message,
         );
       }
+      try {
+        await clearPatientSmsNotifications(consultationSnapshot.userId, 'doctor_reply');
+      } catch (clearError) {
+        console.warn(
+          `[Public Consultation Status] Failed to clear doctor-reply SMS reminders for ${consultationSnapshot.userId}:`,
+          clearError.message,
+        );
+      }
     }
 
     res.set('Cache-Control', 'no-store');
@@ -389,6 +398,14 @@ router.post('/consultations/status/:lookup/follow-up', async (req, res) => {
         clearError.message,
       );
     }
+    try {
+      await clearPatientSmsNotifications(followUp.userId, 'doctor_reply');
+    } catch (clearError) {
+      console.warn(
+        `[Public Consultation Follow-Up] Failed to clear doctor-reply SMS reminders for ${followUp.userId}:`,
+        clearError.message,
+      );
+    }
 
     const consultation = await dbService.getPublicConsultationStatusByLookup(lookup);
     res.set('Cache-Control', 'no-store');
@@ -429,6 +446,7 @@ router.post('/consultations/status/:lookup/close', async (req, res) => {
       await followUpService.cancelFollowUp(closed.userId);
       await clearDoctorNotifications(closed.userId);
       await clearPatientChannelPushes(closed.userId, 'doctor_reply');
+      await clearPatientSmsNotifications(closed.userId, 'doctor_reply');
     }
 
     const consultation = await dbService.getPublicConsultationStatusByLookup(lookup);
