@@ -417,3 +417,153 @@ test('clearPatientChannelPushes cancels both pending and leased pushes for the r
     context.restore();
   }
 });
+
+test('claimDoctorNotification leases a due notification and delivered ack completes it', { concurrency: false }, async () => {
+  const context = loadNotifyService({
+    doctor_notifications: {
+      'doctor-1': {
+        message: 'urgent triage',
+        patientId: 'patientA',
+        type: 'triage',
+        priority: 'high',
+        groupKey: 'patientA:triage',
+        scheduleKey: 'patientA:triage:schedule-1',
+        messageFingerprint: 'fingerprint-1',
+        status: 'pending',
+        reminderDelayMinutes: 0,
+        reminderStage: 1,
+        availableAt: new Date('2026-04-08T23:00:00.000Z'),
+        attemptCount: 0,
+        createdAt: new Date('2026-04-08T23:00:00.000Z'),
+      },
+    },
+  });
+
+  try {
+    const claimed = await context.service.claimDoctorNotification();
+    assert.equal(claimed.notificationId, 'doctor-1');
+    assert.equal(claimed.patientId, 'patientA');
+    assert.equal(claimed.priority, 'high');
+
+    const leasedDoc = context.getDoc('doctor_notifications', 'doctor-1');
+    assert.equal(leasedDoc.status, 'leased');
+    assert.equal(leasedDoc.attemptCount, 1);
+    assert.ok(typeof leasedDoc.leaseId === 'string' && leasedDoc.leaseId.length > 0);
+    assert.ok(leasedDoc.leaseExpiresAt instanceof Date);
+
+    const acknowledged = await context.service.acknowledgeDoctorNotification('doctor-1', {
+      delivered: true,
+    });
+    assert.equal(acknowledged, true);
+
+    const deliveredDoc = context.getDoc('doctor_notifications', 'doctor-1');
+    assert.equal(deliveredDoc.status, 'delivered');
+    assert.equal(deliveredDoc.leaseId, null);
+    assert.equal(deliveredDoc.leaseExpiresAt, null);
+    assert.equal(deliveredDoc.lastFailureReason, null);
+    assert.ok(deliveredDoc.deliveredAt instanceof Date);
+  } finally {
+    context.restore();
+  }
+});
+
+test('failed doctor notification ack returns it to pending and allows retry claim', { concurrency: false }, async () => {
+  const context = loadNotifyService({
+    doctor_notifications: {
+      'doctor-2': {
+        message: 'needs review',
+        patientId: 'patientA',
+        type: 'triage',
+        priority: 'normal',
+        groupKey: 'patientA:triage',
+        scheduleKey: 'patientA:triage:schedule-2',
+        messageFingerprint: 'fingerprint-2',
+        status: 'pending',
+        reminderDelayMinutes: 5,
+        reminderStage: 1,
+        availableAt: new Date('2026-04-08T23:05:00.000Z'),
+        attemptCount: 0,
+        createdAt: new Date('2026-04-08T23:05:00.000Z'),
+      },
+    },
+  });
+
+  try {
+    await context.service.claimDoctorNotification();
+    const failed = await context.service.acknowledgeDoctorNotification('doctor-2', {
+      delivered: false,
+      error: 'reply_room_failed',
+    });
+
+    assert.equal(failed, true);
+
+    const pendingAgain = context.getDoc('doctor_notifications', 'doctor-2');
+    assert.equal(pendingAgain.status, 'pending');
+    assert.equal(pendingAgain.leaseId, null);
+    assert.equal(pendingAgain.leaseExpiresAt, null);
+    assert.equal(pendingAgain.lastFailureReason, 'reply_room_failed');
+    assert.ok(pendingAgain.lastFailedAt instanceof Date);
+
+    const claimedAgain = await context.service.claimDoctorNotification();
+    assert.equal(claimedAgain.notificationId, 'doctor-2');
+
+    const retriedDoc = context.getDoc('doctor_notifications', 'doctor-2');
+    assert.equal(retriedDoc.status, 'leased');
+    assert.equal(retriedDoc.attemptCount, 2);
+  } finally {
+    context.restore();
+  }
+});
+
+test('claimDoctorNotification supersedes older due schedules for the same patient group', { concurrency: false }, async () => {
+  const context = loadNotifyService({
+    doctor_notifications: {
+      'older-schedule': {
+        message: 'older triage',
+        patientId: 'patientA',
+        type: 'triage',
+        priority: 'normal',
+        groupKey: 'patientA:triage',
+        scheduleKey: 'patientA:triage:schedule-old',
+        messageFingerprint: 'fingerprint-old',
+        status: 'pending',
+        reminderDelayMinutes: 0,
+        reminderStage: 1,
+        availableAt: new Date('2026-04-08T22:00:00.000Z'),
+        attemptCount: 0,
+        createdAt: new Date('2026-04-08T22:00:00.000Z'),
+      },
+      'newer-schedule': {
+        message: 'newer triage',
+        patientId: 'patientA',
+        type: 'triage',
+        priority: 'normal',
+        groupKey: 'patientA:triage',
+        scheduleKey: 'patientA:triage:schedule-new',
+        messageFingerprint: 'fingerprint-new',
+        status: 'pending',
+        reminderDelayMinutes: 0,
+        reminderStage: 1,
+        availableAt: new Date('2026-04-08T22:05:00.000Z'),
+        attemptCount: 0,
+        createdAt: new Date('2026-04-08T22:05:00.000Z'),
+      },
+    },
+  });
+
+  try {
+    const claimed = await context.service.claimDoctorNotification();
+
+    assert.equal(claimed.notificationId, 'newer-schedule');
+
+    const olderDoc = context.getDoc('doctor_notifications', 'older-schedule');
+    assert.equal(olderDoc.status, 'superseded');
+    assert.equal(olderDoc.supersededById, 'newer-schedule');
+
+    const newerDoc = context.getDoc('doctor_notifications', 'newer-schedule');
+    assert.equal(newerDoc.status, 'leased');
+    assert.equal(newerDoc.attemptCount, 1);
+  } finally {
+    context.restore();
+  }
+});
