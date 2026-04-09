@@ -90,6 +90,18 @@ async function postJson(url, body, options = {}) {
   };
 }
 
+async function getJson(url, options = {}) {
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: options.headers || {},
+  });
+
+  return {
+    status: response.status,
+    body: await response.json(),
+  };
+}
+
 test('public follow-up route appends the question, queues a doctor notification, and returns fresh status', { concurrency: false }, async () => {
   const calls = [];
   const routeModule = loadRouteWithMocks(PUBLIC_ROUTE_PATH, {
@@ -233,6 +245,198 @@ test('public close route clears durable follow-up and reply delivery state befor
       { type: 'clearPatientChannelPushes', userId: 'public_user_2', pushType: 'doctor_reply' },
       { type: 'loadStatus', lookup: 'PCBXWN' },
     ]);
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});
+
+test('public status routes reject malformed lookup values before hitting the database', { concurrency: false }, async () => {
+  const calls = [];
+  const routeModule = loadRouteWithMocks(PUBLIC_ROUTE_PATH, {
+    [DB_SERVICE_PATH]: {
+      getPublicConsultationStatusByLookup: async (lookup) => {
+        calls.push({ type: 'getPublicConsultationStatusByLookup', lookup });
+        return null;
+      },
+      appendPublicFollowUpQuestionByLookup: async () => {
+        calls.push({ type: 'appendPublicFollowUpQuestionByLookup' });
+        return null;
+      },
+    },
+    [FOLLOW_UP_SERVICE_PATH]: {
+      cancelFollowUp: async () => {},
+      scheduleFollowUpWithOptions: async () => {},
+    },
+    [LLM_SERVICE_PATH]: {
+      analyzeAndRouteTriage: async () => {
+        throw new Error('not_used');
+      },
+    },
+    [NOTIFY_SERVICE_PATH]: {
+      enqueueDoctorNotification: async () => true,
+      clearDoctorNotifications: async () => {},
+      clearPatientChannelPushes: async () => {},
+    },
+    [CONFIG_PATH]: {
+      appSiteUrl: 'https://app.happydoctor.kr',
+    },
+  });
+
+  const server = await startServer(routeModule.router, '/api/public');
+
+  try {
+    const statusResponse = await getJson(`${server.baseUrl}/consultations/status/bad%20lookup`);
+    assert.equal(statusResponse.status, 400);
+    assert.match(statusResponse.body.error, /조회 코드 형식/);
+
+    const followUpResponse = await postJson(
+      `${server.baseUrl}/consultations/status/bad%20lookup/follow-up`,
+      { question: '열이 계속 나요?' },
+    );
+    assert.equal(followUpResponse.status, 400);
+    assert.match(followUpResponse.body.error, /조회 코드 형식/);
+
+    assert.deepEqual(calls, []);
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});
+
+test('portal consultation list route validates query params and returns pagination metadata', { concurrency: false }, async () => {
+  const calls = [];
+  const routeModule = loadRouteWithMocks(PORTAL_ROUTE_PATH, {
+    [DB_SERVICE_PATH]: {
+      getActiveConsultations: async (options) => {
+        calls.push({ type: 'getActiveConsultations', options });
+        return {
+          consultations: [
+            {
+              id: 'consult-1',
+              userId: 'public_user_4',
+              patientData: {
+                age: '44세',
+                gender: '남성',
+                cc: '흉통',
+                symptom: '어제부터 답답합니다.',
+                associated: '숨차요',
+                pmhx: '없음',
+                nrs: '8',
+              },
+              aiAction: 'ESCALATE',
+              status: 'ACTIVE',
+              createdAt: new Date('2026-04-09T00:00:00.000Z'),
+            },
+          ],
+          total: 21,
+        };
+      },
+      getConsultationSummary: async () => ({ pending: 0, replied: 0, closed: 0, followUp: 0 }),
+      getConsultationById: async () => null,
+      saveDoctorReply: async () => 'reply-1',
+      getConsultationTrackingById: async () => null,
+      awardHDT: async () => {},
+      getDoctorStats: async () => null,
+      getAdmin: () => ({
+        auth() {
+          return {
+            verifyIdToken: async (token) => {
+              calls.push({ type: 'verifyIdToken', token });
+              return {
+                uid: 'doctor-uid',
+                email: 'doctor@example.com',
+                name: '김의사',
+              };
+            },
+          };
+        },
+      }),
+      getDoctorAccessRecordByEmail: async (email) => {
+        calls.push({ type: 'getDoctorAccessRecordByEmail', email });
+        return null;
+      },
+      upsertDoctorAccessRequest: async () => null,
+      ensureApprovedDoctorAccess: async (doctor) => {
+        calls.push({ type: 'ensureApprovedDoctorAccess', doctor });
+        return {
+          status: 'approved',
+          email: doctor.email,
+        };
+      },
+      approveDoctorAccessRequest: async () => null,
+      listPendingDoctorAccessRequests: async () => [],
+      HDT_REPLY: 50,
+    },
+    [NOTIFY_SERVICE_PATH]: {
+      enqueuePatientChannelPush: async () => true,
+      clearDoctorNotifications: async () => {},
+    },
+    [FOLLOW_UP_SERVICE_PATH]: {
+      cancelFollowUp: async () => {},
+    },
+    [CONFIG_PATH]: {
+      appSiteUrl: 'https://app.happydoctor.kr',
+      getAllowedDoctorEmails: () => ['doctor@example.com'],
+      getPortalAdminEmails: () => [],
+    },
+  });
+
+  const server = await startServer(routeModule.router, '/api/portal');
+
+  try {
+    const listResponse = await getJson(
+      `${server.baseUrl}/consultations?status=followup&search=%ED%9D%89%ED%86%B5&offset=12&limit=5`,
+      {
+        headers: {
+          Authorization: 'Bearer portal-token',
+        },
+      },
+    );
+
+    assert.equal(listResponse.status, 200);
+    assert.equal(listResponse.body.total, 21);
+    assert.equal(listResponse.body.offset, 12);
+    assert.equal(listResponse.body.limit, 5);
+    assert.equal(listResponse.body.status, 'followup');
+    assert.equal(listResponse.body.search, '흉통');
+    assert.equal(listResponse.body.returned, 1);
+    assert.equal(listResponse.body.hasMore, true);
+
+    assert.deepEqual(calls, [
+      { type: 'verifyIdToken', token: 'portal-token' },
+      { type: 'getDoctorAccessRecordByEmail', email: 'doctor@example.com' },
+      {
+        type: 'ensureApprovedDoctorAccess',
+        doctor: {
+          uid: 'doctor-uid',
+          email: 'doctor@example.com',
+          name: '김의사',
+        },
+      },
+      {
+        type: 'getActiveConsultations',
+        options: {
+          status: 'followup',
+          search: '흉통',
+          offset: 12,
+          limit: 5,
+        },
+      },
+    ]);
+
+    const invalidResponse = await getJson(
+      `${server.baseUrl}/consultations?status=weird&limit=-1`,
+      {
+        headers: {
+          Authorization: 'Bearer portal-token',
+        },
+      },
+    );
+
+    assert.equal(invalidResponse.status, 400);
+    assert.match(invalidResponse.body.error, /조회 상태/);
+    assert.equal(calls.length, 7);
   } finally {
     await server.close();
     routeModule.restore();

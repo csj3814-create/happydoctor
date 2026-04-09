@@ -21,9 +21,29 @@ const consultationImageUpload = multer({
     fileSize: 10 * 1024 * 1024,
   },
 });
+const LOOKUP_PATTERN = /^[A-Za-z0-9_-]{6,160}$/;
+
+function createRequestValidationError(message) {
+  const error = new Error(message);
+  error.statusCode = 400;
+  return error;
+}
 
 function isPlainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function parseLookupParam(value) {
+  const normalized = typeof value === 'string' ? value.trim() : '';
+  if (!normalized) {
+    throw createRequestValidationError('상담 상태를 찾을 수 없습니다.');
+  }
+
+  if (!LOOKUP_PATTERN.test(normalized)) {
+    throw createRequestValidationError('상담 조회 코드 형식을 다시 확인해 주세요.');
+  }
+
+  return normalized;
 }
 
 function sanitizeSingleLine(value, maxLength = 120) {
@@ -198,12 +218,7 @@ router.post('/consultations', handleConsultationImageUpload, async (req, res) =>
 
 router.get('/consultations/status/:lookup', async (req, res) => {
   try {
-    const lookup = (req.params.lookup || '').toString().trim();
-
-    if (!lookup) {
-      return res.status(404).json({ error: '상담 상태를 찾을 수 없습니다.' });
-    }
-
+    const lookup = parseLookupParam(req.params.lookup);
     const consultation = await dbService.getPublicConsultationStatusByLookup(lookup);
     if (!consultation) {
       return res.status(404).json({ error: '상담 상태를 찾을 수 없습니다.' });
@@ -212,6 +227,9 @@ router.get('/consultations/status/:lookup', async (req, res) => {
     res.set('Cache-Control', 'no-store');
     return res.json(consultation);
   } catch (error) {
+    if (error?.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     console.error('[Public Consultation Status Error]', error);
     return res.status(500).json({ error: '상담 상태를 불러오지 못했습니다.' });
   }
@@ -236,10 +254,7 @@ router.post('/consultations/status/:lookup/images', (req, res) => {
     }
 
     try {
-      const lookup = (req.params.lookup || '').toString().trim();
-      if (!lookup) {
-        return res.status(404).json({ error: '상담 상태를 찾을 수 없습니다.' });
-      }
+      const lookup = parseLookupParam(req.params.lookup);
 
       const files = Array.isArray(req.files) ? req.files : [];
       if (files.length === 0) {
@@ -257,6 +272,9 @@ router.post('/consultations/status/:lookup/images', (req, res) => {
         mediaItems: uploaded,
       });
     } catch (error) {
+      if (error?.statusCode) {
+        return res.status(error.statusCode).json({ error: error.message });
+      }
       console.error('[Public Consultation Image Upload Error]', error);
 
       switch (error.message) {
@@ -281,11 +299,11 @@ router.post('/consultations/status/:lookup/images', (req, res) => {
 
 router.post('/consultations/status/:lookup/follow-up', async (req, res) => {
   try {
-    const lookup = (req.params.lookup || '').toString().trim();
+    const lookup = parseLookupParam(req.params.lookup);
     const question = sanitizeMultiline(req.body?.question, 1200);
 
-    if (!lookup) {
-      return res.status(404).json({ error: '상담 상태를 찾을 수 없습니다.' });
+    if (!question || question.length < 2) {
+      return res.status(400).json({ error: '추가 질문 내용을 조금 더 적어 주세요.' });
     }
 
     const followUp = await dbService.appendPublicFollowUpQuestionByLookup(lookup, question, {
@@ -305,6 +323,9 @@ router.post('/consultations/status/:lookup/follow-up', async (req, res) => {
       consultation,
     });
   } catch (error) {
+    if (error?.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     console.error('[Public Consultation Follow-Up Error]', error);
 
     switch (error.message) {
@@ -322,12 +343,8 @@ router.post('/consultations/status/:lookup/follow-up', async (req, res) => {
 
 router.post('/consultations/status/:lookup/close', async (req, res) => {
   try {
-    const lookup = (req.params.lookup || '').toString().trim();
+    const lookup = parseLookupParam(req.params.lookup);
     const reason = sanitizeSingleLine(req.body?.reason, 120) || '환자가 상태 화면에서 상담 종료를 선택함';
-
-    if (!lookup) {
-      return res.status(404).json({ error: '상담 상태를 찾을 수 없습니다.' });
-    }
 
     const closed = await dbService.closePublicConsultationByLookup(lookup, reason);
     if (!closed) {
@@ -347,6 +364,9 @@ router.post('/consultations/status/:lookup/close', async (req, res) => {
       consultation,
     });
   } catch (error) {
+    if (error?.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     console.error('[Public Consultation Close Error]', error);
     return res.status(500).json({ error: '상담을 종료하지 못했습니다. 잠시 후 다시 시도해 주세요.' });
   }

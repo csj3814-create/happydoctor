@@ -74,6 +74,12 @@ export interface ConsultationQueryOptions {
 export interface ConsultationPage {
   consultations: Consultation[];
   total: number;
+  offset?: number;
+  limit?: number;
+  returned?: number;
+  hasMore?: boolean;
+  status?: ConsultationStatus;
+  search?: string;
 }
 
 export interface ConsultationSummary {

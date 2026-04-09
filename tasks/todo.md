@@ -1402,3 +1402,13 @@
   - Result: `index.js` now validates required runtime config before starting the real server, while `llmService` switched to lazy Gemini model creation so load checks do not require production secrets.
   - Result: MessengerBot auth, Firebase service-account parsing, and follow-up scheduler tuning now share the same config helpers and emit clearer config errors.
   - Result: Added `backend/tests/config.test.js` and expanded syntax/load scripts to cover `config.js`, `llmService.js`, `dbService.js`, and `kakaoWebhook.js`.
+- [x] Stage 93 portal/public API validation and pagination hardening (2026-04-09)
+  - Reject invalid `status`, `offset`, `limit`, overly long search strings, malformed lookup codes, and empty/oversized reply payloads with explicit `400` errors instead of silently coercing them.
+  - Narrow portal consultation reads by requested inbox status so `pending`, `followup`, and `replied` tabs do not fetch completed consultations unnecessarily.
+  - Return stable pagination metadata from the portal list route and update the portal frontend to consume the real paginated endpoint instead of refetching `status=all` for every tab/search interaction.
+  - Add route/integration coverage for the new validation behavior and paginated portal list contract.
+  - Verification: `backend npm test`, `backend npm run check:syntax`, `backend npm run check:load`, `frontend/portal npm run build`, `frontend/portal npm run lint`.
+  - Result: `backend/routes/portal.js` now rejects malformed query/body params with explicit `400` errors and returns `offset`, `limit`, `returned`, and `hasMore` metadata.
+  - Result: `backend/routes/public.js` now validates public lookup codes before DB access and rejects empty follow-up questions earlier.
+  - Result: `backend/services/dbService.js` now scopes portal consultation reads by requested inbox status, so non-closed tabs no longer fetch completed consultations.
+  - Result: `frontend/portal/app/page.tsx` now consumes the backend summary and paginated consultation endpoint directly instead of reloading `status=all` and re-slicing on the client.
