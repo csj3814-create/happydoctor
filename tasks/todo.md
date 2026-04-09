@@ -1412,3 +1412,10 @@
   - Result: `backend/routes/public.js` now validates public lookup codes before DB access and rejects empty follow-up questions earlier.
   - Result: `backend/services/dbService.js` now scopes portal consultation reads by requested inbox status, so non-closed tabs no longer fetch completed consultations.
   - Result: `frontend/portal/app/page.tsx` now consumes the backend summary and paginated consultation endpoint directly instead of reloading `status=all` and re-slicing on the client.
+- [x] Stage 94 portal visibility and reply authorization hardening (2026-04-10)
+  - Limit portal detail/reply access to consultations that actually belong in the doctor workflow (`aiAction === ESCALATE`) instead of allowing any consultation id to resolve.
+  - Reject new doctor replies for consultations that are already closed or missing a patient delivery target.
+  - Add integration coverage so hidden non-escalated consultations return `404` and closed consultations reject replies with `400` before any downstream side effects run.
+  - Verification: `backend npm test`, `backend npm run check:syntax`, `backend npm run check:load`.
+  - Result: `backend/routes/portal.js` now hides non-escalated consultations from detail/reply routes and blocks replies to closed or disconnected consultations before any save/push/HDT side effects.
+  - Result: `backend/tests/publicPortal.routes.integration.test.js` now locks the new authorization contract with non-escalated `404` and closed-reply `400` cases.

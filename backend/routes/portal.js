@@ -33,6 +33,12 @@ function createRequestValidationError(message) {
   return error;
 }
 
+function createPortalNotFoundError(message = '상담을 찾을 수 없습니다.') {
+  const error = new Error(message);
+  error.statusCode = 404;
+  return error;
+}
+
 function parseBoundedInteger(value, { name, defaultValue, min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
   if (typeof value === 'undefined') return defaultValue;
 
@@ -92,6 +98,28 @@ function parseReplyMessage(value) {
   }
 
   return normalized;
+}
+
+function assertPortalVisibleConsultation(consultation) {
+  if (!consultation || consultation.aiAction !== 'ESCALATE') {
+    throw createPortalNotFoundError();
+  }
+
+  return consultation;
+}
+
+function assertConsultationCanReceiveDoctorReply(consultation) {
+  assertPortalVisibleConsultation(consultation);
+
+  if (!consultation.userId) {
+    throw createRequestValidationError('환자 연결 정보가 없어 답변을 전송할 수 없습니다.');
+  }
+
+  if (consultation.status === 'COMPLETED' || consultation.closedAt) {
+    throw createRequestValidationError('종료된 상담에는 새 답변을 보낼 수 없습니다.');
+  }
+
+  return consultation;
 }
 
 function parseListQuery(query = {}) {
@@ -343,10 +371,7 @@ router.get('/consultations/summary', requireDoctorAuth, async (req, res) => {
 router.get('/consultations/:id', requireDoctorAuth, async (req, res) => {
   try {
     const consultationId = parseConsultationId(req.params.id);
-    const consultation = await getConsultationById(consultationId);
-    if (!consultation) {
-      return res.status(404).json({ error: '상담을 찾을 수 없습니다.' });
-    }
+    const consultation = assertPortalVisibleConsultation(await getConsultationById(consultationId));
 
     return res.json(serializeTimestamps(consultation));
   } catch (error) {
@@ -362,10 +387,7 @@ router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
   try {
     const consultationId = parseConsultationId(req.params.id);
     const message = parseReplyMessage(req.body?.message);
-    const consultation = await getConsultationById(consultationId);
-    if (!consultation) {
-      return res.status(404).json({ error: '상담을 찾을 수 없습니다.' });
-    }
+    const consultation = assertConsultationCanReceiveDoctorReply(await getConsultationById(consultationId));
 
     const replyId = await saveDoctorReply(
       consultationId,
