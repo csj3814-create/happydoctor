@@ -313,9 +313,48 @@ export default function StatusPageClient() {
       ? consultation.doctorReplies[consultation.doctorReplies.length - 1]
       : null
   const chatbotReply = consultation?.chatbotReply || sessionChatbotReply
+  const hasDoctorReply = Boolean(latestReply)
   const canCloseConsultation = consultation
     ? consultation.status === 'doctor_replied' && !consultation.closedAt
     : false
+
+  const doctorReplyCard = (
+    <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
+      <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
+        의료진 답변
+      </p>
+      {latestReply ? (
+        <article className="mt-4 rounded-[1.4rem] bg-[var(--surface)] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-[var(--ink)]">
+              {latestReply.doctorName}
+              {consultation && consultation.doctorReplies.length > 1
+                ? ` · 총 ${consultation.doctorReplies.length}건`
+                : ''}
+            </p>
+            <p className="text-xs text-[var(--muted)]">{formatDateTime(latestReply.createdAt)}</p>
+          </div>
+          <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--ink)]">
+            {latestReply.message}
+          </p>
+        </article>
+      ) : (
+        <p className="mt-4 rounded-[1.4rem] bg-[var(--surface)] p-4 text-sm leading-7 text-[var(--muted)]">
+          아직 의료진 답변이 없습니다.
+        </p>
+      )}
+    </div>
+  )
+
+  const nextActionCard = resolvedLookup ? (
+    <StatusCloseActions
+      lookup={resolvedLookup}
+      canClose={canCloseConsultation}
+      isClosed={consultation?.status === 'closed'}
+      allowFollowUp={Boolean(latestReply) && consultation?.status !== 'closed'}
+      onUpdated={() => setRefreshKey((current) => current + 1)}
+    />
+  ) : null
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#eef8ff_0%,#ffffff_32%,#f7fbff_100%)]">
@@ -416,7 +455,7 @@ export default function StatusPageClient() {
               </div>
             ) : null}
 
-            {chatbotReply ? (
+            {chatbotReply && !hasDoctorReply ? (
               <div className="rounded-[2rem] border border-[#cfe0ff] bg-[#f5f9ff] p-6 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
                 <p className="display-face text-xs font-semibold uppercase tracking-[0.24em] text-[var(--blue)]">
                   Bodeum First Reply
@@ -437,6 +476,29 @@ export default function StatusPageClient() {
               <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em]">{statusCopy.title}</h2>
               <p className="mt-4 text-sm leading-7 text-white/82">{statusCopy.body}</p>
             </div>
+
+            {hasDoctorReply ? (
+              <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
+                {doctorReplyCard}
+                <div className="space-y-5">
+                  {nextActionCard}
+                </div>
+              </div>
+            ) : null}
+
+            {chatbotReply && hasDoctorReply ? (
+              <div className="rounded-[2rem] border border-[#cfe0ff] bg-[#f5f9ff] p-6 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
+                <p className="display-face text-xs font-semibold uppercase tracking-[0.24em] text-[var(--blue)]">
+                  Bodeum First Reply
+                </p>
+                <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-[var(--ink)]">
+                  보듬이의 1차 상담 결과
+                </h2>
+                <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-[var(--ink)]">
+                  {chatbotReply}
+                </p>
+              </div>
+            ) : null}
 
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
@@ -509,7 +571,8 @@ export default function StatusPageClient() {
             </div>
 
             <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
-              <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
+              {!hasDoctorReply ? (
+                <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
                 <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
                   의료진 답변
                 </p>
@@ -531,10 +594,11 @@ export default function StatusPageClient() {
                     아직 의료진 답변이 없습니다.
                   </p>
                 )}
-              </div>
+                </div>
+              ) : null}
 
               <div className="space-y-5">
-                {resolvedLookup ? (
+                {!hasDoctorReply && resolvedLookup ? (
                   <StatusCloseActions
                     lookup={resolvedLookup}
                     canClose={canCloseConsultation}

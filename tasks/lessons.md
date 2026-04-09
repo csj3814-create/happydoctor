@@ -137,3 +137,4 @@
 - **교훈**: 카카오 `symptom_image`는 LLM 프롬프트에만 쓰지 말고 상담 `mediaItems`에도 같이 저장해야 포털, 상태 화면, 추후 협진 흐름에서 같은 자료를 일관되게 볼 수 있다.
 - **Lesson**: If the start response shows a user-facing AI summary, the public status API must also expose that same summary so the status page can reconstruct the full journey after redirects or refreshes.
 - **Lesson**: Polling indicators on the patient status page should stay secondary to the main content and be throttled so they do not flash on every background refresh.
+- **Lesson**: When a doctor reply exists on the public status page, the doctor reply and next-action UI should outrank the AI first-reply summary in visual order so the most actionable update is seen first.

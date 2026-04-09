@@ -1307,3 +1307,7 @@
   - Moved the `상담 상태를 불러오고 있습니다...` notice to the bottom of the page and throttled background refresh notices to once per minute.
   - Verification: `frontend/app npm run lint`, `frontend/app npm run build`, `backend node --check services/dbService.js`.
   - Deployment: `happydoctor-8d8ny2x38-csj3814-8131s-projects.vercel.app` promoted and aliased to `app.happydoctor.kr`.
+- [x] Stage 76 public status doctor-reply prioritization (2026-04-09)
+  - Moved the doctor reply card and next-action card directly under the reply-arrived state so they appear before the Bodeum first-reply summary.
+  - Kept the lower sections for images, metadata, and informational follow-up content.
+  - Verification: `frontend/app npm run lint`, `frontend/app npm run build`.
