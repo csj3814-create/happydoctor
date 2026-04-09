@@ -1336,3 +1336,8 @@
   - Replace the final CTA heading with a more concrete `방법`-based phrase.
   - Verification: `frontend/app npm run lint`, `Invoke-WebRequest https://app.happydoctor.kr/` CTA-copy checks.
   - Deployment: `happydoctor-cpoyqo71w-csj3814-8131s-projects.vercel.app` promoted and aliased to `app.happydoctor.kr`.
+- [x] Stage 82 durable follow-up scheduler (2026-04-09)
+  - Replace the in-memory `setTimeout` follow-up scheduler with a Firestore lease/claim loop so restarts and multi-instance deploys do not double-send or lose due reminders.
+  - Store follow-up lease metadata on `follow_up_sessions` and reclaim expired leases before processing.
+  - Keep patient follow-up push delivery behavior unchanged while making scheduling durable.
+  - Verification: `backend node --check services/dbService.js`, `backend node --check services/followUpService.js`, `backend node --check index.js`, `backend node -e "require('./services/dbService'); require('./services/followUpService'); require('./routes/public'); require('./routes/kakaoWebhook'); require('./routes/portal'); require('./routes/messengerBot'); console.log('backend-load-ok');"`.

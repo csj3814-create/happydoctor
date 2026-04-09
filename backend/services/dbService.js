@@ -1467,6 +1467,139 @@ async function getScheduledFollowUpSessions() {
   return snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
 }
 
+async function getDueFollowUpSessionDocs(limit = 20) {
+  if (!db) return [];
+
+  const snapshot = await db.collection(FOLLOW_UP_SESSIONS)
+    .where('status', '==', 'scheduled')
+    .get();
+
+  const now = Date.now();
+  return snapshot.docs
+    .filter((doc) => {
+      const data = doc.data() || {};
+      const dueAtMs = getTimestampMs(data.dueAt);
+      return dueAtMs > 0 && dueAtMs <= now;
+    })
+    .sort((left, right) => {
+      const leftDueAtMs = getTimestampMs(left.data()?.dueAt);
+      const rightDueAtMs = getTimestampMs(right.data()?.dueAt);
+      return leftDueAtMs - rightDueAtMs;
+    })
+    .slice(0, limit);
+}
+
+async function reclaimExpiredFollowUpLeases() {
+  if (!db) return 0;
+
+  const snapshot = await db.collection(FOLLOW_UP_SESSIONS)
+    .where('status', '==', 'leased')
+    .get();
+
+  if (snapshot.empty) return 0;
+
+  const now = Date.now();
+  const expiredDocs = snapshot.docs.filter((doc) => {
+    const data = doc.data() || {};
+    const leaseExpiryMs = getTimestampMs(data.leaseExpiresAt);
+    return leaseExpiryMs > 0 && leaseExpiryMs <= now;
+  });
+
+  if (expiredDocs.length === 0) return 0;
+
+  const batch = db.batch();
+  const serverTimestamp = admin.firestore.FieldValue.serverTimestamp();
+  expiredDocs.forEach((doc) => {
+    const data = doc.data() || {};
+    batch.update(doc.ref, {
+      status: 'scheduled',
+      leaseId: null,
+      leaseExpiresAt: null,
+      leasedAt: null,
+      lastLeaseFailedAt: serverTimestamp,
+      lastLeaseFailureReason: data.lastLeaseFailureReason || 'lease_expired',
+    });
+  });
+  await batch.commit();
+
+  return expiredDocs.length;
+}
+
+async function claimDueFollowUpSession(options = {}) {
+  if (!db) return null;
+
+  const limit = Number.isFinite(Number(options.limit)) ? Math.max(1, Number(options.limit)) : 20;
+  const leaseMs = Number.isFinite(Number(options.leaseMs)) ? Math.max(1000, Number(options.leaseMs)) : 60 * 1000;
+
+  await reclaimExpiredFollowUpLeases();
+  const dueDocs = await getDueFollowUpSessionDocs(limit);
+  if (dueDocs.length === 0) return null;
+
+  for (const doc of dueDocs) {
+    const leaseId = crypto.randomUUID();
+    const leaseExpiresAt = new Date(Date.now() + leaseMs);
+
+    const claimed = await db.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(doc.ref);
+      if (!snapshot.exists) return null;
+
+      const data = snapshot.data() || {};
+      if (data.status !== 'scheduled') {
+        return null;
+      }
+
+      const dueAtMs = getTimestampMs(data.dueAt);
+      if (!dueAtMs || dueAtMs > Date.now()) {
+        return null;
+      }
+
+      transaction.update(doc.ref, {
+        status: 'leased',
+        leaseId,
+        leaseExpiresAt,
+        leasedAt: admin.firestore.FieldValue.serverTimestamp(),
+        leaseAttemptCount: (Number(data.leaseAttemptCount) || 0) + 1,
+        lastLeaseFailureReason: null,
+      });
+
+      return {
+        ...data,
+        id: snapshot.id,
+        leaseId,
+        leaseExpiresAt,
+      };
+    });
+
+    if (claimed) {
+      return claimed;
+    }
+  }
+
+  return null;
+}
+
+async function releaseFollowUpLease(userId, reason = 'processing_failed') {
+  const ref = getFollowUpSessionRef(userId);
+  if (!ref) return false;
+
+  const snapshot = await ref.get();
+  if (!snapshot.exists) return false;
+
+  const data = snapshot.data() || {};
+  if (data.status !== 'leased') return false;
+
+  await ref.update({
+    status: 'scheduled',
+    leaseId: null,
+    leaseExpiresAt: null,
+    leasedAt: null,
+    lastLeaseFailedAt: admin.firestore.FieldValue.serverTimestamp(),
+    lastLeaseFailureReason: reason,
+  });
+
+  return true;
+}
+
 module.exports = {
   logConsultation,
   logFollowUp,
@@ -1500,6 +1633,9 @@ module.exports = {
   getFollowUpSession,
   deleteFollowUpSession,
   getScheduledFollowUpSessions,
+  reclaimExpiredFollowUpLeases,
+  claimDueFollowUpSession,
+  releaseFollowUpLease,
   HDT_REPLY,
   HDT_SEEN,
   getDb: () => db,

@@ -2,21 +2,25 @@ const dbService = require('./dbService');
 const { enqueuePatientChannelPush } = require('./notifyService');
 
 const DEFAULT_FOLLOW_UP_REMINDER_DELAYS_MINUTES = Object.freeze([15, 180, 1440]);
+const DEFAULT_FOLLOW_UP_LEASE_MS = 60 * 1000;
+const DEFAULT_FOLLOW_UP_POLL_INTERVAL_MS = 30 * 1000;
+const DEFAULT_FOLLOW_UP_BATCH_SIZE = 10;
 
 class FollowUpService {
   constructor() {
-    this.timers = new Map();
     this.pendingMessageExpiryMs = 2 * 24 * 60 * 60 * 1000;
     this.absoluteExpiryMs = 4 * 24 * 60 * 60 * 1000;
+    this.leaseMs = Number(process.env.FOLLOW_UP_LEASE_MS) || DEFAULT_FOLLOW_UP_LEASE_MS;
+    this.pollIntervalMs = Number(process.env.FOLLOW_UP_POLL_INTERVAL_MS) || DEFAULT_FOLLOW_UP_POLL_INTERVAL_MS;
+    this.batchSize = Number(process.env.FOLLOW_UP_PROCESS_BATCH_SIZE) || DEFAULT_FOLLOW_UP_BATCH_SIZE;
+    this.processorHandle = null;
+    this.isProcessing = false;
   }
 
   async initialize() {
-    const sessions = await dbService.getScheduledFollowUpSessions();
-    for (const session of sessions) {
-      const dueAt = this.toDate(session.dueAt);
-      if (!dueAt) continue;
-      this.scheduleLocalTimer(session.userId, dueAt);
-    }
+    await dbService.reclaimExpiredFollowUpLeases();
+    await this.processDueSessions();
+    this.startProcessorLoop();
   }
 
   toDate(value) {
@@ -27,23 +31,41 @@ class FollowUpService {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
-  scheduleLocalTimer(userId, dueAt) {
-    this.clearLocalTimer(userId);
+  startProcessorLoop() {
+    if (this.processorHandle) return;
 
-    const delayMs = Math.max(0, dueAt.getTime() - Date.now());
-    const timerId = setTimeout(() => {
-      this.executeFollowUpPush(userId).catch((error) => {
-        console.error('[F/U Timer Error]', error);
+    this.processorHandle = setInterval(() => {
+      this.processDueSessions().catch((error) => {
+        console.error('[F/U Scheduler Error]', error);
       });
-    }, delayMs);
-
-    this.timers.set(userId, timerId);
+    }, this.pollIntervalMs);
   }
 
-  clearLocalTimer(userId) {
-    if (!this.timers.has(userId)) return;
-    clearTimeout(this.timers.get(userId));
-    this.timers.delete(userId);
+  async processDueSessions() {
+    if (this.isProcessing) return 0;
+    this.isProcessing = true;
+
+    try {
+      let processedCount = 0;
+
+      while (processedCount < this.batchSize) {
+        const claimedSession = await dbService.claimDueFollowUpSession({
+          leaseMs: this.leaseMs,
+          limit: this.batchSize,
+        });
+
+        if (!claimedSession?.userId) {
+          break;
+        }
+
+        await this.executeClaimedFollowUpPush(claimedSession);
+        processedCount += 1;
+      }
+
+      return processedCount;
+    } finally {
+      this.isProcessing = false;
+    }
   }
 
   normalizeReminderDelaysMinutes(delays = DEFAULT_FOLLOW_UP_REMINDER_DELAYS_MINUTES) {
@@ -81,9 +103,13 @@ class FollowUpService {
       status: 'scheduled',
       pendingMessage: null,
       pendingCreatedAt: null,
+      leaseId: null,
+      leaseExpiresAt: null,
+      leasedAt: null,
+      lastLeaseFailureReason: null,
+      lastLeaseFailedAt: null,
     });
 
-    this.scheduleLocalTimer(userId, dueAt);
     console.log(`[Follow-Up Scheduled] ${userId} follow-up in ${delayMinutes} minutes.`);
   }
 
@@ -115,11 +141,11 @@ class FollowUpService {
     return false;
   }
 
-  async executeFollowUpPush(userId) {
-    console.log(`[F/U Timer Fired] ${userId}`);
+  async executeClaimedFollowUpPush(session) {
+    const userId = session?.userId;
+    if (!userId) return;
 
-    const session = await this.loadSession(userId);
-    if (!session) return;
+    console.log(`[F/U Due Session Claimed] ${userId}`);
 
     if (this.isExpired(session)) {
       await this.cancelFollowUp(userId);
@@ -147,22 +173,33 @@ class FollowUpService {
       ? new Date(now.getTime() + nextDelayMinutes * 60 * 1000)
       : null;
 
-    await enqueuePatientChannelPush(userId, message, 'follow_up');
+    try {
+      await enqueuePatientChannelPush(userId, message, 'follow_up');
 
-    await dbService.saveFollowUpSession(userId, {
-      lastActiveAt: now,
-      pendingMessage: message,
-      pendingCreatedAt: now,
-      nextReminderIndex,
-      dueAt: nextDueAt,
-      status: nextDueAt ? 'scheduled' : 'pending',
-    });
-
-    if (nextDueAt) {
-      this.scheduleLocalTimer(userId, nextDueAt);
-    } else {
-      this.clearLocalTimer(userId);
+      await dbService.saveFollowUpSession(userId, {
+        lastActiveAt: now,
+        pendingMessage: message,
+        pendingCreatedAt: now,
+        nextReminderIndex,
+        dueAt: nextDueAt,
+        status: nextDueAt ? 'scheduled' : 'pending',
+        leaseId: null,
+        leaseExpiresAt: null,
+        leasedAt: null,
+        lastLeaseFailureReason: null,
+      });
+    } catch (error) {
+      await dbService.releaseFollowUpLease(userId, error?.message || 'push_enqueue_failed');
+      throw error;
     }
+  }
+
+  async executeFollowUpPush(userId) {
+    const session = await this.loadSession(userId);
+    if (!session) return false;
+
+    await this.executeClaimedFollowUpPush(session);
+    return true;
   }
 
   async getOriginalChart(userId) {
@@ -203,7 +240,6 @@ class FollowUpService {
   }
 
   async cancelFollowUp(userId) {
-    this.clearLocalTimer(userId);
     await dbService.deleteFollowUpSession(userId);
     console.log(`[F/U Cancelled] ${userId}`);
   }
