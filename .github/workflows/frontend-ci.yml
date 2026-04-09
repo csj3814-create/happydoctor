@@ -2,7 +2,17 @@ name: Frontend CI
 
 on:
   push:
+    paths:
+      - 'frontend/app/**'
+      - 'frontend/portal/**'
+      - 'frontend/homepage/**'
+      - '.github/workflows/frontend-ci.yml'
   pull_request:
+    paths:
+      - 'frontend/app/**'
+      - 'frontend/portal/**'
+      - 'frontend/homepage/**'
+      - '.github/workflows/frontend-ci.yml'
   workflow_dispatch:
 
 permissions:
