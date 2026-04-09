@@ -139,3 +139,5 @@
 - **Lesson**: Polling indicators on the patient status page should stay secondary to the main content and be throttled so they do not flash on every background refresh.
 - **Lesson**: When a doctor reply exists on the public status page, the doctor reply and next-action UI should outrank the AI first-reply summary in visual order so the most actionable update is seen first.
 - **Lesson**: Mobile landing screens need explicit no-wrap/min-width rules for short action labels and deliberate headline line breaks; leaving hero copy to auto-wrap creates awkward two-line breaks on real devices.
+- **Lesson**: Decorative mobile mockups on landing pages need their own small-screen size budget; if the shell is allowed to keep desktop padding and secondary cards, it quickly becomes taller than the story it is supposed to support.
+- **Lesson**: If a landing page promises home-screen installation, the install guidance card should include the actual PWA install action instead of making users hunt for it elsewhere.

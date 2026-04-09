@@ -63,7 +63,7 @@ a {
   position: relative;
   overflow: hidden;
   border-radius: 2.5rem;
-  padding: 5.5rem 1.4rem 1.6rem;
+  padding: 1.5rem 0.95rem 1rem;
   background:
     radial-gradient(circle at top right, rgba(255, 255, 255, 0.38), transparent 28%),
     linear-gradient(145deg, #0b4377 0%, #0c5c96 50%, #6bb8df 100%);
@@ -94,11 +94,11 @@ a {
 .phone-shell {
   position: relative;
   width: 100%;
-  max-width: 24rem;
-  border-radius: 2.5rem;
+  max-width: 18rem;
+  border-radius: 2rem;
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: #072846;
-  padding: 0.85rem;
+  padding: 0.65rem;
   box-shadow: 0 32px 60px rgba(2, 13, 24, 0.35);
   animation: deviceFloat 6.2s ease-in-out infinite;
 }
@@ -347,6 +347,12 @@ a {
 
   .hero-stage {
     padding: 5.7rem 1.6rem 1.8rem;
+  }
+
+  .phone-shell {
+    max-width: 24rem;
+    border-radius: 2.5rem;
+    padding: 0.85rem;
   }
 
   .editorial-band {
