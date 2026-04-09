@@ -1342,3 +1342,8 @@
   - Keep patient follow-up push delivery behavior unchanged while making scheduling durable.
   - Verification: `backend node --check services/dbService.js`, `backend node --check services/followUpService.js`, `backend node --check index.js`, `backend node -e "require('./services/dbService'); require('./services/followUpService'); require('./routes/public'); require('./routes/kakaoWebhook'); require('./routes/portal'); require('./routes/messengerBot'); console.log('backend-load-ok');"`.
   - Deployment: Render `/api/version` updated to `c368bedd8b7f89a12e534bc25a10e94e2cffe7bd`.
+- [x] Stage 83 durable patient push delivery (2026-04-09)
+  - Replace immediate `dequeue -> delivered` behavior for `patient_channel_pushes` with the same Firestore lease/ack semantics used by doctor notifications.
+  - Add patient push reclaim/claim/ack helpers so follow-up reminders and portal reply pushes can retry safely after MessengerBot delivery failures or worker restarts.
+  - Update MessengerBot poll routes and the MessengerBot R script so patient pushes acknowledge delivery success/failure explicitly instead of assuming success on dequeue.
+  - Verification: `backend node --check services/notifyService.js`, `backend node --check routes/messengerBot.js`, `backend node --check messengerbot_script.js`, `backend node --check index.js`, `backend node -e "require('./services/dbService'); require('./services/followUpService'); require('./services/notifyService'); require('./routes/public'); require('./routes/kakaoWebhook'); require('./routes/portal'); require('./routes/messengerBot'); console.log('backend-load-ok');"`.

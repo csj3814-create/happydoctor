@@ -4,8 +4,8 @@ const {
     claimDoctorNotification,
     acknowledgeDoctorNotification,
     confirmDoctorNotifications,
-    dequeueFUPush,
-    dequeuePatientChannelPush,
+    claimPatientChannelPush,
+    acknowledgePatientChannelPush,
     registerRoom,
     registerDoctorRoom,
     getDoctorRoomName,
@@ -197,35 +197,42 @@ router.post('/poll/ack', checkApiKey, async (req, res) => {
     return res.status(200).json({ ok: true });
 });
 
-router.get('/fu-push-poll', checkApiKey, async (req, res) => {
-    const fuItem = await dequeueFUPush();
-    if (!fuItem) {
-        return res.status(200).json({ hasNew: false });
-    }
-
-    return res.status(200).json({
-        hasNew: true,
-        roomName: fuItem.roomName,
-        message: fuItem.message,
-        userId: fuItem.userId,
-        type: fuItem.type || 'follow_up',
-    });
-});
-
-router.get('/patient-push-poll', checkApiKey, async (req, res) => {
-    const item = await dequeuePatientChannelPush();
+async function handlePatientPushPoll(req, res) {
+    const item = await claimPatientChannelPush();
     if (!item) {
         return res.status(200).json({ hasNew: false });
     }
 
     return res.status(200).json({
         hasNew: true,
+        queueId: item.queueId,
+        leaseId: item.leaseId,
         roomName: item.roomName,
         message: item.message,
         userId: item.userId,
         type: item.type || 'general',
     });
-});
+}
+
+async function handlePatientPushAck(req, res) {
+    const queueId = (req.body?.queueId || '').toString().trim();
+    if (!queueId) {
+        return res.status(400).json({ error: 'queueId required' });
+    }
+
+    await acknowledgePatientChannelPush(queueId, {
+        delivered: req.body?.delivered !== false,
+        error: typeof req.body?.error === 'string' ? req.body.error.slice(0, 240) : null,
+    });
+
+    return res.status(200).json({ ok: true });
+}
+
+router.get('/fu-push-poll', checkApiKey, handlePatientPushPoll);
+router.post('/fu-push-poll/ack', checkApiKey, handlePatientPushAck);
+
+router.get('/patient-push-poll', checkApiKey, handlePatientPushPoll);
+router.post('/patient-push-poll/ack', checkApiKey, handlePatientPushAck);
 
 router.post('/register-room', checkApiKey, async (req, res) => {
     const { userId, roomName } = req.body;
