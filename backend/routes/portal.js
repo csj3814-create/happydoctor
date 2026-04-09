@@ -23,18 +23,91 @@ const followUpService = require('../services/followUpService');
 
 const router = express.Router();
 const ALLOWED_LIST_STATUS = new Set(['all', 'active', 'followup', 'replied', 'closed']);
+const MAX_SEARCH_LENGTH = 120;
+const MAX_REPLY_LENGTH = 2000;
+const MAX_CONSULTATION_ID_LENGTH = 160;
+
+function createRequestValidationError(message) {
+  const error = new Error(message);
+  error.statusCode = 400;
+  return error;
+}
+
+function parseBoundedInteger(value, { name, defaultValue, min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
+  if (typeof value === 'undefined') return defaultValue;
+
+  const normalized = String(value).trim();
+  if (!normalized) return defaultValue;
+  if (!/^\d+$/.test(normalized)) {
+    throw createRequestValidationError(`${name} 값을 다시 확인해 주세요.`);
+  }
+
+  const parsed = Number.parseInt(normalized, 10);
+  if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
+    throw createRequestValidationError(`${name} 값을 다시 확인해 주세요.`);
+  }
+
+  return parsed;
+}
+
+function parseOptionalSearch(value) {
+  if (typeof value === 'undefined') return '';
+  if (typeof value !== 'string') {
+    throw createRequestValidationError('검색어를 다시 확인해 주세요.');
+  }
+
+  const normalized = value.trim();
+  if (normalized.length > MAX_SEARCH_LENGTH) {
+    throw createRequestValidationError(`검색어는 ${MAX_SEARCH_LENGTH}자 이하로 입력해 주세요.`);
+  }
+
+  return normalized;
+}
+
+function parseConsultationId(value) {
+  const normalized = typeof value === 'string' ? value.trim() : '';
+  if (!normalized) {
+    throw createRequestValidationError('상담 ID를 다시 확인해 주세요.');
+  }
+
+  if (normalized.length > MAX_CONSULTATION_ID_LENGTH || /[\\/\s]/.test(normalized)) {
+    throw createRequestValidationError('상담 ID를 다시 확인해 주세요.');
+  }
+
+  return normalized;
+}
+
+function parseReplyMessage(value) {
+  if (typeof value !== 'string') {
+    throw createRequestValidationError('답변 내용을 입력해 주세요.');
+  }
+
+  const normalized = value.trim();
+  if (!normalized) {
+    throw createRequestValidationError('답변 내용을 입력해 주세요.');
+  }
+
+  if (normalized.length > MAX_REPLY_LENGTH) {
+    throw createRequestValidationError(`답변은 ${MAX_REPLY_LENGTH}자 이하로 입력해 주세요.`);
+  }
+
+  return normalized;
+}
 
 function parseListQuery(query = {}) {
-  const status = (query.status || 'all').toString().trim().toLowerCase();
-  const search = typeof query.search === 'string' ? query.search.trim() : '';
-  const offset = Number.parseInt(query.offset, 10);
-  const limit = Number.parseInt(query.limit, 10);
+  const status = typeof query.status === 'undefined'
+    ? 'all'
+    : String(query.status).trim().toLowerCase();
+
+  if (!ALLOWED_LIST_STATUS.has(status)) {
+    throw createRequestValidationError('조회 상태를 다시 확인해 주세요.');
+  }
 
   return {
-    status: ALLOWED_LIST_STATUS.has(status) ? status : 'all',
-    search,
-    offset: Number.isFinite(offset) ? Math.max(0, offset) : 0,
-    limit: Number.isFinite(limit) ? Math.max(1, Math.min(100, limit)) : 50,
+    status,
+    search: parseOptionalSearch(query.search),
+    offset: parseBoundedInteger(query.offset, { name: 'offset', defaultValue: 0, min: 0, max: 10000 }),
+    limit: parseBoundedInteger(query.limit, { name: 'limit', defaultValue: 50, min: 1, max: 100 }),
   };
 }
 
@@ -241,8 +314,17 @@ router.get('/consultations', requireDoctorAuth, async (req, res) => {
     return res.json({
       consultations: consultations.map(serializeTimestamps),
       total,
+      offset: listQuery.offset,
+      limit: listQuery.limit,
+      status: listQuery.status,
+      search: listQuery.search,
+      returned: consultations.length,
+      hasMore: (listQuery.offset + consultations.length) < total,
     });
   } catch (error) {
+    if (error?.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     console.error('[Portal List Error]', error);
     return res.status(500).json({ error: '목록 조회 실패' });
   }
@@ -260,39 +342,40 @@ router.get('/consultations/summary', requireDoctorAuth, async (req, res) => {
 
 router.get('/consultations/:id', requireDoctorAuth, async (req, res) => {
   try {
-    const consultation = await getConsultationById(req.params.id);
+    const consultationId = parseConsultationId(req.params.id);
+    const consultation = await getConsultationById(consultationId);
     if (!consultation) {
       return res.status(404).json({ error: '상담을 찾을 수 없습니다.' });
     }
 
     return res.json(serializeTimestamps(consultation));
   } catch (error) {
+    if (error?.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     console.error('[Portal Detail Error]', error);
     return res.status(500).json({ error: '상세 조회 실패' });
   }
 });
 
 router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
-  const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
-  if (!message) {
-    return res.status(400).json({ error: '답변 내용을 입력해 주세요.' });
-  }
-
   try {
-    const consultation = await getConsultationById(req.params.id);
+    const consultationId = parseConsultationId(req.params.id);
+    const message = parseReplyMessage(req.body?.message);
+    const consultation = await getConsultationById(consultationId);
     if (!consultation) {
       return res.status(404).json({ error: '상담을 찾을 수 없습니다.' });
     }
 
     const replyId = await saveDoctorReply(
-      consultation.id,
+      consultationId,
       consultation.userId,
       message,
       req.doctor.name,
       req.doctor.email,
     );
 
-    const trackingInfo = await getConsultationTrackingById(consultation.id);
+    const trackingInfo = await getConsultationTrackingById(consultationId);
     const statusUrl = buildPatientStatusUrl(trackingInfo);
     await enqueuePatientChannelPush(
       consultation.userId,
@@ -312,6 +395,9 @@ router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
 
     return res.json({ ok: true, replyId });
   } catch (error) {
+    if (error?.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     console.error('[Portal Reply Error]', error);
     return res.status(500).json({ error: '답변 전송 실패' });
   }

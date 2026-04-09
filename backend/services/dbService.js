@@ -848,7 +848,7 @@ async function getActiveConsultations(options = {}) {
   if (!db) return { consultations: [], total: 0 };
 
   try {
-    const docs = await getEscalatedConsultationDocs();
+    const docs = await getEscalatedConsultationDocsForPortalStatus(options.status);
 
     return applyConsultationViewOptions(docs, options);
   } catch (error) {
@@ -858,6 +858,28 @@ async function getActiveConsultations(options = {}) {
 }
 
 async function getEscalatedConsultationDocs() {
+  return getEscalatedConsultationDocsForPortalStatus('all');
+}
+
+async function getEscalatedConsultationDocsForPortalStatus(status = 'all') {
+  if (status === 'closed') {
+    const completedSnap = await db.collection('consultations')
+      .where('aiAction', '==', 'ESCALATE')
+      .where('status', '==', 'COMPLETED')
+      .get();
+
+    return completedSnap.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
+  }
+
+  if (status === 'active' || status === 'followup' || status === 'replied') {
+    const activeSnap = await db.collection('consultations')
+      .where('aiAction', '==', 'ESCALATE')
+      .where('status', '==', 'ACTIVE')
+      .get();
+
+    return activeSnap.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
+  }
+
   const [activeSnap, completedSnap] = await Promise.all([
     db.collection('consultations')
       .where('aiAction', '==', 'ESCALATE')
