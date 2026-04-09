@@ -34,6 +34,7 @@ export interface PublicConsultationStatus {
   trackingCode: string | null
   status: PublicConsultationStage
   chiefComplaint: string | null
+  chatbotReply: string | null
   createdAt: string | null
   doctorRepliedAt: string | null
   closedAt: string | null

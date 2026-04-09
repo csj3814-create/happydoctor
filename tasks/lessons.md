@@ -135,3 +135,5 @@
 - **교훈**: 업로드 허용 포맷은 프런트 `accept`와 백엔드 MIME 검사 기준을 반드시 맞춘다. 프런트에서 HEIC를 고를 수 있게 열어 두고 백엔드가 막으면 사용자에게는 그냥 저장 실패처럼 보인다.
 - **교훈**: 상태 화면 실시간 갱신은 단순 polling만으로 끝내지 말고 `최초 로드`와 `새 답변 도착` 전환을 구분해 배너나 다음 행동을 보여줘야 사용자가 변화를 바로 인지한다.
 - **교훈**: 카카오 `symptom_image`는 LLM 프롬프트에만 쓰지 말고 상담 `mediaItems`에도 같이 저장해야 포털, 상태 화면, 추후 협진 흐름에서 같은 자료를 일관되게 볼 수 있다.
+- **Lesson**: If the start response shows a user-facing AI summary, the public status API must also expose that same summary so the status page can reconstruct the full journey after redirects or refreshes.
+- **Lesson**: Polling indicators on the patient status page should stay secondary to the main content and be throttled so they do not flash on every background refresh.

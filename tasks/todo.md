@@ -220,6 +220,21 @@
 - [x] `backend`: `node --check services/dbService.js`
 - [x] portal production deploy: `happydoctor-5ou70mv16-csj3814-8131s-projects.vercel.app`
 
+## Stage 75: public status flow regression fix (2026.04.09)
+
+### Goals
+- [x] 웹 상담 접수 직후 status 화면에서 보듬이의 1차 답변을 다시 보여준다.
+- [x] `확인 대기` 상태 카드보다 보듬이 답변이 먼저 보이도록 순서를 조정한다.
+- [x] `상담 상태를 불러오고 있습니다...` 안내는 화면 하단으로 내리고, background refresh에서는 1분에 한 번만 노출되게 조정한다.
+
+### Notes
+- [x] 원인 확인 및 수정 내용을 정리한다.
+
+### Verification
+- [x] `frontend/app`: `npm run build`
+- [x] `frontend/app`: `npm run lint`
+- [x] `backend`: `node --check services/dbService.js`
+
 ## 오늘 우선 작업 정리 (2026.04.09)
 
 ### 실제 우선순위
@@ -1286,3 +1301,9 @@
 - [x] `frontend/portal`: `npm run build`
 - [x] 라이브 API 기준 사진 업로드 생성/조회/서명 URL/종료/정리까지 확인
 - [ ] Render 최신 리비전 반영과 포털 인증 화면 시각 검증은 아직 남음
+- [x] Stage 75 public status flow regression fix shipped on 2026-04-09
+  - Restored the initial Bodeum reply on the status page by persisting `replyToPatient` in the active web consultation session and exposing `chatbotReply` from the public status API.
+  - Kept the Bodeum reply card above the waiting-doctor status card, including the first redirected load before the status payload finishes loading.
+  - Moved the `상담 상태를 불러오고 있습니다...` notice to the bottom of the page and throttled background refresh notices to once per minute.
+  - Verification: `frontend/app npm run lint`, `frontend/app npm run build`, `backend node --check services/dbService.js`.
+  - Deployment: `happydoctor-8d8ny2x38-csj3814-8131s-projects.vercel.app` promoted and aliased to `app.happydoctor.kr`.

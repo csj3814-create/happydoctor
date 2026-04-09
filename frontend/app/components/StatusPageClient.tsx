@@ -24,6 +24,8 @@ const timeFormatter = new Intl.DateTimeFormat('ko-KR', {
 })
 
 const LIVE_STATUS_POLL_INTERVAL_MS = 15 * 1000
+const STATUS_LOADING_NOTICE_MIN_INTERVAL_MS = 60 * 1000
+const STATUS_LOADING_NOTICE_VISIBLE_MS = 4 * 1000
 
 function formatDateTime(value: string | null) {
   if (!value) return '아직 기록이 없습니다.'
@@ -94,16 +96,61 @@ export default function StatusPageClient() {
   const [restoredRecentSession, setRestoredRecentSession] = useState(false)
   const [checkingStoredSession, setCheckingStoredSession] = useState(true)
   const [liveUpdateMessage, setLiveUpdateMessage] = useState<string | null>(null)
+  const [sessionChatbotReply, setSessionChatbotReply] = useState<string | null>(null)
+  const [showBackgroundLoadingNotice, setShowBackgroundLoadingNotice] = useState(false)
   const latestReplyIdRef = useRef<string | null>(null)
   const replyBaselineReadyRef = useRef(false)
+  const latestConsultationRef = useRef<PublicConsultationStatus | null>(null)
+  const lastLoadingNoticeAtRef = useRef(0)
+  const loadingNoticeTimeoutRef = useRef<number | null>(null)
+
+  function queueBackgroundLoadingNotice() {
+    if (typeof window === 'undefined') return
+
+    const now = Date.now()
+    if (now - lastLoadingNoticeAtRef.current < STATUS_LOADING_NOTICE_MIN_INTERVAL_MS) {
+      return
+    }
+
+    lastLoadingNoticeAtRef.current = now
+    setShowBackgroundLoadingNotice(true)
+
+    if (loadingNoticeTimeoutRef.current) {
+      window.clearTimeout(loadingNoticeTimeoutRef.current)
+    }
+
+    loadingNoticeTimeoutRef.current = window.setTimeout(() => {
+      setShowBackgroundLoadingNotice(false)
+      loadingNoticeTimeoutRef.current = null
+    }, STATUS_LOADING_NOTICE_VISIBLE_MS)
+  }
 
   useEffect(() => {
     setLookupValue(rawLookup)
   }, [rawLookup])
 
   useEffect(() => {
+    latestConsultationRef.current = consultation
+  }, [consultation])
+
+  useEffect(() => {
+    return () => {
+      if (loadingNoticeTimeoutRef.current && typeof window !== 'undefined') {
+        window.clearTimeout(loadingNoticeTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
     const normalizedLookup = normalizeStatusLookup(rawLookup)
+    const recentSession = getActiveConsultationSession()
+    const matchedSessionReply =
+      recentSession && normalizedLookup && recentSession.lookup === normalizedLookup
+        ? recentSession.chatbotReply || null
+        : null
+
     setLiveUpdateMessage(null)
+    setSessionChatbotReply(matchedSessionReply)
 
     if (rawLookup && !normalizedLookup) {
       setResolvedLookup(null)
@@ -120,9 +167,9 @@ export default function StatusPageClient() {
       return
     }
 
-    const recentSession = getActiveConsultationSession()
     if (recentSession?.lookup) {
       setRestoredRecentSession(true)
+      setSessionChatbotReply(recentSession.chatbotReply || null)
       setCheckingStoredSession(false)
       router.replace(`/status?lookup=${encodeURIComponent(recentSession.lookup)}`)
       return
@@ -131,6 +178,7 @@ export default function StatusPageClient() {
     setResolvedLookup(null)
     setConsultation(null)
     setFetchError(null)
+    setSessionChatbotReply(null)
     setCheckingStoredSession(false)
   }, [rawLookup, router])
 
@@ -141,7 +189,12 @@ export default function StatusPageClient() {
     const activeLookup = resolvedLookup
 
     async function loadConsultation() {
-      setLoading(true)
+      const hasVisibleConsultation = Boolean(latestConsultationRef.current)
+      if (hasVisibleConsultation) {
+        queueBackgroundLoadingNotice()
+      } else {
+        setLoading(true)
+      }
       setFetchError(null)
 
       try {
@@ -149,12 +202,15 @@ export default function StatusPageClient() {
         if (cancelled) return
 
         if (!status) {
-          setConsultation(null)
+          if (!hasVisibleConsultation) {
+            setConsultation(null)
           setFetchError('상담 상태를 찾지 못했습니다. 받은 링크 또는 코드를 다시 확인해 주세요.')
+          }
           return
         }
 
         setConsultation(status)
+        setSessionChatbotReply(status.chatbotReply || null)
         saveActiveConsultationSession({
           consultationId: status.consultationId,
           lookup: activeLookup,
@@ -163,13 +219,16 @@ export default function StatusPageClient() {
             typeof window !== 'undefined'
               ? `${window.location.origin}/status?lookup=${encodeURIComponent(activeLookup)}`
               : `/status?lookup=${encodeURIComponent(activeLookup)}`,
+          chatbotReply: status.chatbotReply,
         })
       } catch {
         if (cancelled) return
-        setConsultation(null)
+        if (!hasVisibleConsultation) {
+          setConsultation(null)
         setFetchError('지금은 상태를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.')
+        }
       } finally {
-        if (!cancelled) {
+        if (!cancelled && !hasVisibleConsultation) {
           setLoading(false)
         }
       }
@@ -210,8 +269,9 @@ export default function StatusPageClient() {
   }, [consultation])
 
   useEffect(() => {
+    const consultationStatus = consultation?.status
     if (!resolvedLookup) return
-    if (!consultation || consultation.status === 'closed') return
+    if (!consultationStatus || consultationStatus === 'closed') return
 
     const intervalId = window.setInterval(() => {
       if (document.visibilityState === 'visible') {
@@ -252,6 +312,7 @@ export default function StatusPageClient() {
     consultation && consultation.doctorReplies.length > 0
       ? consultation.doctorReplies[consultation.doctorReplies.length - 1]
       : null
+  const chatbotReply = consultation?.chatbotReply || sessionChatbotReply
   const canCloseConsultation = consultation
     ? consultation.status === 'doctor_replied' && !consultation.closedAt
     : false
@@ -331,9 +392,19 @@ export default function StatusPageClient() {
           </section>
         ) : null}
 
-        {loading ? (
-          <section className="mt-6 rounded-[2rem] border border-[var(--line)] bg-white p-6 text-sm leading-7 text-[var(--muted)] shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
-            상담 상태를 불러오고 있습니다...
+        {chatbotReply && !consultation ? (
+          <section className="mt-6">
+            <div className="rounded-[2rem] border border-[#cfe0ff] bg-[#f5f9ff] p-6 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
+              <p className="display-face text-xs font-semibold uppercase tracking-[0.24em] text-[var(--blue)]">
+                Bodeum First Reply
+              </p>
+              <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-[var(--ink)]">
+                보듬이의 1차 상담 결과
+              </h2>
+              <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-[var(--ink)]">
+                {chatbotReply}
+              </p>
+            </div>
           </section>
         ) : null}
 
@@ -342,6 +413,20 @@ export default function StatusPageClient() {
             {liveUpdateMessage ? (
               <div className="rounded-[1.8rem] border border-[#d4eadb] bg-[#f4fbf6] px-5 py-4 text-sm leading-7 text-[#2f6b45]">
                 {liveUpdateMessage}
+              </div>
+            ) : null}
+
+            {chatbotReply ? (
+              <div className="rounded-[2rem] border border-[#cfe0ff] bg-[#f5f9ff] p-6 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
+                <p className="display-face text-xs font-semibold uppercase tracking-[0.24em] text-[var(--blue)]">
+                  Bodeum First Reply
+                </p>
+                <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-[var(--ink)]">
+                  보듬이의 1차 상담 결과
+                </h2>
+                <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-[var(--ink)]">
+                  {chatbotReply}
+                </p>
               </div>
             ) : null}
 
@@ -498,6 +583,12 @@ export default function StatusPageClient() {
                 </div>
               </div>
             </div>
+          </section>
+        ) : null}
+
+        {(loading || showBackgroundLoadingNotice) ? (
+          <section className="mt-6 rounded-[2rem] border border-[var(--line)] bg-white p-6 text-sm leading-7 text-[var(--muted)] shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
+            상담 상태를 불러오고 있습니다...
           </section>
         ) : null}
       </div>

@@ -470,6 +470,7 @@ async function buildPublicConsultationStatus(consultation, replies) {
     trackingCode: consultation.publicTrackingCode || null,
     status: stage,
     chiefComplaint: consultation.patientData?.cc || null,
+    chatbotReply: consultation.chatbotReply || null,
     createdAt: toIsoString(consultation.createdAt),
     doctorRepliedAt: toIsoString(consultation.doctorRepliedAt),
     closedAt: toIsoString(consultation.closedAt),
