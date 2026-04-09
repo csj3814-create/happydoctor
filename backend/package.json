@@ -5,7 +5,10 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test": "node --test \"tests/*.test.js\""
+    "test": "node --test \"tests/*.test.js\"",
+    "check:syntax": "node --check tests/messengerBot.routes.integration.test.js && node --check tests/publicPortal.routes.integration.test.js && node --check tests/notifyService.patientPush.test.js && node --check tests/followUpService.durableScheduler.test.js && node --check routes/messengerBot.js && node --check routes/public.js && node --check routes/portal.js && node --check services/notifyService.js && node --check services/followUpService.js && node --check messengerbot_script.js && node --check index.js",
+    "check:load": "node -e \"require('./services/dbService'); require('./services/followUpService'); require('./services/notifyService'); require('./routes/public'); require('./routes/kakaoWebhook'); require('./routes/portal'); require('./routes/messengerBot'); console.log('backend-load-ok');\"",
+    "verify:ci": "npm test && npm run check:syntax && npm run check:load"
   },
   "keywords": [],
   "author": "",

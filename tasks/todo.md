@@ -1372,3 +1372,8 @@
   - Keep everything inside `backend/tests/*.test.js` with module mocks only; no new test dependency.
   - Verification: `backend npm test`, `backend node --check tests/messengerBot.routes.integration.test.js`, `backend node --check tests/publicPortal.routes.integration.test.js`, `backend node --check tests/notifyService.patientPush.test.js`, `backend node --check tests/followUpService.durableScheduler.test.js`, `backend node --check routes/messengerBot.js`, `backend node --check routes/public.js`, `backend node --check routes/portal.js`, `backend node --check services/notifyService.js`, `backend node --check services/followUpService.js`, `backend node --check messengerbot_script.js`, `backend node --check index.js`, `backend node -e "require('./services/dbService'); require('./services/followUpService'); require('./services/notifyService'); require('./routes/public'); require('./routes/kakaoWebhook'); require('./routes/portal'); require('./routes/messengerBot'); console.log('backend-load-ok');"`.
   - Deployment: Render `/api/version` updated to `482f752898822132269fdb72d5e5e3321edf51f0`.
+- [x] Stage 88 backend CI automation (2026-04-09)
+  - Add reusable backend verification scripts so the same checks run locally and in CI.
+  - Add a GitHub Actions workflow that installs backend dependencies and runs the backend verification suite on push, pull request, and manual dispatch.
+  - Keep the workflow narrow and deterministic: no deployment, just backend verification.
+  - Verification: `backend npm run verify:ci`, inspect `.github/workflows/backend-ci.yml`.
