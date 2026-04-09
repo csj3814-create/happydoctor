@@ -1330,3 +1330,9 @@
   - Review nearby landing-page copy for other user-facing wording that is awkward or incomplete, then report the recommended follow-up edits.
   - Verification: `frontend/app npm run lint`, `Invoke-WebRequest https://app.happydoctor.kr/` install-label and updated-copy checks.
   - Deployment: `happydoctor-gnka3j5ht-csj3814-8131s-projects.vercel.app` promoted and aliased to `app.happydoctor.kr`.
+- [x] Stage 81 landing CTA copy polish (2026-04-09)
+  - Change the install heading to clearer home-screen language.
+  - Simplify the iPhone install tip into a direct action sentence.
+  - Replace the final CTA heading with a more concrete `방법`-based phrase.
+  - Verification: `frontend/app npm run lint`, `Invoke-WebRequest https://app.happydoctor.kr/` CTA-copy checks.
+  - Deployment: `happydoctor-cpoyqo71w-csj3814-8131s-projects.vercel.app` promoted and aliased to `app.happydoctor.kr`.

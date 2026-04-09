@@ -43,7 +43,7 @@ const processSteps = [
 
 const installTips = [
   'Android Chrome에서는 메뉴에서 홈 화면 추가를 누르면 앱처럼 바로 열 수 있습니다.',
-  'iPhone Safari에서는 공유 메뉴의 홈 화면에 추가로 바로가기 설치가 가능합니다.',
+  'iPhone Safari에서는 공유 메뉴에서 홈 화면에 추가를 누르면 됩니다.',
   '설치하지 않아도 상담 시작과 상태 확인은 그대로 이용할 수 있습니다.',
 ]
 
@@ -286,9 +286,9 @@ export default function AppHomePage() {
                 설치 안내
               </p>
               <h3 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-[var(--ink)]">
-                필요하다면
+                원하면
                 <br />
-                홈 화면으로 더 가깝게
+                홈 화면에 추가해 두세요
               </h3>
               <ul className="mt-6 space-y-3 text-sm leading-7 text-[var(--muted)]">
                 {installTips.map((tip) => (
@@ -306,9 +306,9 @@ export default function AppHomePage() {
                 시작하기
               </p>
               <h3 className="mt-3 text-3xl font-semibold tracking-[-0.04em]">
-                지금 필요한 행동만
+                지금 필요한 방법으로
                 <br />
-                바로 고르세요
+                바로 시작하세요
               </h3>
               <p className="mt-4 text-sm leading-7 text-white/78">
                 새 상담을 시작하거나, 익숙한 카카오톡 채널로 들어가거나, 이미 받은 코드로 상태를 다시 확인하면 됩니다.
