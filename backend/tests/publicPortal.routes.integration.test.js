@@ -452,6 +452,8 @@ test('portal reply route authenticates the doctor and enqueues the patient reply
         return {
           id: consultationId,
           userId: 'public_user_3',
+          aiAction: 'ESCALATE',
+          status: 'ACTIVE',
         };
       },
       saveDoctorReply: async (consultationId, userId, message, doctorName, doctorEmail) => {
@@ -580,6 +582,241 @@ test('portal reply route authenticates the doctor and enqueues the patient reply
       { type: 'cancelFollowUp', userId: 'public_user_3' },
       { type: 'clearDoctorNotifications', userId: 'public_user_3' },
       { type: 'awardHDT', email: 'doctor@example.com', name: '김의사', points: 50, reason: 'reply' },
+    ]);
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});
+
+test('portal detail and reply routes hide non-escalated consultations from the doctor portal', { concurrency: false }, async () => {
+  const calls = [];
+  const routeModule = loadRouteWithMocks(PORTAL_ROUTE_PATH, {
+    [DB_SERVICE_PATH]: {
+      getActiveConsultations: async () => ({ consultations: [], total: 0 }),
+      getConsultationSummary: async () => ({ pending: 0, replied: 0, closed: 0, followUp: 0 }),
+      getConsultationById: async (consultationId) => {
+        calls.push({ type: 'getConsultationById', consultationId });
+        return {
+          id: consultationId,
+          userId: 'public_user_hidden',
+          aiAction: 'AUTONOMOUS_REPLY',
+          status: 'ACTIVE',
+        };
+      },
+      saveDoctorReply: async () => {
+        calls.push({ type: 'saveDoctorReply' });
+        return 'reply-should-not-happen';
+      },
+      getConsultationTrackingById: async () => {
+        calls.push({ type: 'getConsultationTrackingById' });
+        return null;
+      },
+      awardHDT: async () => {
+        calls.push({ type: 'awardHDT' });
+      },
+      getDoctorStats: async () => null,
+      getAdmin: () => ({
+        auth() {
+          return {
+            verifyIdToken: async (token) => {
+              calls.push({ type: 'verifyIdToken', token });
+              return {
+                uid: 'doctor-uid',
+                email: 'doctor@example.com',
+                name: '김의사',
+              };
+            },
+          };
+        },
+      }),
+      getDoctorAccessRecordByEmail: async (email) => {
+        calls.push({ type: 'getDoctorAccessRecordByEmail', email });
+        return null;
+      },
+      ensureApprovedDoctorAccess: async (doctor) => {
+        calls.push({ type: 'ensureApprovedDoctorAccess', doctor });
+        return {
+          status: 'approved',
+          email: doctor.email,
+        };
+      },
+      upsertDoctorAccessRequest: async () => null,
+      approveDoctorAccessRequest: async () => null,
+      listPendingDoctorAccessRequests: async () => [],
+      HDT_REPLY: 50,
+    },
+    [NOTIFY_SERVICE_PATH]: {
+      enqueuePatientChannelPush: async () => {
+        calls.push({ type: 'enqueuePatientChannelPush' });
+        return true;
+      },
+      clearDoctorNotifications: async () => {
+        calls.push({ type: 'clearDoctorNotifications' });
+      },
+    },
+    [FOLLOW_UP_SERVICE_PATH]: {
+      cancelFollowUp: async () => {
+        calls.push({ type: 'cancelFollowUp' });
+      },
+    },
+    [CONFIG_PATH]: {
+      appSiteUrl: 'https://app.happydoctor.kr',
+      getAllowedDoctorEmails: () => ['doctor@example.com'],
+      getPortalAdminEmails: () => [],
+    },
+  });
+
+  const server = await startServer(routeModule.router, '/api/portal');
+
+  try {
+    const detailResponse = await getJson(`${server.baseUrl}/consultations/consult-hidden`, {
+      headers: { Authorization: 'Bearer portal-token' },
+    });
+
+    assert.equal(detailResponse.status, 404);
+    assert.match(detailResponse.body.error, /상담을 찾을 수 없습니다/);
+
+    const replyResponse = await postJson(
+      `${server.baseUrl}/consultations/consult-hidden/reply`,
+      { message: '답변' },
+      { headers: { Authorization: 'Bearer portal-token' } },
+    );
+
+    assert.equal(replyResponse.status, 404);
+    assert.match(replyResponse.body.error, /상담을 찾을 수 없습니다/);
+    assert.deepEqual(calls, [
+      { type: 'verifyIdToken', token: 'portal-token' },
+      { type: 'getDoctorAccessRecordByEmail', email: 'doctor@example.com' },
+      {
+        type: 'ensureApprovedDoctorAccess',
+        doctor: {
+          uid: 'doctor-uid',
+          email: 'doctor@example.com',
+          name: '김의사',
+        },
+      },
+      { type: 'getConsultationById', consultationId: 'consult-hidden' },
+      { type: 'verifyIdToken', token: 'portal-token' },
+      { type: 'getDoctorAccessRecordByEmail', email: 'doctor@example.com' },
+      {
+        type: 'ensureApprovedDoctorAccess',
+        doctor: {
+          uid: 'doctor-uid',
+          email: 'doctor@example.com',
+          name: '김의사',
+        },
+      },
+      { type: 'getConsultationById', consultationId: 'consult-hidden' },
+    ]);
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});
+
+test('portal reply route rejects closed consultations before saving a new doctor reply', { concurrency: false }, async () => {
+  const calls = [];
+  const routeModule = loadRouteWithMocks(PORTAL_ROUTE_PATH, {
+    [DB_SERVICE_PATH]: {
+      getActiveConsultations: async () => ({ consultations: [], total: 0 }),
+      getConsultationSummary: async () => ({ pending: 0, replied: 0, closed: 0, followUp: 0 }),
+      getConsultationById: async (consultationId) => {
+        calls.push({ type: 'getConsultationById', consultationId });
+        return {
+          id: consultationId,
+          userId: 'public_user_closed',
+          aiAction: 'ESCALATE',
+          status: 'COMPLETED',
+          closedAt: '2026-04-10T00:00:00.000Z',
+        };
+      },
+      saveDoctorReply: async () => {
+        calls.push({ type: 'saveDoctorReply' });
+        return 'reply-should-not-happen';
+      },
+      getConsultationTrackingById: async () => {
+        calls.push({ type: 'getConsultationTrackingById' });
+        return null;
+      },
+      awardHDT: async () => {
+        calls.push({ type: 'awardHDT' });
+      },
+      getDoctorStats: async () => null,
+      getAdmin: () => ({
+        auth() {
+          return {
+            verifyIdToken: async (token) => {
+              calls.push({ type: 'verifyIdToken', token });
+              return {
+                uid: 'doctor-uid',
+                email: 'doctor@example.com',
+                name: '김의사',
+              };
+            },
+          };
+        },
+      }),
+      getDoctorAccessRecordByEmail: async (email) => {
+        calls.push({ type: 'getDoctorAccessRecordByEmail', email });
+        return null;
+      },
+      ensureApprovedDoctorAccess: async (doctor) => {
+        calls.push({ type: 'ensureApprovedDoctorAccess', doctor });
+        return {
+          status: 'approved',
+          email: doctor.email,
+        };
+      },
+      upsertDoctorAccessRequest: async () => null,
+      approveDoctorAccessRequest: async () => null,
+      listPendingDoctorAccessRequests: async () => [],
+      HDT_REPLY: 50,
+    },
+    [NOTIFY_SERVICE_PATH]: {
+      enqueuePatientChannelPush: async () => {
+        calls.push({ type: 'enqueuePatientChannelPush' });
+        return true;
+      },
+      clearDoctorNotifications: async () => {
+        calls.push({ type: 'clearDoctorNotifications' });
+      },
+    },
+    [FOLLOW_UP_SERVICE_PATH]: {
+      cancelFollowUp: async () => {
+        calls.push({ type: 'cancelFollowUp' });
+      },
+    },
+    [CONFIG_PATH]: {
+      appSiteUrl: 'https://app.happydoctor.kr',
+      getAllowedDoctorEmails: () => ['doctor@example.com'],
+      getPortalAdminEmails: () => [],
+    },
+  });
+
+  const server = await startServer(routeModule.router, '/api/portal');
+
+  try {
+    const response = await postJson(
+      `${server.baseUrl}/consultations/consult-closed/reply`,
+      { message: '답변' },
+      { headers: { Authorization: 'Bearer portal-token' } },
+    );
+
+    assert.equal(response.status, 400);
+    assert.match(response.body.error, /종료된 상담/);
+    assert.deepEqual(calls, [
+      { type: 'verifyIdToken', token: 'portal-token' },
+      { type: 'getDoctorAccessRecordByEmail', email: 'doctor@example.com' },
+      {
+        type: 'ensureApprovedDoctorAccess',
+        doctor: {
+          uid: 'doctor-uid',
+          email: 'doctor@example.com',
+          name: '김의사',
+        },
+      },
+      { type: 'getConsultationById', consultationId: 'consult-closed' },
     ]);
   } finally {
     await server.close();
