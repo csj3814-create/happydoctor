@@ -11,6 +11,7 @@ const DOCTOR_ROOM_KIND = 'doctor_group';
 const DOCTOR_NOTIFICATION_LEASE_MS = 60 * 1000;
 const PATIENT_PUSH_LEASE_MS = 60 * 1000;
 const DEFAULT_DOCTOR_REMINDER_DELAYS_MINUTES = Object.freeze([0, 5, 15]);
+const DEFAULT_DOCTOR_REPLY_REMINDER_DELAYS_MINUTES = Object.freeze([0, 5, 15]);
 const DOCTOR_NOTIFICATION_DUPLICATE_WINDOW_MS = 20 * 60 * 1000;
 const DOCTOR_NOTIFICATION_CATCHUP_GAP_MS = 5 * 60 * 1000;
 const DOCTOR_ROOM_BLOCKED_PATTERNS = Object.freeze([
@@ -82,6 +83,27 @@ function normalizeReminderDelaysMinutes(delays = DEFAULT_DOCTOR_REMINDER_DELAYS_
 
   if (normalized.length === 0) {
     return [...DEFAULT_DOCTOR_REMINDER_DELAYS_MINUTES];
+  }
+
+  return [...new Set(normalized)].sort((a, b) => a - b);
+}
+
+function normalizePatientPushReminderDelaysMinutes(delays = [0]) {
+  const sourceDelays = typeof delays === 'undefined' ? [0] : delays;
+  const fallback = [0];
+
+  if (sourceDelays === 'doctor_reply_default') {
+    return [...DEFAULT_DOCTOR_REPLY_REMINDER_DELAYS_MINUTES];
+  }
+
+  const values = Array.isArray(sourceDelays) ? sourceDelays : [sourceDelays];
+  const normalized = values
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value) && value >= 0)
+    .map((value) => Math.round(value));
+
+  if (normalized.length === 0) {
+    return fallback;
   }
 
   return [...new Set(normalized)].sort((a, b) => a - b);
@@ -613,7 +635,7 @@ async function enqueueFUPush(userId, message) {
   return enqueuePatientChannelPush(userId, message, 'follow_up');
 }
 
-async function enqueuePatientChannelPush(userId, message, type = 'general') {
+async function enqueuePatientChannelPush(userId, message, type = 'general', options = {}) {
   const db = getDb();
   if (!db) {
     console.warn('[Patient Push] Firestore unavailable, skipping enqueue.');
@@ -628,16 +650,28 @@ async function enqueuePatientChannelPush(userId, message, type = 'general') {
     return false;
   }
 
-  await db.collection(PATIENT_CHANNEL_PUSHES).add({
-    id: randomUUID(),
-    userId,
-    roomName,
-    message,
-    type,
-    status: 'pending',
-    attemptCount: 0,
-    createdAt: getAdmin().firestore.FieldValue.serverTimestamp(),
-  });
+  const reminderDelaysMinutes = normalizePatientPushReminderDelaysMinutes(
+    typeof options.reminderDelaysMinutes === 'undefined'
+      ? (type === 'doctor_reply' ? 'doctor_reply_default' : [0])
+      : options.reminderDelaysMinutes,
+  );
+  const now = Date.now();
+
+  for (const [index, reminderDelayMinutes] of reminderDelaysMinutes.entries()) {
+    await db.collection(PATIENT_CHANNEL_PUSHES).add({
+      id: randomUUID(),
+      userId,
+      roomName,
+      message,
+      type,
+      status: 'pending',
+      attemptCount: 0,
+      createdAt: getAdmin().firestore.FieldValue.serverTimestamp(),
+      availableAt: new Date(now + reminderDelayMinutes * 60 * 1000),
+      reminderDelayMinutes,
+      reminderStage: index + 1,
+    });
+  }
 
   console.log(`[Patient Push Enqueued] ${userId} -> ${roomName} (${type})`);
   return true;
@@ -646,14 +680,29 @@ async function enqueuePatientChannelPush(userId, message, type = 'general') {
 async function getDuePendingPatientPushDocs(collection, limit = 20) {
   const snapshot = await collection
     .where('status', '==', 'pending')
-    .limit(Math.max(limit, 20))
     .get();
 
-  return snapshot.docs.sort((left, right) => {
-    const leftTime = toDate(left.data()?.createdAt)?.getTime() || 0;
-    const rightTime = toDate(right.data()?.createdAt)?.getTime() || 0;
-    return leftTime - rightTime;
-  });
+  if (snapshot.empty) return [];
+
+  const now = Date.now();
+  return snapshot.docs
+    .filter((doc) => {
+      const data = doc.data() || {};
+      const availableAt = toDate(data.availableAt);
+      return !availableAt || availableAt.getTime() <= now;
+    })
+    .sort((left, right) => {
+      const leftAvailableTime = toDate(left.data()?.availableAt)?.getTime() || 0;
+      const rightAvailableTime = toDate(right.data()?.availableAt)?.getTime() || 0;
+      if (leftAvailableTime !== rightAvailableTime) {
+        return leftAvailableTime - rightAvailableTime;
+      }
+
+      const leftCreatedTime = toDate(left.data()?.createdAt)?.getTime() || 0;
+      const rightCreatedTime = toDate(right.data()?.createdAt)?.getTime() || 0;
+      return leftCreatedTime - rightCreatedTime;
+    })
+    .slice(0, limit);
 }
 
 async function reclaimExpiredPatientPushLeases() {

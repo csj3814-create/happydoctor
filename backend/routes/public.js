@@ -219,9 +219,27 @@ router.post('/consultations', handleConsultationImageUpload, async (req, res) =>
 router.get('/consultations/status/:lookup', async (req, res) => {
   try {
     const lookup = parseLookupParam(req.params.lookup);
-    const consultation = await dbService.getPublicConsultationStatusByLookup(lookup);
+    const consultationSnapshot = await dbService.getAcknowledgedPublicConsultationStatusByLookup(lookup);
+    const consultation = consultationSnapshot?.consultation || null;
     if (!consultation) {
       return res.status(404).json({ error: '상담 상태를 찾을 수 없습니다.' });
+    }
+
+    if (
+      consultationSnapshot?.userId
+      && (
+        consultation.status === 'doctor_replied'
+        || (Array.isArray(consultation.doctorReplies) && consultation.doctorReplies.length > 0)
+      )
+    ) {
+      try {
+        await clearPatientChannelPushes(consultationSnapshot.userId, 'doctor_reply');
+      } catch (clearError) {
+        console.warn(
+          `[Public Consultation Status] Failed to clear doctor-reply reminders for ${consultationSnapshot.userId}:`,
+          clearError.message,
+        );
+      }
     }
 
     res.set('Cache-Control', 'no-store');
@@ -315,6 +333,14 @@ router.post('/consultations/status/:lookup/follow-up', async (req, res) => {
       priority: 'high',
       reminderDelaysMinutes: [0, 5, 15],
     });
+    try {
+      await clearPatientChannelPushes(followUp.userId, 'doctor_reply');
+    } catch (clearError) {
+      console.warn(
+        `[Public Consultation Follow-Up] Failed to clear doctor-reply reminders for ${followUp.userId}:`,
+        clearError.message,
+      );
+    }
 
     const consultation = await dbService.getPublicConsultationStatusByLookup(lookup);
     res.set('Cache-Control', 'no-store');

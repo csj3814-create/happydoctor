@@ -17,7 +17,11 @@ const {
   HDT_REPLY,
   getAdmin,
 } = require('../services/dbService');
-const { enqueuePatientChannelPush, clearDoctorNotifications } = require('../services/notifyService');
+const {
+  enqueuePatientChannelPush,
+  clearDoctorNotifications,
+  clearPatientChannelPushes,
+} = require('../services/notifyService');
 const { appSiteUrl, getAllowedDoctorEmails, getPortalAdminEmails } = require('../config');
 const followUpService = require('../services/followUpService');
 
@@ -399,7 +403,12 @@ router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
 
     const trackingInfo = await getConsultationTrackingById(consultationId);
     const statusUrl = buildPatientStatusUrl(trackingInfo);
-    await enqueuePatientChannelPush(
+    try {
+      await clearPatientChannelPushes(consultation.userId, 'doctor_reply');
+    } catch (error) {
+      console.warn(`[Portal] Failed to clear stale patient reply reminders for ${consultation.userId}:`, error.message);
+    }
+    const patientNotificationQueued = await enqueuePatientChannelPush(
       consultation.userId,
       buildPatientReplyPushMessage({
         doctorName: req.doctor.name,
@@ -408,7 +417,13 @@ router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
         trackingCode: trackingInfo?.trackingCode || null,
       }),
       'doctor_reply',
+      {
+        reminderDelaysMinutes: [0, 5, 15],
+      },
     );
+    if (!patientNotificationQueued) {
+      console.warn(`[Portal] No patient reply notification channel available for ${consultation.userId}.`);
+    }
     await followUpService.cancelFollowUp(consultation.userId);
     await clearDoctorNotifications(consultation.userId);
 

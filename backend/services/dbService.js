@@ -1259,7 +1259,10 @@ async function markUnseenDoctorRepliesAsSeen(consultationId) {
   return unseenReplies.length;
 }
 
-async function getPublicConsultationStatusByLookup(trackingLookup) {
+async function loadPublicConsultationStatusSnapshotByLookup(
+  trackingLookup,
+  options = {},
+) {
   if (!db || !trackingLookup) return null;
 
   try {
@@ -1275,19 +1278,49 @@ async function getPublicConsultationStatusByLookup(trackingLookup) {
       publicTrackingCode: identifiers.trackingCode,
     };
 
-    const repliesSnapshot = await db.collection('doctor_replies')
+    let repliesSnapshot = await db.collection('doctor_replies')
       .where('consultationId', '==', consultationDoc.id)
       .get();
 
-    const replies = repliesSnapshot.docs
+    let replies = repliesSnapshot.docs
       .map((reply) => ({ ...reply.data(), id: reply.id }))
       .sort((a, b) => getTimestampMs(a.createdAt) - getTimestampMs(b.createdAt));
 
-    return await buildPublicConsultationStatus(consultation, replies);
+    let markedDoctorReplyCount = 0;
+    if (options.markDoctorRepliesSeen) {
+      markedDoctorReplyCount = replies.filter((reply) => !reply.seen).length;
+      if (markedDoctorReplyCount > 0) {
+        await markUnseenDoctorRepliesAsSeen(consultationDoc.id);
+        repliesSnapshot = await db.collection('doctor_replies')
+          .where('consultationId', '==', consultationDoc.id)
+          .get();
+        replies = repliesSnapshot.docs
+          .map((reply) => ({ ...reply.data(), id: reply.id }))
+          .sort((a, b) => getTimestampMs(a.createdAt) - getTimestampMs(b.createdAt));
+      }
+    }
+
+    return {
+      consultation: await buildPublicConsultationStatus(consultation, replies),
+      consultationId: consultationDoc.id,
+      userId: consultation.userId || null,
+      markedDoctorReplyCount,
+    };
   } catch (error) {
     console.error('[DB PublicStatus Error]', error);
     throw error;
   }
+}
+
+async function getPublicConsultationStatusByLookup(trackingLookup) {
+  const snapshot = await loadPublicConsultationStatusSnapshotByLookup(trackingLookup);
+  return snapshot?.consultation || null;
+}
+
+async function getAcknowledgedPublicConsultationStatusByLookup(trackingLookup) {
+  return loadPublicConsultationStatusSnapshotByLookup(trackingLookup, {
+    markDoctorRepliesSeen: true,
+  });
 }
 
 async function closePublicConsultationByLookup(trackingLookup, reason) {
@@ -1645,6 +1678,7 @@ module.exports = {
   getConsultationTrackingById,
   getLatestConsultationTracking,
   getPublicConsultationStatusByLookup,
+  getAcknowledgedPublicConsultationStatusByLookup,
   getPublicConsultationStatusByToken: getPublicConsultationStatusByLookup,
   closePublicConsultationByLookup,
   appendPublicFollowUpQuestionByLookup,

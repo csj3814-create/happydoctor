@@ -143,3 +143,6 @@
 - **Lesson**: If a landing page promises home-screen installation, the install guidance card should include the actual PWA install action instead of making users hunt for it elsewhere.
 - **Lesson**: Process-step microcopy on landing mockups should describe a concrete user action; abstract phrasing like `걱정을 보냅니다` reads awkwardly compared with clearer inputs such as `궁금한 점을 남깁니다`.
 - **Lesson**: Patient-facing landing pages should avoid technical platform terms like `PWA`; installation copy should use familiar language such as `앱으로 설치` or `홈 화면에 추가`.
+- **Lesson**: If a patient-facing status endpoint shows a doctor reply, it must also acknowledge that reply as seen and clear any pending reply reminders; otherwise the portal will keep showing stale `미확인` states after a real patient view.
+- **Lesson**: Doctor-reply patient alerts should not be one-shot for Kakao-linked patients; a small durable reminder cadence such as immediate, 5 minutes, and 15 minutes is safer than assuming the first ping will always be noticed.
+- **Lesson**: Web-only public consultations should not promise SMS-style reply notifications unless the product actually collects a patient contact channel and has a real delivery integration behind it.
