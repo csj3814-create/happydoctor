@@ -25,6 +25,24 @@ function genderLabel(gender: string): string {
   return gender
 }
 
+function timestampMs(value?: string | null): number {
+  if (!value) return 0
+  const parsed = new Date(value).getTime()
+  return Number.isNaN(parsed) ? 0 : parsed
+}
+
+function latestFollowUpTimestampMs(logs: FollowUpLog[] = []): number {
+  return logs
+    .map((log) => timestampMs(log.timestamp))
+    .reduce((latest, current) => Math.max(latest, current), 0)
+}
+
+function hasPendingFollowUp(consultation: Consultation): boolean {
+  const latestFollowUp = latestFollowUpTimestampMs(consultation.followUpLogs ?? [])
+  if (!latestFollowUp) return false
+  return latestFollowUp > timestampMs(consultation.doctorRepliedAt)
+}
+
 function LabelValue({ label, value }: { label: string; value?: string | null }) {
   if (!value) return null
   return (
@@ -42,6 +60,15 @@ function statusMeta(consultation: Consultation) {
       badgeClass: 'bg-zinc-100 text-zinc-600',
       cardClass: 'border-zinc-200 bg-zinc-50',
       description: consultation.closeReason || '상담이 종료된 상태입니다.',
+    }
+  }
+
+  if (hasPendingFollowUp(consultation)) {
+    return {
+      label: 'Follow-up',
+      badgeClass: 'bg-amber-100 text-amber-800',
+      cardClass: 'border-amber-200 bg-amber-50',
+      description: '최근 follow-up 이후 아직 새 의료진 답변이 없는 상태입니다.',
     }
   }
 

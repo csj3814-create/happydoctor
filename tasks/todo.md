@@ -177,12 +177,12 @@
 ### Goals
 - [x] Confirm the old temporary deploy branch was only a legacy Git branch used by Render auto-deploy.
 - [x] Update repository notes to treat `main` as the only long-term deploy branch.
-- [ ] Switch Render auto-deploy branch to `main` in the dashboard.
+- [x] Switch Render auto-deploy branch to `main` in the dashboard.
 - [x] Remove the obsolete remote branch once `main` matches it.
 
 ### Notes
 - [x] `main` and the old temporary deploy branch pointed to the same commit before cleanup.
-- [ ] Render dashboard setting still needs to be changed from the old temporary deploy branch to `main`.
+- [x] Render dashboard branch setting is already `main`; the remaining blocker is build/deploy progression.
 
 ## Stage 73: wrap-up and deploy blocker note (2026.04.09)
 
@@ -199,6 +199,51 @@
   - Render UI stayed on `Building` / `Awaiting build logs...` during repeated deploy attempts.
 - [x] `frontend/homepage`: `npm run lint`
 - [x] `frontend/homepage`: `npm run build`
+
+## Stage 74: portal tab separation fix (2026.04.09)
+
+### Goals
+- [x] `follow-up` 탭과 `답변 완료` 탭이 같은 상담을 동시에 보여주지 않도록 분리한다.
+- [x] 포털 요약 카운트도 같은 분류 규칙을 따르도록 맞춘다.
+- [x] Render 백엔드가 아직 구버전이어도 포털 프런트에서 겹침 없이 보이도록 안전장치를 둔다.
+
+### Notes
+- [x] 원인: `followUpLogs`가 있는 상담이 `doctorRepliedAt` 기준에도 함께 걸려 두 탭에 중복 노출되고 있었다.
+- [x] 백엔드 분류 우선순위를 `closed -> followup -> replied -> pending`으로 정리했다.
+- [x] 포털 프런트는 `status=all` 전체 목록을 받아 같은 우선순위로 다시 나눠 탭 목록과 요약 수치를 계산한다.
+- [x] 보정: `follow-up 기록 존재`만으로는 부족했고, `가장 최근 follow-up > 가장 최근 의사 답변`일 때만 follow-up 탭에 남도록 좁혔다.
+- [x] 포털 상세 화면 상태 배지도 같은 기준으로 맞췄다.
+
+### Verification
+- [x] `frontend/portal`: `npm run build`
+- [x] `frontend/portal`: `npm run lint`
+- [x] `backend`: `node --check services/dbService.js`
+- [x] portal production deploy: `happydoctor-5ou70mv16-csj3814-8131s-projects.vercel.app`
+
+## 오늘 우선 작업 정리 (2026.04.09)
+
+### 실제 우선순위
+- [ ] Render 서비스 Events를 다시 확인한다.
+- [ ] `Deploy latest commit` 또는 `Clear build cache & deploy`를 재시도한다.
+- [ ] `https://happydoctor.onrender.com/api/version`가 `eda0c36` 이상으로 올라왔는지 확인한다.
+- [ ] 환자 앱 `/status` 실제 브라우저 화면에서 사진 업로드 UI를 다시 확인한다.
+- [ ] 포털 상세 화면에서 같은 이미지가 보이는지 확인한다.
+- [ ] 필요하면 Render 환경변수 `FIREBASE_STORAGE_BUCKET` 값을 다시 점검한다.
+- [ ] 백엔드 반영 뒤 포털 `follow-up` 탭이 실제 데이터를 제대로 보여주는지 확인한다.
+
+### 메모
+- [x] Render 자동 배포 브랜치는 최신 handoff 기준 이미 `main`이다.
+- [x] 오늘의 핵심 미해결 이슈는 브랜치 설정이 아니라 Render 배포 정체와 라이브 사진 업로드 확인이다.
+- [x] Render 공식 상태 페이지 확인: 2026-04-09 기준 `All Systems Operational`, 2026-04-08 빌드/프로비저닝 장애는 해소된 상태다.
+- [x] 라이브 API 기준 사진 업로드 E2E 확인 완료
+  - 테스트 상담 `73WTZS` 생성
+  - 이미지 업로드 후 상태 조회에서 `mediaItems` 확인
+  - 서명 URL `200` 확인
+  - 테스트 상담 종료 후 Firestore 문서/이미지 삭제 및 `public_stats` 재빌드로 정리 완료
+- [x] Vercel 포털/앱 프로덕션 배포는 둘 다 최신 `3f58d9e` 기준 READY 상태다.
+- [x] 포털 환자 상세 페이지 코드는 `mediaItems`를 이미지 섹션에서 직접 렌더한다.
+- [x] 포털 최근 24시간 production runtime error/warning 로그는 별도 없음.
+- [ ] 포털 인증 화면에서 이미지가 실제로 렌더되는지에 대한 시각 검증은 아직 남아 있다.
 
 ## Phase 10: Code Review & Improvement Plan (2026.04.02)
 
@@ -1239,4 +1284,5 @@
 - [x] `backend/routes/messengerBot.js`: `node --check`
 - [x] `frontend/app`: `npm run build`
 - [x] `frontend/portal`: `npm run build`
-- [ ] 라이브 사진 업로드 성공과 Render 반영 확인은 아직 남음
+- [x] 라이브 API 기준 사진 업로드 생성/조회/서명 URL/종료/정리까지 확인
+- [ ] Render 최신 리비전 반영과 포털 인증 화면 시각 검증은 아직 남음
