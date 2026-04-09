@@ -28,10 +28,23 @@ const INITIAL_FORM_STATE: ConsultationFormState = {
   nrs: '',
   associatedSymptom: '',
   pastMedicalHistory: '',
+  replyNotificationConsent: false,
+  replyNotificationPhone: '',
 }
 
 function isEmptyFormState(formState: ConsultationFormState) {
-  return Object.values(formState).every((value) => !value.trim())
+  return (
+    !formState.age.trim()
+    && !formState.gender.trim()
+    && !formState.chiefComplaint.trim()
+    && !formState.onset.trim()
+    && !formState.symptomDetail.trim()
+    && !formState.nrs.trim()
+    && !formState.associatedSymptom.trim()
+    && !formState.pastMedicalHistory.trim()
+    && !formState.replyNotificationConsent
+    && !formState.replyNotificationPhone.trim()
+  )
 }
 
 function formatFileSize(bytes: number) {
@@ -87,6 +100,19 @@ export default function WebConsultationStartForm({
     setSubmitting(true)
     setError(null)
 
+    const trimmedReplyNotificationPhone = formState.replyNotificationPhone.trim()
+    if (formState.replyNotificationConsent && !trimmedReplyNotificationPhone) {
+      setError('답변 알림을 받으려면 휴대폰 번호를 입력해 주세요.')
+      setSubmitting(false)
+      return
+    }
+
+    if (!formState.replyNotificationConsent && trimmedReplyNotificationPhone) {
+      setError('답변 알림 연락처는 동의한 경우에만 저장할 수 있습니다.')
+      setSubmitting(false)
+      return
+    }
+
     try {
       const formData = new FormData()
       formData.append('age', formState.age)
@@ -97,6 +123,8 @@ export default function WebConsultationStartForm({
       formData.append('nrs', formState.nrs)
       formData.append('associatedSymptom', formState.associatedSymptom)
       formData.append('pastMedicalHistory', formState.pastMedicalHistory)
+      formData.append('replyNotificationConsent', String(formState.replyNotificationConsent))
+      formData.append('replyNotificationPhone', formState.replyNotificationPhone)
       formData.append('entrySurface', entrySurface)
       files.forEach((file) => formData.append('images', file))
 
@@ -300,6 +328,58 @@ export default function WebConsultationStartForm({
               className="mt-3 block w-full rounded-[1.1rem] border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--ink)] file:mr-4 file:rounded-full file:border-0 file:bg-[var(--navy)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
             />
           </label>
+
+          <section className="rounded-[1.4rem] border border-[var(--line)] bg-[var(--surface)] px-4 py-4">
+            <div className="flex items-start gap-3">
+              <input
+                id="replyNotificationConsent"
+                type="checkbox"
+                checked={formState.replyNotificationConsent}
+                onChange={(event) => {
+                  const checked = event.target.checked
+                  setError(null)
+                  setFormState((current) => ({
+                    ...current,
+                    replyNotificationConsent: checked,
+                    replyNotificationPhone: checked ? current.replyNotificationPhone : '',
+                  }))
+                }}
+                className="mt-1 h-4 w-4 rounded border-[var(--line)] text-[var(--navy)] focus:ring-[var(--blue)]"
+              />
+              <div className="flex-1">
+                <label
+                  htmlFor="replyNotificationConsent"
+                  className="text-sm font-semibold text-[var(--ink)]"
+                >
+                  의료진 답변 알림 연락처 남기기
+                </label>
+                <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
+                  선택 항목입니다. 동의한 경우에만 의료진 답변 알림용 연락처로 사용합니다.
+                </p>
+                {formState.replyNotificationConsent ? (
+                  <label className="mt-3 block">
+                    <span className="text-sm font-medium text-[var(--ink)]">휴대폰 번호</span>
+                    <input
+                      type="tel"
+                      required={formState.replyNotificationConsent}
+                      value={formState.replyNotificationPhone}
+                      onChange={(event) =>
+                        {
+                          setError(null)
+                          setFormState((current) => ({
+                            ...current,
+                            replyNotificationPhone: event.target.value,
+                          }))
+                        }
+                      }
+                      placeholder="예: 010-1234-5678"
+                      className="mt-3 w-full rounded-[1.1rem] border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--blue)]"
+                    />
+                  </label>
+                ) : null}
+              </div>
+            </div>
+          </section>
 
           {selectedSummary.length > 0 ? (
             <ul className="rounded-[1.4rem] bg-[var(--surface)] px-4 py-4 text-sm leading-7 text-[var(--ink)]">

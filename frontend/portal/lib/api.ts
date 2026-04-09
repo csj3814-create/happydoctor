@@ -32,6 +32,14 @@ export interface FollowUpLog {
   alertMessage?: string;
 }
 
+export interface PatientNotificationContact {
+  consented: boolean;
+  phone: string;
+  normalizedPhone?: string | null;
+  source?: string | null;
+  consentedAt?: string | null;
+}
+
 export interface ConsultationMediaItem {
   id?: string | null;
   kind?: string;
@@ -60,6 +68,7 @@ export interface Consultation {
   doctorReplies?: DoctorReply[];
   doctorRepliedAt?: string;
   mediaItems?: ConsultationMediaItem[];
+  patientNotificationContact?: PatientNotificationContact | null;
 }
 
 export type ConsultationStatus = 'all' | 'active' | 'followup' | 'replied' | 'closed';

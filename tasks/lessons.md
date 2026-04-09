@@ -146,3 +146,4 @@
 - **Lesson**: If a patient-facing status endpoint shows a doctor reply, it must also acknowledge that reply as seen and clear any pending reply reminders; otherwise the portal will keep showing stale `미확인` states after a real patient view.
 - **Lesson**: Doctor-reply patient alerts should not be one-shot for Kakao-linked patients; a small durable reminder cadence such as immediate, 5 minutes, and 15 minutes is safer than assuming the first ping will always be noticed.
 - **Lesson**: Web-only public consultations should not promise SMS-style reply notifications unless the product actually collects a patient contact channel and has a real delivery integration behind it.
+- **Lesson**: Patient reply-notification contact capture must stay explicit opt-in; the intake flow should proceed normally when the patient skips it, and the backend should reject any phone/contact data that is sent without matching consent.

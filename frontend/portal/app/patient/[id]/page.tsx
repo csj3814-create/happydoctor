@@ -429,6 +429,18 @@ export default function PatientPage({ params }: PatientPageProps) {
                 <LabelValue label="동반 증상" value={consultation.patientData.associated} />
                 <LabelValue label="과거력" value={consultation.patientData.pmhx} />
                 <LabelValue label="접수 시각" value={formatDate(consultation.createdAt)} />
+                {consultation.patientNotificationContact?.consented && (
+                  <LabelValue
+                    label="알림 동의 연락처"
+                    value={consultation.patientNotificationContact.phone}
+                  />
+                )}
+                {consultation.patientNotificationContact?.consentedAt && (
+                  <LabelValue
+                    label="알림 동의 시각"
+                    value={formatDate(consultation.patientNotificationContact.consentedAt)}
+                  />
+                )}
                 {consultation.closedAt && (
                   <LabelValue label="종료 시각" value={formatDate(consultation.closedAt)} />
                 )}

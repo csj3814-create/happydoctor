@@ -120,6 +120,49 @@ function validatePublicPatientData(patientData) {
   return null;
 }
 
+function parseConsentFlag(value) {
+  return value === true || value === 'true' || value === '1' || value === 'on';
+}
+
+function normalizePhoneNumber(value) {
+  if (typeof value !== 'string') return '';
+
+  return value
+    .trim()
+    .replace(/[^\d+]/g, '')
+    .replace(/(?!^)\+/g, '')
+    .slice(0, 20);
+}
+
+function buildReplyNotificationContact(body = {}) {
+  const consent = parseConsentFlag(body.replyNotificationConsent);
+  const rawPhone = sanitizeSingleLine(body.replyNotificationPhone, 40);
+  const normalizedPhone = normalizePhoneNumber(rawPhone);
+
+  if (!consent && !normalizedPhone) {
+    return null;
+  }
+
+  if (!consent && normalizedPhone) {
+    throw createRequestValidationError('답변 알림 연락처는 동의한 경우에만 저장할 수 있습니다.');
+  }
+
+  if (consent && !normalizedPhone) {
+    throw createRequestValidationError('답변 알림을 받으려면 휴대폰 번호를 입력해 주세요.');
+  }
+
+  if (!/^\+?\d{10,15}$/.test(normalizedPhone)) {
+    throw createRequestValidationError('휴대폰 번호를 다시 확인해 주세요.');
+  }
+
+  return {
+    consented: true,
+    phone: rawPhone || normalizedPhone,
+    normalizedPhone,
+    source: 'web_start',
+  };
+}
+
 function buildPublicStatusUrl(trackingCode, trackingToken) {
   const baseUrl = appSiteUrl.replace(/\/$/, '');
   if (trackingCode) {
@@ -153,6 +196,7 @@ router.post('/consultations', handleConsultationImageUpload, async (req, res) =>
     }
 
     const patientData = buildPublicPatientData(req.body);
+    const patientNotificationContact = buildReplyNotificationContact(req.body);
     const validationError = validatePublicPatientData(patientData);
 
     if (validationError) {
@@ -168,6 +212,7 @@ router.post('/consultations', handleConsultationImageUpload, async (req, res) =>
     const saved = await dbService.logConsultation(userId, patientData, analysisResult, {
       entryChannel: 'web',
       entrySurface: sanitizeSingleLine(req.body.entrySurface, 40) || 'app',
+      patientNotificationContact,
     });
 
     if (!saved?.consultationId) {
@@ -211,6 +256,9 @@ router.post('/consultations', handleConsultationImageUpload, async (req, res) =>
       replyToPatient: buildInitialReply(analysisResult),
     });
   } catch (error) {
+    if (error?.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     console.error('[Public Consultation Create Error]', error);
     return res.status(500).json({ error: '상담을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.' });
   }

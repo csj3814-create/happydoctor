@@ -90,6 +90,19 @@ async function postJson(url, body, options = {}) {
   };
 }
 
+async function postForm(url, formData, options = {}) {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: options.headers || {},
+    body: formData,
+  });
+
+  return {
+    status: response.status,
+    body: await response.json(),
+  };
+}
+
 async function getJson(url, options = {}) {
   const response = await fetch(url, {
     method: 'GET',
@@ -101,6 +114,141 @@ async function getJson(url, options = {}) {
     body: await response.json(),
   };
 }
+
+test('public create route stores an optional consented notification phone for web consultations', { concurrency: false }, async () => {
+  const calls = [];
+  const routeModule = loadRouteWithMocks(PUBLIC_ROUTE_PATH, {
+    [DB_SERVICE_PATH]: {
+      logConsultation: async (userId, patientData, analysisResult, options) => {
+        calls.push({ type: 'logConsultation', userId, patientData, analysisResult, options });
+        return {
+          consultationId: 'consult-create-1',
+          trackingCode: 'PCBXWN',
+          trackingToken: 'token-1',
+        };
+      },
+      addConsultationImagesById: async () => {
+        calls.push({ type: 'addConsultationImagesById' });
+        return [];
+      },
+    },
+    [FOLLOW_UP_SERVICE_PATH]: {
+      cancelFollowUp: async () => {},
+      scheduleFollowUpWithOptions: async (userId, chart, minutes, options) => {
+        calls.push({ type: 'scheduleFollowUpWithOptions', userId, chart, minutes, options });
+      },
+    },
+    [LLM_SERVICE_PATH]: {
+      analyzeAndRouteTriage: async (patientData) => {
+        calls.push({ type: 'analyzeAndRouteTriage', patientData });
+        return {
+          action: 'AUTONOMOUS_REPLY',
+          replyToPatient: 'First reply',
+          soapChartForDoctor: 'SOAP',
+        };
+      },
+    },
+    [NOTIFY_SERVICE_PATH]: {
+      enqueueDoctorNotification: async (...args) => {
+        calls.push({ type: 'enqueueDoctorNotification', args });
+        return true;
+      },
+      clearDoctorNotifications: async () => {},
+      clearPatientChannelPushes: async () => {},
+    },
+    [CONFIG_PATH]: {
+      appSiteUrl: 'https://app.happydoctor.kr',
+    },
+  });
+
+  const server = await startServer(routeModule.router, '/api/public');
+
+  try {
+    const formData = new FormData();
+    formData.append('age', '44');
+    formData.append('gender', 'male');
+    formData.append('chiefComplaint', 'cough');
+    formData.append('onset', 'today');
+    formData.append('symptomDetail', 'details about cough');
+    formData.append('nrs', '4');
+    formData.append('associatedSymptom', 'fatigue');
+    formData.append('pastMedicalHistory', 'none');
+    formData.append('entrySurface', 'app');
+    formData.append('replyNotificationConsent', 'true');
+    formData.append('replyNotificationPhone', '010-1234-5678');
+
+    const response = await postForm(`${server.baseUrl}/consultations`, formData);
+
+    assert.equal(response.status, 201);
+    assert.equal(response.body.consultationId, 'consult-create-1');
+    assert.equal(response.body.statusUrl, 'https://app.happydoctor.kr/status?code=PCBXWN');
+
+    const logCall = calls.find((entry) => entry.type === 'logConsultation');
+    assert.ok(logCall);
+    assert.deepEqual(logCall.options.patientNotificationContact, {
+      consented: true,
+      phone: '010-1234-5678',
+      normalizedPhone: '01012345678',
+      source: 'web_start',
+    });
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});
+
+test('public create route rejects notification consent without a phone number', { concurrency: false }, async () => {
+  const calls = [];
+  const routeModule = loadRouteWithMocks(PUBLIC_ROUTE_PATH, {
+    [DB_SERVICE_PATH]: {
+      logConsultation: async () => {
+        calls.push({ type: 'logConsultation' });
+        return null;
+      },
+    },
+    [FOLLOW_UP_SERVICE_PATH]: {
+      cancelFollowUp: async () => {},
+      scheduleFollowUpWithOptions: async () => {},
+    },
+    [LLM_SERVICE_PATH]: {
+      analyzeAndRouteTriage: async () => {
+        calls.push({ type: 'analyzeAndRouteTriage' });
+        return {
+          action: 'AUTONOMOUS_REPLY',
+          replyToPatient: 'unused',
+        };
+      },
+    },
+    [NOTIFY_SERVICE_PATH]: {
+      enqueueDoctorNotification: async () => true,
+      clearDoctorNotifications: async () => {},
+      clearPatientChannelPushes: async () => {},
+    },
+    [CONFIG_PATH]: {
+      appSiteUrl: 'https://app.happydoctor.kr',
+    },
+  });
+
+  const server = await startServer(routeModule.router, '/api/public');
+
+  try {
+    const formData = new FormData();
+    formData.append('age', '44');
+    formData.append('gender', 'male');
+    formData.append('chiefComplaint', 'cough');
+    formData.append('symptomDetail', 'details about cough');
+    formData.append('replyNotificationConsent', 'true');
+
+    const response = await postForm(`${server.baseUrl}/consultations`, formData);
+
+    assert.equal(response.status, 400);
+    assert.ok(response.body.error);
+    assert.deepEqual(calls, []);
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});
 
 test('public follow-up route appends the question, queues a doctor notification, and returns fresh status', { concurrency: false }, async () => {
   const calls = [];
