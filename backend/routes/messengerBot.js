@@ -10,6 +10,7 @@ const {
     registerDoctorRoom,
     getDoctorRoomName,
 } = require('../services/notifyService');
+const { ConfigurationError, getMessengerApiKey } = require('../config');
 
 const PORTAL_OPEN_IN_BROWSER_URL = 'https://portal.happydoctor.kr/open-browser?next=%2F';
 
@@ -62,11 +63,17 @@ function buildDoctorRoomRegistrationErrorReply(validation) {
 
 function checkApiKey(req, res, next) {
     const apiKey = req.headers['x-api-key'];
-    const validKey = process.env.MESSENGER_API_KEY;
+    let validKey = '';
 
-    if (!validKey) {
-        console.error('[MessengerBotR Auth] MESSENGER_API_KEY 환경변수가 설정되지 않았습니다. 모든 요청을 거부합니다.');
-        return res.status(503).json({ error: 'Service not configured' });
+    try {
+        validKey = getMessengerApiKey();
+    } catch (error) {
+        if (error instanceof ConfigurationError) {
+            console.error('[MessengerBotR Auth]', error.message);
+            return res.status(503).json({ error: 'Service not configured' });
+        }
+
+        throw error;
     }
 
     if (apiKey !== validKey) {

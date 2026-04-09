@@ -1,5 +1,10 @@
 const admin = require('firebase-admin');
 const crypto = require('crypto');
+const {
+  ConfigurationError,
+  getFirebaseServiceAccount,
+  getFirebaseStorageBucket,
+} = require('../config');
 
 const PUBLIC_STATS_PATH = ['system', 'public_stats'];
 const FOLLOW_UP_SESSIONS = 'follow_up_sessions';
@@ -29,12 +34,13 @@ let resolvedStorageBucketName = '';
 let storageBucketCandidates = [];
 
 try {
-  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  const serviceAccount = getFirebaseServiceAccount();
+
+  if (serviceAccount) {
     storageBucketCandidates = Array.from(
       new Set(
         [
-          process.env.FIREBASE_STORAGE_BUCKET,
+          getFirebaseStorageBucket(),
           serviceAccount.storageBucket,
           serviceAccount.project_id && `${serviceAccount.project_id}.firebasestorage.app`,
           serviceAccount.project_id && `${serviceAccount.project_id}.appspot.com`,
@@ -54,7 +60,11 @@ try {
     console.warn('[Firebase] FIREBASE_SERVICE_ACCOUNT is missing. DB logging is disabled.');
   }
 } catch (error) {
-  console.error('[Firebase Init Error]', error);
+  if (error instanceof ConfigurationError) {
+    console.error('[Firebase Init Error]', error.message);
+  } else {
+    console.error('[Firebase Init Error]', error);
+  }
 }
 
 function getPublicStatsRef() {

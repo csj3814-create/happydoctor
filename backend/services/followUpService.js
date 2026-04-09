@@ -1,5 +1,6 @@
 const dbService = require('./dbService');
 const { enqueuePatientChannelPush } = require('./notifyService');
+const { getFollowUpRuntimeConfig } = require('../config');
 
 const DEFAULT_FOLLOW_UP_REMINDER_DELAYS_MINUTES = Object.freeze([15, 180, 1440]);
 const DEFAULT_FOLLOW_UP_LEASE_MS = 60 * 1000;
@@ -8,11 +9,12 @@ const DEFAULT_FOLLOW_UP_BATCH_SIZE = 10;
 
 class FollowUpService {
   constructor() {
+    const runtimeConfig = getFollowUpRuntimeConfig();
     this.pendingMessageExpiryMs = 2 * 24 * 60 * 60 * 1000;
     this.absoluteExpiryMs = 4 * 24 * 60 * 60 * 1000;
-    this.leaseMs = Number(process.env.FOLLOW_UP_LEASE_MS) || DEFAULT_FOLLOW_UP_LEASE_MS;
-    this.pollIntervalMs = Number(process.env.FOLLOW_UP_POLL_INTERVAL_MS) || DEFAULT_FOLLOW_UP_POLL_INTERVAL_MS;
-    this.batchSize = Number(process.env.FOLLOW_UP_PROCESS_BATCH_SIZE) || DEFAULT_FOLLOW_UP_BATCH_SIZE;
+    this.leaseMs = runtimeConfig.leaseMs || DEFAULT_FOLLOW_UP_LEASE_MS;
+    this.pollIntervalMs = runtimeConfig.pollIntervalMs || DEFAULT_FOLLOW_UP_POLL_INTERVAL_MS;
+    this.batchSize = runtimeConfig.batchSize || DEFAULT_FOLLOW_UP_BATCH_SIZE;
     this.processorHandle = null;
     this.isProcessing = false;
   }

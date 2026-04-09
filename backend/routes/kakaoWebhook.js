@@ -8,7 +8,7 @@ const {
 } = require('../services/notifyService');
 const followUpService = require('../services/followUpService');
 const dbService = require('../services/dbService');
-const { appSiteUrl } = require('../config');
+const { appSiteUrl, ConfigurationError, getMessengerApiKey } = require('../config');
 
 function buildStatusLinkText(trackingInfo) {
     const trackingCode = trackingInfo?.trackingCode || '';
@@ -548,8 +548,19 @@ router.post('/cancel-triage', async (req, res) => {
 router.post('/test-trigger-fu', async (req, res) => {
     // MESSENGER_API_KEY로 인증 — 설정되지 않으면 항상 거부
     const apiKey = req.headers['x-api-key'];
-    const validKey = process.env.MESSENGER_API_KEY;
-    if (!validKey || apiKey !== validKey) {
+    let validKey = '';
+
+    try {
+        validKey = getMessengerApiKey();
+    } catch (error) {
+        if (error instanceof ConfigurationError) {
+            return res.status(503).json({ error: 'Service not configured' });
+        }
+
+        throw error;
+    }
+
+    if (apiKey !== validKey) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
 
