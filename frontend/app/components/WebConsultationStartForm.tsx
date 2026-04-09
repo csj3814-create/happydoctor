@@ -121,6 +121,7 @@ export default function WebConsultationStartForm({
         lookup: consultation.trackingCode || '',
         trackingCode: consultation.trackingCode || null,
         statusUrl: consultation.statusUrl,
+        chatbotReply: consultation.replyToPatient,
       })
       clearWebConsultationDraft()
       setFormState(INITIAL_FORM_STATE)
