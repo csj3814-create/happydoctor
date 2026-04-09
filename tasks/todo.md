@@ -1315,3 +1315,8 @@
   - Cleaned up awkward two-line wraps on the app landing page for the mobile hero header, headline, and CTA labels.
   - Made the top action button and hero CTAs keep intentional single-line labels on small screens.
   - Verification: `frontend/app npm run lint`, `frontend/app npm run build`.
+- [x] Stage 78 mobile mockup sizing and install CTA polish (2026-04-09)
+  - Shorten the decorative phone shell on small screens so it supports the hero instead of dominating the page height.
+  - Add a real PWA install button inside the install-guide card, with graceful fallback guidance when the browser does not expose an install prompt.
+  - Verification: `frontend/app npm run lint`, `frontend/app npm run build`, `Invoke-WebRequest https://app.happydoctor.kr/` install-button check.
+  - Deployment: `happydoctor-fmshvoxwm-csj3814-8131s-projects.vercel.app` promoted and aliased to `app.happydoctor.kr`.

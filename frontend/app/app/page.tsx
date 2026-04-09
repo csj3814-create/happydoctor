@@ -1,6 +1,8 @@
 import Image from 'next/image'
 import Link from 'next/link'
 
+import PwaInstallButton from '../components/PwaInstallButton'
+
 const KAKAO_CHAT_URL = 'https://pf.kakao.com/_PxaTxhX/chat'
 const WEB_START_URL = '/start?source=app'
 
@@ -145,15 +147,15 @@ export default function AppHomePage() {
 
             <div className="reveal-2 relative lg:pl-10">
               <div className="hero-stage">
-                <div className="relative mx-auto flex max-w-[22rem] justify-center md:max-w-[24rem]">
+                <div className="relative mx-auto flex max-w-[17.5rem] justify-center sm:max-w-[20rem] md:max-w-[24rem]">
                   <div className="phone-shell">
-                    <div className="rounded-[2rem] bg-[#edf6fb] p-4">
-                      <div className="flex items-center justify-between rounded-[1.4rem] bg-white px-4 py-3 shadow-[0_14px_24px_rgba(11,38,62,0.08)]">
+                    <div className="rounded-[1.75rem] bg-[#edf6fb] p-3 sm:rounded-[2rem] sm:p-4">
+                      <div className="flex items-center justify-between rounded-[1.2rem] bg-white px-3 py-2.5 shadow-[0_14px_24px_rgba(11,38,62,0.08)] sm:rounded-[1.4rem] sm:px-4 sm:py-3">
                         <div>
                           <p className="display-face text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--blue)]">
                             Happy Doctor
                           </p>
-                          <p className="mt-1 text-sm font-semibold text-[var(--ink)]">
+                          <p className="mt-1 text-[13px] font-semibold leading-5 text-[var(--ink)] sm:text-sm">
                             필요한 곳에 먼저 닿는 상담 창구
                           </p>
                         </div>
@@ -162,30 +164,30 @@ export default function AppHomePage() {
                           alt="AI 인턴 보듬이 캐릭터"
                           width={54}
                           height={54}
-                          className="h-14 w-14 object-contain"
+                          className="h-11 w-11 object-contain sm:h-14 sm:w-14"
                         />
                       </div>
 
-                      <div className="phone-screen mt-4">
-                        <div className="rounded-[1.35rem] bg-[linear-gradient(180deg,#e9f6ff_0%,#f8fcff_100%)] p-4">
-                          <div className="rounded-[1.3rem] bg-white p-4 shadow-[0_14px_24px_rgba(11,38,62,0.07)]">
+                      <div className="phone-screen mt-3 sm:mt-4">
+                        <div className="rounded-[1.2rem] bg-[linear-gradient(180deg,#e9f6ff_0%,#f8fcff_100%)] p-3 sm:rounded-[1.35rem] sm:p-4">
+                          <div className="rounded-[1.15rem] bg-white p-3 shadow-[0_14px_24px_rgba(11,38,62,0.07)] sm:rounded-[1.3rem] sm:p-4">
                             <p className="display-face text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--blue)]">
                               상담 흐름
                             </p>
-                            <div className="mt-4 space-y-3">
-                              <div className="rounded-[1rem] bg-[var(--surface)] px-3 py-3 text-sm leading-6 text-[var(--ink)]">
+                            <div className="mt-3 space-y-2.5 sm:mt-4 sm:space-y-3">
+                              <div className="rounded-[0.95rem] bg-[var(--surface)] px-3 py-2.5 text-[13px] leading-5 text-[var(--ink)] sm:rounded-[1rem] sm:py-3 sm:text-sm sm:leading-6">
                                 증상과 걱정을 먼저 보냅니다.
                               </div>
-                              <div className="rounded-[1rem] bg-[var(--sky)] px-3 py-3 text-sm leading-6 text-[var(--ink)]">
+                              <div className="rounded-[0.95rem] bg-[var(--sky)] px-3 py-2.5 text-[13px] leading-5 text-[var(--ink)] sm:rounded-[1rem] sm:py-3 sm:text-sm sm:leading-6">
                                 보듬이가 정리하고 필요하면 의료진이 답변합니다.
                               </div>
-                              <div className="rounded-[1rem] bg-[var(--navy)] px-3 py-3 text-sm leading-6 text-white">
+                              <div className="rounded-[0.95rem] bg-[var(--navy)] px-3 py-2.5 text-[13px] leading-5 text-white sm:rounded-[1rem] sm:py-3 sm:text-sm sm:leading-6">
                                 링크나 6자리 코드로 상태를 다시 확인합니다.
                               </div>
                             </div>
                           </div>
 
-                          <div className="mt-4 rounded-[1.3rem] bg-white px-4 py-3 shadow-[0_12px_20px_rgba(11,38,62,0.06)]">
+                          <div className="mt-3 hidden rounded-[1.3rem] bg-white px-4 py-3 shadow-[0_12px_20px_rgba(11,38,62,0.06)] sm:block">
                             <p className="text-sm font-semibold text-[var(--ink)]">무료 온라인 의료상담</p>
                             <p className="mt-2 text-[13px] leading-6 text-[var(--muted)]">
                               웹과 카카오톡 중 편한 곳에서 시작하고, 같은 흐름을 다시 확인할 수 있습니다.
@@ -296,6 +298,7 @@ export default function AppHomePage() {
                   </li>
                 ))}
               </ul>
+              <PwaInstallButton />
             </div>
 
             <div className="rounded-[2rem] bg-[var(--navy)] px-6 py-7 text-white shadow-[0_24px_55px_rgba(7,28,49,0.18)]">
