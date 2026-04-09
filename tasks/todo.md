@@ -1388,3 +1388,8 @@
   - Add `paths` filters to `frontend-ci.yml` so frontend verification runs only for the three frontend workspaces or frontend-workflow edits.
   - Keep `workflow_dispatch` available so either workflow can still be run manually even when the filtered paths do not match.
   - Verification: inspect `.github/workflows/backend-ci.yml`, inspect `.github/workflows/frontend-ci.yml`, confirm the new GitHub Actions runs for the workflow-update commit succeed.
+- [x] Stage 91 main-branch required checks (2026-04-09)
+  - Protect `main` and require the live GitHub Actions checks `Backend Verify`, `Frontend Verify (app)`, `Frontend Verify (homepage)`, and `Frontend Verify (portal)`.
+  - Leave admin enforcement off so repository admins can still use the current direct-maintenance workflow while non-admin contributors are gated by the required checks.
+  - Keep the rule minimal: no pull-request review requirement, no extra history/lock restrictions, and no force-push or deletion allowance.
+  - Verification: `gh api repos/csj3814-create/happydoctor/branches/main/protection`, `gh api repos/csj3814-create/happydoctor/branches/main --jq '{name: .name, protected: .protected, protection_url: .protection_url}'`.
