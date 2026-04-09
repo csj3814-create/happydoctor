@@ -280,6 +280,54 @@ test('claimPatientChannelPush leases the oldest pending push and delivered ack c
   }
 });
 
+test('enqueuePatientChannelPush stores due and future doctor-reply reminders and only the due reminder is claimable immediately', { concurrency: false }, async () => {
+  const context = loadNotifyService({
+    messenger_rooms: {
+      patientA: { roomName: 'room-a' },
+    },
+  });
+
+  try {
+    const enqueued = await context.service.enqueuePatientChannelPush(
+      'patientA',
+      'doctor reply message',
+      'doctor_reply',
+      {
+        reminderDelaysMinutes: [0, 5, 15],
+      },
+    );
+    assert.equal(enqueued, true);
+
+    const queuedPushes = context.listDocs('patient_channel_pushes');
+    assert.equal(queuedPushes.length, 3);
+    assert.deepEqual(
+      queuedPushes.map((entry) => entry.data.reminderDelayMinutes),
+      [0, 5, 15],
+    );
+    assert.deepEqual(
+      queuedPushes.map((entry) => entry.data.reminderStage),
+      [1, 2, 3],
+    );
+
+    const claimed = await context.service.claimPatientChannelPush();
+    assert.equal(claimed.type, 'doctor_reply');
+
+    const leasedCount = context
+      .listDocs('patient_channel_pushes')
+      .filter((entry) => entry.data.status === 'leased').length;
+    const pendingDocs = context
+      .listDocs('patient_channel_pushes')
+      .filter((entry) => entry.data.status === 'pending');
+
+    assert.equal(leasedCount, 1);
+    assert.equal(pendingDocs.length, 2);
+    assert(pendingDocs.every((entry) => entry.data.availableAt instanceof Date));
+    assert(pendingDocs.every((entry) => entry.data.availableAt.getTime() > Date.now()));
+  } finally {
+    context.restore();
+  }
+});
+
 test('failed patient push ack returns the queue to pending and allows a retry claim', { concurrency: false }, async () => {
   const context = loadNotifyService({
     messenger_rooms: {

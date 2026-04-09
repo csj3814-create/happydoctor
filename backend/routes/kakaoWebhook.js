@@ -648,6 +648,11 @@ router.post('/check-doctor-reply', async (req, res) => {
 
         if (pending) {
             await dbService.markReplyAsSeen(pending.id);
+            try {
+                await clearPatientChannelPushes(userId, 'doctor_reply');
+            } catch (clearError) {
+                console.warn(`[Kakao Check Doctor Reply] Failed to clear reply reminders for ${userId}:`, clearError.message);
+            }
             if (pending.doctorEmail) {
                 await dbService.awardHDT(pending.doctorEmail, pending.doctorName, dbService.HDT_SEEN, 'seen');
             }

@@ -1419,3 +1419,12 @@
   - Verification: `backend npm test`, `backend npm run check:syntax`, `backend npm run check:load`.
   - Result: `backend/routes/portal.js` now hides non-escalated consultations from detail/reply routes and blocks replies to closed or disconnected consultations before any save/push/HDT side effects.
   - Result: `backend/tests/publicPortal.routes.integration.test.js` now locks the new authorization contract with non-escalated `404` and closed-reply `400` cases.
+- [x] Stage 95 patient doctor-reply acknowledgement and reminder hardening (2026-04-10)
+  - Mark doctor replies as seen when patients actually open the public status page, and clear any queued doctor-reply reminders at the same time so the portal no longer shows `미확인` after a real view.
+  - Turn doctor-reply patient pushes into a small durable reminder schedule for Kakao-linked patients instead of a one-shot enqueue, so a missed first alert still gets another chance to bring the patient back.
+  - Keep the scope honest: web-only public consultations still have no SMS-capable contact channel today, so document that limitation rather than pretending the system can text patients already.
+  - Verification: `backend npm test`, `backend npm run check:syntax`, `backend npm run check:load`.
+  - Result: `backend/routes/public.js` now acknowledges doctor replies as seen when the patient opens the public status page and clears queued `doctor_reply` reminders during public status/follow-up activity.
+  - Result: `backend/routes/kakaoWebhook.js` now clears queued `doctor_reply` reminders when the patient checks a pending doctor reply inside Kakao, so reminder pushes stop once the reply is actually opened.
+  - Result: `backend/services/notifyService.js` now supports scheduled patient reply reminders via `availableAt`, and `backend/routes/portal.js` uses that to enqueue doctor replies with an immediate + 5 minute + 15 minute reminder cadence for Kakao-linked patients.
+  - Result: `backend/tests/notifyService.patientPush.test.js` and `backend/tests/publicPortal.routes.integration.test.js` now cover scheduled doctor-reply reminders and public-status acknowledgement cleanup.

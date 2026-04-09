@@ -137,7 +137,9 @@ test('public follow-up route appends the question, queues a doctor notification,
         return true;
       },
       clearDoctorNotifications: async () => {},
-      clearPatientChannelPushes: async () => {},
+      clearPatientChannelPushes: async (userId, pushType) => {
+        calls.push({ type: 'clearPatientChannelPushes', userId, pushType });
+      },
     },
     [CONFIG_PATH]: {
       appSiteUrl: 'https://app.happydoctor.kr',
@@ -173,10 +175,73 @@ test('public follow-up route appends the question, queues a doctor notification,
           reminderDelaysMinutes: [0, 5, 15],
         },
       },
+      { type: 'clearPatientChannelPushes', userId: 'public_user_1', pushType: 'doctor_reply' },
       {
         type: 'loadStatus',
         lookup: 'PCBXWN',
       },
+    ]);
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});
+
+test('public status route acknowledges doctor replies and clears queued reply reminders when the patient opens the status page', { concurrency: false }, async () => {
+  const calls = [];
+  const routeModule = loadRouteWithMocks(PUBLIC_ROUTE_PATH, {
+    [DB_SERVICE_PATH]: {
+      getAcknowledgedPublicConsultationStatusByLookup: async (lookup) => {
+        calls.push({ type: 'getAcknowledgedPublicConsultationStatusByLookup', lookup });
+        return {
+          userId: 'public_user_status_1',
+          consultation: {
+            consultationId: 'consult-1',
+            status: 'doctor_replied',
+            doctorReplies: [
+              {
+                id: 'reply-1',
+                message: '의료진 답변',
+                seen: true,
+              },
+            ],
+          },
+        };
+      },
+    },
+    [FOLLOW_UP_SERVICE_PATH]: {
+      cancelFollowUp: async () => {},
+      scheduleFollowUpWithOptions: async () => {},
+    },
+    [LLM_SERVICE_PATH]: {
+      analyzeAndRouteTriage: async () => {
+        throw new Error('not_used');
+      },
+    },
+    [NOTIFY_SERVICE_PATH]: {
+      enqueueDoctorNotification: async () => true,
+      clearDoctorNotifications: async () => {},
+      clearPatientChannelPushes: async (userId, pushType) => {
+        calls.push({ type: 'clearPatientChannelPushes', userId, pushType });
+      },
+    },
+    [CONFIG_PATH]: {
+      appSiteUrl: 'https://app.happydoctor.kr',
+    },
+  });
+
+  const server = await startServer(routeModule.router, '/api/public');
+
+  try {
+    const response = await getJson(`${server.baseUrl}/consultations/status/PCBXWN`);
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.status, 'doctor_replied');
+    assert.equal(response.body.doctorReplies.length, 1);
+
+    assert.deepEqual(calls, [
+      { type: 'getAcknowledgedPublicConsultationStatusByLookup', lookup: 'PCBXWN' },
+      { type: 'clearPatientChannelPushes', userId: 'public_user_status_1', pushType: 'doctor_reply' },
     ]);
   } finally {
     await server.close();
@@ -513,9 +578,12 @@ test('portal reply route authenticates the doctor and enqueues the patient reply
       HDT_REPLY: 50,
     },
     [NOTIFY_SERVICE_PATH]: {
-      enqueuePatientChannelPush: async (userId, message, pushType) => {
-        calls.push({ type: 'enqueuePatientChannelPush', userId, message, pushType });
+      enqueuePatientChannelPush: async (userId, message, pushType, options) => {
+        calls.push({ type: 'enqueuePatientChannelPush', userId, message, pushType, options });
         return true;
+      },
+      clearPatientChannelPushes: async (userId, pushType) => {
+        calls.push({ type: 'clearPatientChannelPushes', userId, pushType });
       },
       clearDoctorNotifications: async (userId) => {
         calls.push({ type: 'clearDoctorNotifications', userId });
@@ -552,6 +620,7 @@ test('portal reply route authenticates the doctor and enqueues the patient reply
     const pushCall = calls.find((entry) => entry.type === 'enqueuePatientChannelPush');
     assert.equal(pushCall.userId, 'public_user_3');
     assert.equal(pushCall.pushType, 'doctor_reply');
+    assert.deepEqual(pushCall.options, { reminderDelaysMinutes: [0, 5, 15] });
     assert.match(pushCall.message, /김의사/);
     assert.match(pushCall.message, /흉통이 지속되면 오늘 진료 보세요\./);
     assert.match(pushCall.message, /https:\/\/app\.happydoctor\.kr\/status\?code=PCBXWN/);
@@ -578,6 +647,7 @@ test('portal reply route authenticates the doctor and enqueues the patient reply
         doctorEmail: 'doctor@example.com',
       },
       { type: 'getConsultationTrackingById', consultationId: 'consult-1' },
+      { type: 'clearPatientChannelPushes', userId: 'public_user_3', pushType: 'doctor_reply' },
       pushCall,
       { type: 'cancelFollowUp', userId: 'public_user_3' },
       { type: 'clearDoctorNotifications', userId: 'public_user_3' },
