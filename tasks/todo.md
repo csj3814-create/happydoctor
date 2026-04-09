@@ -1375,5 +1375,5 @@
 - [x] Stage 88 backend CI automation (2026-04-09)
   - Add reusable backend verification scripts so the same checks run locally and in CI.
   - Add a GitHub Actions workflow that installs backend dependencies and runs the backend verification suite on push, pull request, and manual dispatch.
-  - Keep the workflow narrow and deterministic: no deployment, just backend verification.
+  - Keep the workflow narrow and deterministic: no deployment, just backend verification, and use Node 24-compatible GitHub Action majors to avoid runner deprecation warnings.
   - Verification: `backend npm run verify:ci`, inspect `.github/workflows/backend-ci.yml`.
