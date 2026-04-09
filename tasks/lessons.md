@@ -141,3 +141,4 @@
 - **Lesson**: Mobile landing screens need explicit no-wrap/min-width rules for short action labels and deliberate headline line breaks; leaving hero copy to auto-wrap creates awkward two-line breaks on real devices.
 - **Lesson**: Decorative mobile mockups on landing pages need their own small-screen size budget; if the shell is allowed to keep desktop padding and secondary cards, it quickly becomes taller than the story it is supposed to support.
 - **Lesson**: If a landing page promises home-screen installation, the install guidance card should include the actual PWA install action instead of making users hunt for it elsewhere.
+- **Lesson**: Process-step microcopy on landing mockups should describe a concrete user action; abstract phrasing like `걱정을 보냅니다` reads awkwardly compared with clearer inputs such as `궁금한 점을 남깁니다`.
