@@ -2,7 +2,7 @@
 import { useDeferredValue, useEffect, useState } from 'react'
 import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth'
 import Link from 'next/link'
-import { auth, googleProvider } from '@/lib/firebase'
+import { auth, firebaseConfigError, googleProvider } from '@/lib/firebase'
 import { Consultation, ConsultationSummary, DoctorAccessRequest, DoctorStats, PortalAuthStatus, approveDoctorRequest, getAllConsultations, getLeaderboard, getMyHDT, getPortalAuthStatus } from '@/lib/api'
 
 type Tab='pending'|'followup'|'replied'|'closed'|'leaderboard'
@@ -56,9 +56,9 @@ export default function HomePage(){
   const [leaderboard,setLeaderboard]=useState<DoctorStats[]>([])
   const [boardLoading,setBoardLoading]=useState(false)
 
-  useEffect(()=>{const unsubscribe=onAuthStateChanged(auth,(nextUser)=>{setUser(nextUser);setPortalAuth(null);setPendingRequests([]);setConsultations([]);setSummary(EMPTY_SUMMARY);setTotalConsultations(0);setMyStats(null);setLeaderboard([]);setSearchQuery('');setError(null);setAuthLoading(false)});return unsubscribe},[])
+  useEffect(()=>{if(!auth){setError(firebaseConfigError);setAuthLoading(false);return}const unsubscribe=onAuthStateChanged(auth,(nextUser)=>{setUser(nextUser);setPortalAuth(null);setPendingRequests([]);setConsultations([]);setSummary(EMPTY_SUMMARY);setTotalConsultations(0);setMyStats(null);setLeaderboard([]);setSearchQuery('');setError(null);setAuthLoading(false)});return unsubscribe},[])
 
-  async function loadPortalAccessStatus(){if(!auth.currentUser)return;setAccessLoading(true);try{const nextStatus=await getPortalAuthStatus();setPortalAuth(nextStatus);setPendingRequests(nextStatus.pendingRequests||[]);setError(null)}catch(fetchError){setPortalAuth(null);setPendingRequests([]);setError(fetchError instanceof Error?fetchError.message:'포털 권한 상태를 불러오지 못했습니다.')}finally{setAccessLoading(false)}}
+  async function loadPortalAccessStatus(){if(!auth?.currentUser)return;setAccessLoading(true);try{const nextStatus=await getPortalAuthStatus();setPortalAuth(nextStatus);setPendingRequests(nextStatus.pendingRequests||[]);setError(null)}catch(fetchError){setPortalAuth(null);setPendingRequests([]);setError(fetchError instanceof Error?fetchError.message:'포털 권한 상태를 불러오지 못했습니다.')}finally{setAccessLoading(false)}}
 
   useEffect(()=>{if(!user)return;loadPortalAccessStatus()},[user,refreshKey])
   useEffect(()=>{if(!user||portalAuth?.accessStatus!=='approved')return;let cancelled=false;async function loadSummary(){try{const [summaryData,stats]=await Promise.all([getConsultationSummary(),getMyHDT()]);if(cancelled)return;setSummary(summaryData);setMyStats(stats)}catch(fetchError){if(cancelled)return;setError(fetchError instanceof Error?fetchError.message:'포털 요약을 불러오지 못했습니다.')}}loadSummary();return()=>{cancelled=true}},[user,portalAuth?.accessStatus,refreshKey])
@@ -66,8 +66,8 @@ export default function HomePage(){
   useEffect(()=>{if(!user||portalAuth?.accessStatus!=='approved'||tab!=='leaderboard')return;let cancelled=false;async function loadBoard(){setBoardLoading(true);try{const board=await getLeaderboard();if(cancelled)return;setLeaderboard(board)}catch(fetchError){if(cancelled)return;setError(fetchError instanceof Error?fetchError.message:'리더보드를 불러오지 못했습니다.')}finally{if(!cancelled)setBoardLoading(false)}}loadBoard();return()=>{cancelled=true}},[user,portalAuth?.accessStatus,tab,refreshKey])
   useEffect(()=>{setCurrentPage(1)},[tab,deferredSearch])
 
-  async function handleLogin(){setError(null);try{await signInWithPopup(auth,googleProvider)}catch(loginError){setError(loginError instanceof Error?loginError.message:'로그인에 실패했습니다.')}}
-  async function handleLogout(){await signOut(auth);setPortalAuth(null);setPendingRequests([]);setConsultations([]);setSummary(EMPTY_SUMMARY);setTotalConsultations(0);setMyStats(null);setLeaderboard([]);setSearchQuery('');setError(null)}
+  async function handleLogin(){if(!auth||!googleProvider){setError(firebaseConfigError);return}setError(null);try{await signInWithPopup(auth,googleProvider)}catch(loginError){setError(loginError instanceof Error?loginError.message:'로그인에 실패했습니다.')}}
+  async function handleLogout(){if(auth)await signOut(auth);setPortalAuth(null);setPendingRequests([]);setConsultations([]);setSummary(EMPTY_SUMMARY);setTotalConsultations(0);setMyStats(null);setLeaderboard([]);setSearchQuery('');setError(null)}
   async function handleApprove(email:string){setApprovingEmail(email);setError(null);try{const payload=await approveDoctorRequest(email);setPendingRequests(payload.pendingRequests||[])}catch(approveError){setError(approveError instanceof Error?approveError.message:'의료진 승인 처리에 실패했습니다.')}finally{setApprovingEmail(null)}}
 
   const consultTabs:{key:Tab;label:string}[]=[{key:'pending',label:'미답변'},{key:'followup',label:'Follow-up'},{key:'replied',label:'답변 완료'},{key:'closed',label:'상담 종료'},{key:'leaderboard',label:'HDT 리더보드'}]
