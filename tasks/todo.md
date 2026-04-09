@@ -1377,3 +1377,8 @@
   - Add a GitHub Actions workflow that installs backend dependencies and runs the backend verification suite on push, pull request, and manual dispatch.
   - Keep the workflow narrow and deterministic: no deployment, just backend verification, and use Node 24-compatible GitHub Action majors to avoid runner deprecation warnings.
   - Verification: `backend npm run verify:ci`, inspect `.github/workflows/backend-ci.yml`.
+- [x] Stage 89 frontend CI automation (2026-04-09)
+  - Add reusable `verify:ci` scripts to the `frontend/app`, `frontend/portal`, and `frontend/homepage` workspaces so the same checks run locally and in CI.
+  - Add a GitHub Actions workflow that installs dependencies and runs each frontend workspace in a separate matrix job on push, pull request, and manual dispatch.
+  - Keep the workflow verification-only: lint/build checks, no deployment side effects.
+  - Verification: `frontend/app npm run verify:ci`, `frontend/portal npm run verify:ci`, `frontend/homepage npm run verify:ci`, inspect `.github/workflows/frontend-ci.yml`.
