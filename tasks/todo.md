@@ -1347,3 +1347,4 @@
   - Add patient push reclaim/claim/ack helpers so follow-up reminders and portal reply pushes can retry safely after MessengerBot delivery failures or worker restarts.
   - Update MessengerBot poll routes and the MessengerBot R script so patient pushes acknowledge delivery success/failure explicitly instead of assuming success on dequeue.
   - Verification: `backend node --check services/notifyService.js`, `backend node --check routes/messengerBot.js`, `backend node --check messengerbot_script.js`, `backend node --check index.js`, `backend node -e "require('./services/dbService'); require('./services/followUpService'); require('./services/notifyService'); require('./routes/public'); require('./routes/kakaoWebhook'); require('./routes/portal'); require('./routes/messengerBot'); console.log('backend-load-ok');"`.
+  - Deployment: Render `/api/version` updated to `fdd42c2c8913ffcc5de50fc00265b67a44c62261`.
