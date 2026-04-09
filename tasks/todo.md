@@ -1348,3 +1348,8 @@
   - Update MessengerBot poll routes and the MessengerBot R script so patient pushes acknowledge delivery success/failure explicitly instead of assuming success on dequeue.
   - Verification: `backend node --check services/notifyService.js`, `backend node --check routes/messengerBot.js`, `backend node --check messengerbot_script.js`, `backend node --check index.js`, `backend node -e "require('./services/dbService'); require('./services/followUpService'); require('./services/notifyService'); require('./routes/public'); require('./routes/kakaoWebhook'); require('./routes/portal'); require('./routes/messengerBot'); console.log('backend-load-ok');"`.
   - Deployment: Render `/api/version` updated to `fdd42c2c8913ffcc5de50fc00265b67a44c62261`.
+- [x] Stage 84 backend patient-push tests (2026-04-09)
+  - Add a real backend test entrypoint instead of relying only on ad hoc `test_fu*.js` scripts.
+  - Cover patient push lease/ack semantics so pending -> leased -> delivered, failed ack retry, and expired lease reclaim behavior are locked down.
+  - Keep the new test runner scoped to dedicated `backend/tests/*.test.js` files so old manual scripts do not start failing CI.
+  - Verification: `backend npm test`, `backend node --check services/notifyService.js`, `backend node --check routes/messengerBot.js`, `backend node --check messengerbot_script.js`, `backend node --check index.js`, `backend node -e "require('./services/dbService'); require('./services/followUpService'); require('./services/notifyService'); require('./routes/public'); require('./routes/kakaoWebhook'); require('./routes/portal'); require('./routes/messengerBot'); console.log('backend-load-ok');"`.
