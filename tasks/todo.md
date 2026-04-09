@@ -1341,3 +1341,4 @@
   - Store follow-up lease metadata on `follow_up_sessions` and reclaim expired leases before processing.
   - Keep patient follow-up push delivery behavior unchanged while making scheduling durable.
   - Verification: `backend node --check services/dbService.js`, `backend node --check services/followUpService.js`, `backend node --check index.js`, `backend node -e "require('./services/dbService'); require('./services/followUpService'); require('./routes/public'); require('./routes/kakaoWebhook'); require('./routes/portal'); require('./routes/messengerBot'); console.log('backend-load-ok');"`.
+  - Deployment: Render `/api/version` updated to `c368bedd8b7f89a12e534bc25a10e94e2cffe7bd`.
