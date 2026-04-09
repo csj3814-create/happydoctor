@@ -176,7 +176,7 @@ export default function AppHomePage() {
                             </p>
                             <div className="mt-3 space-y-2.5 sm:mt-4 sm:space-y-3">
                               <div className="rounded-[0.95rem] bg-[var(--surface)] px-3 py-2.5 text-[13px] leading-5 text-[var(--ink)] sm:rounded-[1rem] sm:py-3 sm:text-sm sm:leading-6">
-                                증상과 걱정을 먼저 보냅니다.
+                                증상과 궁금한 점을 먼저 남깁니다.
                               </div>
                               <div className="rounded-[0.95rem] bg-[var(--sky)] px-3 py-2.5 text-[13px] leading-5 text-[var(--ink)] sm:rounded-[1rem] sm:py-3 sm:text-sm sm:leading-6">
                                 보듬이가 정리하고 필요하면 의료진이 답변합니다.

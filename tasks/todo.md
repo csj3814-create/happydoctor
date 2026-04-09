@@ -1320,3 +1320,7 @@
   - Add a real PWA install button inside the install-guide card, with graceful fallback guidance when the browser does not expose an install prompt.
   - Verification: `frontend/app npm run lint`, `frontend/app npm run build`, `Invoke-WebRequest https://app.happydoctor.kr/` install-button check.
   - Deployment: `happydoctor-fmshvoxwm-csj3814-8131s-projects.vercel.app` promoted and aliased to `app.happydoctor.kr`.
+- [x] Stage 79 landing mockup microcopy polish (2026-04-09)
+  - Change the first phone-mockup step from `증상과 걱정을 먼저 보냅니다.` to the more concrete `증상과 궁금한 점을 먼저 남깁니다.`
+  - Verification: `frontend/app npm run lint`, `Invoke-WebRequest https://app.happydoctor.kr/` updated-microcopy check.
+  - Deployment: `happydoctor-429b01itl-csj3814-8131s-projects.vercel.app` promoted and aliased to `app.happydoctor.kr`.
