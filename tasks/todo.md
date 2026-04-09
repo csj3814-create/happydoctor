@@ -1393,3 +1393,12 @@
   - Leave admin enforcement off so repository admins can still use the current direct-maintenance workflow while non-admin contributors are gated by the required checks.
   - Keep the rule minimal: no pull-request review requirement, no extra history/lock restrictions, and no force-push or deletion allowance.
   - Verification: `gh api repos/csj3814-create/happydoctor/branches/main/protection`, `gh api repos/csj3814-create/happydoctor/branches/main --jq '{name: .name, protected: .protected, protection_url: .protection_url}'`.
+- [x] Stage 92 backend config validation layer (2026-04-09)
+  - Extend `backend/config.js` into the single backend env entrypoint for required strings, optional JSON, optional booleans, and bounded numeric settings.
+  - Fail fast on real server startup when required backend secrets are missing or malformed, while keeping module-load checks and tests usable without production secrets.
+  - Replace scattered `process.env` reads in startup, LLM bootstrap, MessengerBot auth, Firebase init, and follow-up scheduler tuning with config helpers.
+  - Add focused backend tests for config parsing/validation and include the touched files in the reusable syntax/load verification path.
+  - Verification: `backend npm test`, `backend npm run check:syntax`, `backend npm run check:load`.
+  - Result: `index.js` now validates required runtime config before starting the real server, while `llmService` switched to lazy Gemini model creation so load checks do not require production secrets.
+  - Result: MessengerBot auth, Firebase service-account parsing, and follow-up scheduler tuning now share the same config helpers and emit clearer config errors.
+  - Result: Added `backend/tests/config.test.js` and expanded syntax/load scripts to cover `config.js`, `llmService.js`, `dbService.js`, and `kakaoWebhook.js`.

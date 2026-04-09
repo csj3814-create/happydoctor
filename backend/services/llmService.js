@@ -1,14 +1,18 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { getGeminiApiKey } = require('../config');
 
-const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = ai.getGenerativeModel({
-    model: 'gemini-2.5-flash',
-    generationConfig: {
-        maxOutputTokens: 4096,
-        temperature: 0.3,
-        responseMimeType: 'application/json',
-    },
-    systemInstruction: { parts: [{ text: `
+let model = null;
+
+function createModel() {
+    const ai = new GoogleGenerativeAI(getGeminiApiKey());
+    return ai.getGenerativeModel({
+        model: 'gemini-2.5-flash',
+        generationConfig: {
+            maxOutputTokens: 4096,
+            temperature: 0.3,
+            responseMimeType: 'application/json',
+        },
+        systemInstruction: { parts: [{ text: `
 당신은 '해피닥터 행복한 의사' 단체의 똑똑하고 다정한 예진 비서 '인턴 닥터 보듬'입니다.
 '해피닥터 행복한 의사'는 병원에 가기 어려운 의료 취약계층(노숙자, 다문화 가정, 외국인 노동자, 주민등록 말소자, 의료보험 체불자 등) 환자분들을 온라인에서 돌보기 위해 자원봉사 의사들이 운영하는 비영리 봉사 단체입니다. 누구든지 상담을 받을 수 있습니다.
 환자가 입력한 문진 내용(육하원칙)을 분석하여, 이 환자가 단순 홈케어/일반적 안내로 끝날 수 있는 경증인지(자율 해결), 아니면 전문의 선생님의 확인이 꼭 필요한지(협진)를 먼저 판단하세요.
@@ -30,7 +34,16 @@ const model = ai.getGenerativeModel({
   "soapChartForDoctor": "(ESCALATE일 경우에만 작성되는 마크다운 형태의 전문의용 예진 노트. 아닐 경우 null)"
 }
 ` }] }
-});
+    });
+}
+
+function getModel() {
+    if (!model) {
+        model = createModel();
+    }
+
+    return model;
+}
 
 async function analyzeAndRouteTriage(patientData) {
     try {
@@ -47,7 +60,7 @@ async function analyzeAndRouteTriage(patientData) {
             `\n위 정보를 분석하여 지침에 맞는 JSON 형태로 답변해주세요. JSON 구조체(마크다운 백틱 제외)만 정확히 반환하세요.`;
 
         const startTime = Date.now();
-        const result = await model.generateContent(prompt);
+        const result = await getModel().generateContent(prompt);
         const durationMs = Date.now() - startTime;
         console.log(`[Timing] Gemini generateContent took ${durationMs}ms`);
 
@@ -98,7 +111,7 @@ async function analyzeFollowUp(originalChart, nrsChange, additionalSymptom) {
             `  "fuChartForDoctor": "(ESCALATE_FU일 경우 작성되는 기존 대비 변화된 마크다운 F/U 노트. 아닐 경우 null)"\n` +
             `}`;
 
-        const result = await model.generateContent(prompt);
+        const result = await getModel().generateContent(prompt);
         let textResult = result.response.text().trim();
         
         if (textResult.startsWith('```json')) {

@@ -5,10 +5,69 @@ const DEFAULT_STATS = Object.freeze({
   doctorReplied: LEGACY_COMPLETED,
 });
 
+class ConfigurationError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'ConfigurationError';
+  }
+}
+
 function getEnv(name, fallback = '') {
   const value = process.env[name];
   if (typeof value !== 'string') return fallback;
   return value.trim();
+}
+
+function getRequiredEnv(name) {
+  const value = getEnv(name);
+  if (!value) {
+    throw new ConfigurationError(`[Config] Missing required environment variable: ${name}`);
+  }
+  return value;
+}
+
+function getBooleanEnv(name, fallback = false) {
+  const value = getEnv(name);
+  if (!value) return fallback;
+
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+
+  throw new ConfigurationError(`[Config] ${name} must be "true" or "false". Received: ${value}`);
+}
+
+function getNumberEnv(name, fallback, { min = null, integer = false } = {}) {
+  const value = getEnv(name);
+  if (!value) return fallback;
+
+  const parsed = Number(value);
+  const isValidNumber = Number.isFinite(parsed) && (!integer || Number.isInteger(parsed));
+  if (!isValidNumber) {
+    throw new ConfigurationError(
+      `[Config] ${name} must be a${integer ? 'n integer' : ' valid number'}. Received: ${value}`,
+    );
+  }
+
+  if (min !== null && parsed < min) {
+    throw new ConfigurationError(`[Config] ${name} must be >= ${min}. Received: ${parsed}`);
+  }
+
+  return parsed;
+}
+
+function getOptionalJsonObjectEnv(name) {
+  const value = getEnv(name);
+  if (!value) return null;
+
+  try {
+    const parsed = JSON.parse(value);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('not an object');
+    }
+    return parsed;
+  } catch (error) {
+    throw new ConfigurationError(`[Config] ${name} must be a valid JSON object.`);
+  }
 }
 
 function getAllowedDoctorEmails() {
@@ -82,14 +141,63 @@ function getRuntimeRevision() {
   };
 }
 
+function getGeminiApiKey() {
+  return getRequiredEnv('GEMINI_API_KEY');
+}
+
+function getMessengerApiKey() {
+  return getRequiredEnv('MESSENGER_API_KEY');
+}
+
+function getFirebaseServiceAccount() {
+  return getOptionalJsonObjectEnv('FIREBASE_SERVICE_ACCOUNT');
+}
+
+function getFirebaseStorageBucket() {
+  return getEnv('FIREBASE_STORAGE_BUCKET');
+}
+
+function getFollowUpRuntimeConfig() {
+  return {
+    leaseMs: getNumberEnv('FOLLOW_UP_LEASE_MS', 60 * 1000, { min: 1000, integer: true }),
+    pollIntervalMs: getNumberEnv('FOLLOW_UP_POLL_INTERVAL_MS', 30 * 1000, { min: 1000, integer: true }),
+    batchSize: getNumberEnv('FOLLOW_UP_PROCESS_BATCH_SIZE', 10, { min: 1, integer: true }),
+  };
+}
+
+function isKeepAliveDisabled() {
+  return getBooleanEnv('DISABLE_KEEP_ALIVE', false);
+}
+
+function validateStartupConfig() {
+  getGeminiApiKey();
+  getMessengerApiKey();
+  getFollowUpRuntimeConfig();
+  getFirebaseServiceAccount();
+
+  return true;
+}
+
 module.exports = {
+  ConfigurationError,
   LEGACY_TOTAL,
   LEGACY_COMPLETED,
   DEFAULT_STATS,
+  getEnv,
+  getRequiredEnv,
+  getBooleanEnv,
+  getNumberEnv,
   getAllowedDoctorEmails,
   getPortalAdminEmails,
   getPortalOrigins,
   getRuntimeRevision,
+  getGeminiApiKey,
+  getMessengerApiKey,
+  getFirebaseServiceAccount,
+  getFirebaseStorageBucket,
+  getFollowUpRuntimeConfig,
+  isKeepAliveDisabled,
+  validateStartupConfig,
   port: getEnv('PORT', '3000'),
   appSiteUrl: getEnv('APP_SITE_URL', 'https://app.happydoctor.kr'),
   renderExternalUrl: getEnv('RENDER_EXTERNAL_URL', 'https://happydoctor.onrender.com'),

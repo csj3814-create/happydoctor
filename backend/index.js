@@ -4,7 +4,12 @@ const axios = require('axios');
 
 const { createApp } = require('./app');
 const followUpService = require('./services/followUpService');
-const { port, renderExternalUrl } = require('./config');
+const {
+  isKeepAliveDisabled,
+  port,
+  renderExternalUrl,
+  validateStartupConfig,
+} = require('./config');
 
 const PING_INTERVAL_MS = 14 * 60 * 1000;
 
@@ -20,6 +25,8 @@ function startKeepAlive() {
 }
 
 async function startServer() {
+  validateStartupConfig();
+
   const app = createApp();
   const server = app.listen(Number(port), async () => {
     console.log(`Happy Doctor Chatbot Server listening on port ${port}`);
@@ -30,7 +37,7 @@ async function startServer() {
     }
   });
 
-  const keepAliveTimer = process.env.DISABLE_KEEP_ALIVE === 'true'
+  const keepAliveTimer = isKeepAliveDisabled()
     ? null
     : startKeepAlive();
 
