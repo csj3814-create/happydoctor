@@ -1324,3 +1324,9 @@
   - Change the first phone-mockup step from `증상과 걱정을 먼저 보냅니다.` to the more concrete `증상과 궁금한 점을 먼저 남깁니다.`
   - Verification: `frontend/app npm run lint`, `Invoke-WebRequest https://app.happydoctor.kr/` updated-microcopy check.
   - Deployment: `happydoctor-429b01itl-csj3814-8131s-projects.vercel.app` promoted and aliased to `app.happydoctor.kr`.
+- [x] Stage 80 landing install language cleanup (2026-04-09)
+  - Replace technical `PWA` wording with user-facing `앱` wording in the install card and button.
+  - Align the first 상담 흐름 step copy so the mockup card and the timeline section do not disagree.
+  - Review nearby landing-page copy for other user-facing wording that is awkward or incomplete, then report the recommended follow-up edits.
+  - Verification: `frontend/app npm run lint`, `Invoke-WebRequest https://app.happydoctor.kr/` install-label and updated-copy checks.
+  - Deployment: `happydoctor-gnka3j5ht-csj3814-8131s-projects.vercel.app` promoted and aliased to `app.happydoctor.kr`.

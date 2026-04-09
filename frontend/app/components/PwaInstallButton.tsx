@@ -92,7 +92,7 @@ export default function PwaInstallButton() {
   }
 
   const helperText = installPrompt
-    ? '이 브라우저에서는 설치 창이 열리면 바로 홈 화면에 추가할 수 있습니다.'
+    ? '이 브라우저에서는 설치 창이 열리면 바로 앱처럼 추가할 수 있습니다.'
     : '설치 창이 자동으로 열리지 않는 브라우저라면 아래 안내대로 메뉴에서 홈 화면에 추가해 주세요.'
 
   return (
@@ -103,7 +103,7 @@ export default function PwaInstallButton() {
         className="inline-flex min-h-[3.25rem] w-full items-center justify-center rounded-full bg-[var(--navy)] px-5 py-3 text-sm font-semibold text-white transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-70"
         disabled={isPromptOpen}
       >
-        {isPromptOpen ? '설치 창 여는 중...' : 'PWA 설치하기'}
+        {isPromptOpen ? '설치 창 여는 중...' : '앱으로 설치하기'}
       </button>
       <p className="mt-3 text-sm leading-6 text-[var(--muted)]">{helperText}</p>
       {showFallbackHint ? (

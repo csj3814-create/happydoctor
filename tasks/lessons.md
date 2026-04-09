@@ -142,3 +142,4 @@
 - **Lesson**: Decorative mobile mockups on landing pages need their own small-screen size budget; if the shell is allowed to keep desktop padding and secondary cards, it quickly becomes taller than the story it is supposed to support.
 - **Lesson**: If a landing page promises home-screen installation, the install guidance card should include the actual PWA install action instead of making users hunt for it elsewhere.
 - **Lesson**: Process-step microcopy on landing mockups should describe a concrete user action; abstract phrasing like `걱정을 보냅니다` reads awkwardly compared with clearer inputs such as `궁금한 점을 남깁니다`.
+- **Lesson**: Patient-facing landing pages should avoid technical platform terms like `PWA`; installation copy should use familiar language such as `앱으로 설치` or `홈 화면에 추가`.

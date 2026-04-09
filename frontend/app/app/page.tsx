@@ -9,7 +9,7 @@ const WEB_START_URL = '/start?source=app'
 const heroPoints = [
   '의료 접근성 취약계층을 위한 무료 온라인 의료상담',
   '웹과 카카오톡 중 편한 곳에서 바로 시작',
-  '답변이 오면 상태 확인 화면과 카카오 채널에서 다시 확인',
+  '답변이 오면 상태 화면이나 카카오톡 채널에서 다시 확인할 수 있습니다.',
 ]
 
 const supportPoints = [
@@ -21,7 +21,7 @@ const supportPoints = [
 const processSteps = [
   {
     step: '01',
-    title: '증상과 걱정을 보냅니다',
+    title: '증상과 궁금한 점을 먼저 남깁니다',
     body: '웹이나 카카오톡에서 지금 가장 불편한 점을 적습니다.',
   },
   {
@@ -42,7 +42,7 @@ const processSteps = [
 ]
 
 const installTips = [
-  'Android Chrome에서는 메뉴에서 홈 화면 추가를 누르면 앱처럼 둘 수 있습니다.',
+  'Android Chrome에서는 메뉴에서 홈 화면 추가를 누르면 앱처럼 바로 열 수 있습니다.',
   'iPhone Safari에서는 공유 메뉴의 홈 화면에 추가로 바로가기 설치가 가능합니다.',
   '설치하지 않아도 상담 시작과 상태 확인은 그대로 이용할 수 있습니다.',
 ]
