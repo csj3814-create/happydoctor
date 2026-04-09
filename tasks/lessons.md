@@ -138,3 +138,4 @@
 - **Lesson**: If the start response shows a user-facing AI summary, the public status API must also expose that same summary so the status page can reconstruct the full journey after redirects or refreshes.
 - **Lesson**: Polling indicators on the patient status page should stay secondary to the main content and be throttled so they do not flash on every background refresh.
 - **Lesson**: When a doctor reply exists on the public status page, the doctor reply and next-action UI should outrank the AI first-reply summary in visual order so the most actionable update is seen first.
+- **Lesson**: Mobile landing screens need explicit no-wrap/min-width rules for short action labels and deliberate headline line breaks; leaving hero copy to auto-wrap creates awkward two-line breaks on real devices.

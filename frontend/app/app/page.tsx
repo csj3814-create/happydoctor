@@ -53,8 +53,8 @@ export default function AppHomePage() {
         <div className="hero-orb bottom-[-1rem] right-[-3rem] h-72 w-72 bg-[#d9fff2]" />
 
         <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-5 pb-10 pt-5 sm:px-8">
-          <header className="flex items-center justify-between py-3">
-            <div className="flex items-center gap-3">
+          <header className="flex flex-col gap-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
               <div className="rounded-2xl bg-white/90 p-2 shadow-[0_14px_26px_rgba(6,30,48,0.12)]">
                 <Image
                   src="/app-icon.png"
@@ -64,8 +64,8 @@ export default function AppHomePage() {
                   className="rounded-xl"
                 />
               </div>
-              <div>
-                <p className="display-face text-[11px] font-semibold tracking-[0.24em] text-[var(--blue)]">
+              <div className="min-w-0">
+                <p className="display-face whitespace-nowrap text-[10px] font-semibold tracking-[0.18em] text-[var(--blue)] sm:text-[11px] sm:tracking-[0.24em]">
                   HAPPY DOCTOR APP
                 </p>
                 <h1 className="text-sm font-semibold text-[var(--ink)]">해피닥터 앱</h1>
@@ -74,7 +74,7 @@ export default function AppHomePage() {
 
             <a
               href="https://happydoctor.kr/ko"
-              className="rounded-full border border-[var(--line)] bg-white/75 px-4 py-2 text-sm font-medium text-[var(--ink)] transition hover:bg-white"
+              className="inline-flex min-h-[3rem] min-w-[9.5rem] items-center justify-center self-start whitespace-nowrap rounded-full border border-[var(--line)] bg-white/75 px-5 py-3 text-[15px] font-semibold text-[var(--ink)] transition hover:bg-white sm:min-h-0 sm:min-w-0 sm:self-auto sm:px-4 sm:py-2 sm:text-sm"
             >
               홈페이지 보기
             </a>
@@ -82,11 +82,11 @@ export default function AppHomePage() {
 
           <div className="hero-grid flex-1 py-8 md:py-12">
             <div className="max-w-xl lg:pb-8">
-              <div className="reveal-0 flex flex-wrap gap-2">
-                <span className="rounded-full border border-[var(--line)] bg-white/80 px-3 py-1 text-xs font-semibold text-[var(--blue)]">
+              <div className="reveal-0 flex flex-wrap gap-2 sm:gap-3">
+                <span className="whitespace-nowrap rounded-full border border-[var(--line)] bg-white/80 px-4 py-1.5 text-[13px] font-semibold text-[var(--blue)] sm:px-3 sm:py-1 sm:text-xs">
                   Mobile-first
                 </span>
-                <span className="rounded-full border border-[var(--line)] bg-white/80 px-3 py-1 text-xs font-semibold text-[var(--blue)]">
+                <span className="whitespace-nowrap rounded-full border border-[var(--line)] bg-white/80 px-4 py-1.5 text-[13px] font-semibold text-[var(--blue)] sm:px-3 sm:py-1 sm:text-xs">
                   Web + Kakao
                 </span>
               </div>
@@ -94,35 +94,35 @@ export default function AppHomePage() {
               <p className="reveal-0 mt-6 display-face text-sm font-semibold uppercase tracking-[0.28em] text-[var(--blue)]">
                 온라인 의료상담
               </p>
-              <h2 className="reveal-1 mt-4 text-5xl font-semibold leading-[1.02] tracking-[-0.05em] text-[var(--ink)] md:text-7xl">
+              <h2 className="reveal-1 mt-4 text-[clamp(2.55rem,10vw,4.75rem)] font-semibold leading-[0.94] tracking-[-0.06em] text-[var(--ink)] md:text-7xl md:leading-[1.02]">
                 의료가 멀게 느껴질 때,
                 <br />
                 먼저 닿는
                 <br />
                 온라인 의료상담
               </h2>
-              <p className="reveal-2 mt-6 max-w-lg text-lg leading-8 text-[var(--muted)]">
+              <p className="reveal-2 mt-6 max-w-lg text-base leading-7 text-[var(--muted)] sm:text-lg sm:leading-8">
                 병원에 가기 전 먼저 설명하고 도움을 청할 수 있도록, 해피닥터가 웹과 카카오톡에서 상담을 이어 줍니다.
               </p>
 
-              <div className="reveal-2 mt-8 flex flex-wrap gap-3">
+              <div className="reveal-2 mt-8 flex max-w-sm flex-col gap-3 sm:max-w-none sm:flex-row sm:flex-wrap">
                 <Link
                   href={WEB_START_URL}
-                  className="rounded-full bg-[var(--navy)] px-6 py-3 text-sm font-semibold text-white visited:text-white shadow-[0_16px_26px_rgba(12,68,124,0.28)] transition hover:translate-y-[-1px]"
+                  className="inline-flex min-h-[3.5rem] w-full items-center justify-center whitespace-nowrap rounded-full bg-[var(--navy)] px-6 py-3 text-base font-semibold text-white visited:text-white shadow-[0_16px_26px_rgba(12,68,124,0.28)] transition hover:translate-y-[-1px] sm:min-h-0 sm:w-auto sm:text-sm"
                   style={{ color: '#ffffff' }}
                 >
                   웹으로 상담 시작
                 </Link>
                 <a
                   href={KAKAO_CHAT_URL}
-                  className="signal-pulse rounded-full bg-[var(--signal)] px-6 py-3 text-sm font-semibold text-[var(--ink)] visited:text-[var(--ink)] shadow-[0_16px_26px_rgba(255,223,87,0.32)] transition hover:translate-y-[-1px]"
+                  className="signal-pulse inline-flex min-h-[3.5rem] w-full items-center justify-center whitespace-nowrap rounded-full bg-[var(--signal)] px-6 py-3 text-base font-semibold text-[var(--ink)] visited:text-[var(--ink)] shadow-[0_16px_26px_rgba(255,223,87,0.32)] transition hover:translate-y-[-1px] sm:min-h-0 sm:w-auto sm:text-sm"
                   style={{ color: 'var(--ink)' }}
                 >
                   카카오톡으로 상담하기
                 </a>
                 <Link
                   href="/status"
-                  className="rounded-full border border-[var(--line)] bg-white/82 px-6 py-3 text-sm font-semibold text-[var(--ink)] transition hover:bg-white"
+                  className="inline-flex min-h-[3.5rem] w-full items-center justify-center whitespace-nowrap rounded-full border border-[var(--line)] bg-white/82 px-6 py-3 text-base font-semibold text-[var(--ink)] transition hover:bg-white sm:min-h-0 sm:w-auto sm:text-sm"
                 >
                   상태 확인하기
                 </Link>

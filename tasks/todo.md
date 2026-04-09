@@ -1311,3 +1311,7 @@
   - Moved the doctor reply card and next-action card directly under the reply-arrived state so they appear before the Bodeum first-reply summary.
   - Kept the lower sections for images, metadata, and informational follow-up content.
   - Verification: `frontend/app npm run lint`, `frontend/app npm run build`.
+- [x] Stage 77 mobile landing-page wrap cleanup (2026-04-09)
+  - Cleaned up awkward two-line wraps on the app landing page for the mobile hero header, headline, and CTA labels.
+  - Made the top action button and hero CTAs keep intentional single-line labels on small screens.
+  - Verification: `frontend/app npm run lint`, `frontend/app npm run build`.
