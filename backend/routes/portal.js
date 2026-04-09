@@ -19,8 +19,10 @@ const {
 } = require('../services/dbService');
 const {
   enqueuePatientChannelPush,
+  enqueuePatientSmsNotification,
   clearDoctorNotifications,
   clearPatientChannelPushes,
+  clearPatientSmsNotifications,
 } = require('../services/notifyService');
 const { appSiteUrl, getAllowedDoctorEmails, getPortalAdminEmails } = require('../config');
 const followUpService = require('../services/followUpService');
@@ -195,6 +197,34 @@ function buildPatientReplyPushMessage({
   ]
     .filter(Boolean)
     .join('\n');
+}
+
+function buildPatientReplySmsMessage({
+  doctorName,
+  message,
+  statusUrl,
+  trackingCode,
+}) {
+  return [
+    '[해피닥터] 의료진 답변이 도착했습니다.',
+    `${doctorName || '의료진'} 답변`,
+    '',
+    message,
+    '',
+    statusUrl ? `상태 확인: ${statusUrl}` : null,
+    trackingCode ? `직접 입력 코드: ${trackingCode}` : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+function getOptedInPatientNotificationPhone(consultation) {
+  const contact = consultation?.patientNotificationContact;
+  if (!contact?.consented) {
+    return '';
+  }
+
+  return String(contact.normalizedPhone || contact.phone || '').trim();
 }
 
 async function resolveDoctorAccessContext(decoded) {
@@ -408,6 +438,11 @@ router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
     } catch (error) {
       console.warn(`[Portal] Failed to clear stale patient reply reminders for ${consultation.userId}:`, error.message);
     }
+    try {
+      await clearPatientSmsNotifications(consultation.userId, 'doctor_reply');
+    } catch (error) {
+      console.warn(`[Portal] Failed to clear stale patient SMS reminders for ${consultation.userId}:`, error.message);
+    }
     const patientNotificationQueued = await enqueuePatientChannelPush(
       consultation.userId,
       buildPatientReplyPushMessage({
@@ -421,8 +456,29 @@ router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
         reminderDelaysMinutes: [0, 5, 15],
       },
     );
+    const optedInPhoneNumber = getOptedInPatientNotificationPhone(consultation);
+    const patientSmsQueued = !patientNotificationQueued && optedInPhoneNumber
+      ? await enqueuePatientSmsNotification(
+        consultation.userId,
+        optedInPhoneNumber,
+        buildPatientReplySmsMessage({
+          doctorName: req.doctor.name,
+          message,
+          statusUrl,
+          trackingCode: trackingInfo?.trackingCode || null,
+        }),
+        'doctor_reply',
+        {
+          reminderDelaysMinutes: [0, 5, 15],
+        },
+      )
+      : false;
     if (!patientNotificationQueued) {
-      console.warn(`[Portal] No patient reply notification channel available for ${consultation.userId}.`);
+      if (patientSmsQueued) {
+        console.log(`[Portal] SMS fallback queued for ${consultation.userId}.`);
+      } else {
+        console.warn(`[Portal] No patient reply notification channel available for ${consultation.userId}.`);
+      }
     }
     await followUpService.cancelFollowUp(consultation.userId);
     await clearDoctorNotifications(consultation.userId);

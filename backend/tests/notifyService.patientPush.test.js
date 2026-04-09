@@ -9,6 +9,36 @@ function clone(value) {
   return structuredClone(value);
 }
 
+async function withEnv(overrides, fn) {
+  const previousValues = new Map();
+
+  for (const [name, value] of Object.entries(overrides)) {
+    if (Object.prototype.hasOwnProperty.call(process.env, name)) {
+      previousValues.set(name, process.env[name]);
+    } else {
+      previousValues.set(name, undefined);
+    }
+
+    if (typeof value === 'undefined') {
+      delete process.env[name];
+    } else {
+      process.env[name] = value;
+    }
+  }
+
+  try {
+    await fn();
+  } finally {
+    for (const [name, value] of previousValues.entries()) {
+      if (typeof value === 'undefined') {
+        delete process.env[name];
+      } else {
+        process.env[name] = value;
+      }
+    }
+  }
+}
+
 function createSeededCollections(seed = {}) {
   const collections = new Map();
   Object.entries(seed).forEach(([collectionName, docs]) => {
@@ -510,6 +540,135 @@ test('claimDoctorNotification leases a due notification and delivered ack comple
     assert.equal(deliveredDoc.leaseExpiresAt, null);
     assert.equal(deliveredDoc.lastFailureReason, null);
     assert.ok(deliveredDoc.deliveredAt instanceof Date);
+  } finally {
+    context.restore();
+  }
+});
+
+test('enqueuePatientSmsNotification stores due and future doctor-reply SMS reminders and only the due reminder is claimable immediately', { concurrency: false }, async () => {
+  await withEnv({
+    SOLAPI_API_KEY: 'api-key',
+    SOLAPI_API_SECRET: 'api-secret',
+    SOLAPI_SENDER: '029302266',
+  }, async () => {
+    const context = loadNotifyService();
+
+    try {
+      const enqueued = await context.service.enqueuePatientSmsNotification(
+        'patientA',
+        '010-1234-5678',
+        'doctor reply sms',
+        'doctor_reply',
+        {
+          reminderDelaysMinutes: [0, 5, 15],
+        },
+      );
+      assert.equal(enqueued, true);
+
+      const queuedNotifications = context.listDocs('patient_sms_notifications');
+      assert.equal(queuedNotifications.length, 3);
+      assert.deepEqual(
+        queuedNotifications.map((entry) => entry.data.phoneNumber),
+        ['01012345678', '01012345678', '01012345678'],
+      );
+      assert.deepEqual(
+        queuedNotifications.map((entry) => entry.data.reminderDelayMinutes),
+        [0, 5, 15],
+      );
+
+      const claimed = await context.service.claimPatientSmsNotification();
+      assert.equal(claimed.type, 'doctor_reply');
+      assert.equal(claimed.phoneNumber, '01012345678');
+
+      const leasedCount = context
+        .listDocs('patient_sms_notifications')
+        .filter((entry) => entry.data.status === 'leased').length;
+      const pendingDocs = context
+        .listDocs('patient_sms_notifications')
+        .filter((entry) => entry.data.status === 'pending');
+
+      assert.equal(leasedCount, 1);
+      assert.equal(pendingDocs.length, 2);
+      assert(pendingDocs.every((entry) => entry.data.availableAt instanceof Date));
+      assert(pendingDocs.every((entry) => entry.data.availableAt.getTime() > Date.now()));
+    } finally {
+      context.restore();
+    }
+  });
+});
+
+test('enqueuePatientSmsNotification is a safe no-op when SOLAPI config is absent', { concurrency: false }, async () => {
+  await withEnv({
+    SOLAPI_API_KEY: undefined,
+    SOLAPI_API_SECRET: undefined,
+    SOLAPI_SENDER: undefined,
+  }, async () => {
+    const context = loadNotifyService();
+
+    try {
+      const enqueued = await context.service.enqueuePatientSmsNotification(
+        'patientA',
+        '010-1234-5678',
+        'doctor reply sms',
+        'doctor_reply',
+      );
+
+      assert.equal(enqueued, false);
+      assert.deepEqual(context.listDocs('patient_sms_notifications'), []);
+    } finally {
+      context.restore();
+    }
+  });
+});
+
+test('clearPatientSmsNotifications cancels both pending and leased SMS reminders for the requested type only', { concurrency: false }, async () => {
+  const context = loadNotifyService({
+    patient_sms_notifications: {
+      'sms-pending': {
+        userId: 'patientA',
+        phoneNumber: '01012345678',
+        message: 'pending sms',
+        type: 'doctor_reply',
+        status: 'pending',
+        reminderStage: 1,
+      },
+      'sms-leased': {
+        userId: 'patientA',
+        phoneNumber: '01012345678',
+        message: 'leased sms',
+        type: 'doctor_reply',
+        status: 'leased',
+        leaseId: 'lease-1',
+        leaseExpiresAt: new Date('2026-04-09T00:00:00.000Z'),
+      },
+      'sms-other': {
+        userId: 'patientA',
+        phoneNumber: '01012345678',
+        message: 'follow-up sms',
+        type: 'follow_up',
+        status: 'pending',
+      },
+    },
+  });
+
+  try {
+    const clearedCount = await context.service.clearPatientSmsNotifications('patientA', 'doctor_reply');
+    assert.equal(clearedCount, 2);
+
+    const pendingSms = context.getDoc('patient_sms_notifications', 'sms-pending');
+    assert.equal(pendingSms.status, 'cancelled');
+    assert.equal(pendingSms.leaseId, null);
+    assert.equal(pendingSms.leaseExpiresAt, null);
+    assert.equal(pendingSms.lastFailureReason, null);
+
+    const leasedSms = context.getDoc('patient_sms_notifications', 'sms-leased');
+    assert.equal(leasedSms.status, 'cancelled');
+    assert.equal(leasedSms.leaseId, null);
+    assert.equal(leasedSms.leaseExpiresAt, null);
+    assert.equal(leasedSms.lastFailureReason, null);
+
+    const untouchedSms = context.getDoc('patient_sms_notifications', 'sms-other');
+    assert.equal(untouchedSms.status, 'pending');
   } finally {
     context.restore();
   }

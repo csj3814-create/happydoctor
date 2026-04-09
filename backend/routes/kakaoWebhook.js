@@ -5,6 +5,7 @@ const {
     enqueueDoctorNotification,
     clearDoctorNotifications,
     clearPatientChannelPushes,
+    clearPatientSmsNotifications,
 } = require('../services/notifyService');
 const followUpService = require('../services/followUpService');
 const dbService = require('../services/dbService');
@@ -597,6 +598,7 @@ router.post('/close-consultation', async (req, res) => {
         await followUpService.cancelFollowUp(userId);
         await clearDoctorNotifications(userId);
         await clearPatientChannelPushes(userId, 'doctor_reply');
+        await clearPatientSmsNotifications(userId, 'doctor_reply');
 
         // 2) DB 상태 업데이트
         dbService.closeConsultation(userId, reason).catch(err => console.error('DB Close Error:', err));
@@ -652,6 +654,11 @@ router.post('/check-doctor-reply', async (req, res) => {
                 await clearPatientChannelPushes(userId, 'doctor_reply');
             } catch (clearError) {
                 console.warn(`[Kakao Check Doctor Reply] Failed to clear reply reminders for ${userId}:`, clearError.message);
+            }
+            try {
+                await clearPatientSmsNotifications(userId, 'doctor_reply');
+            } catch (clearError) {
+                console.warn(`[Kakao Check Doctor Reply] Failed to clear SMS reply reminders for ${userId}:`, clearError.message);
             }
             if (pending.doctorEmail) {
                 await dbService.awardHDT(pending.doctorEmail, pending.doctorName, dbService.HDT_SEEN, 'seen');

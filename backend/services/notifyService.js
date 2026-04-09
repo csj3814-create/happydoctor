@@ -1,17 +1,21 @@
 const { randomUUID, createHash } = require('crypto');
 const { getDb, getAdmin } = require('./dbService');
+const { getPatientSmsRuntimeConfig, getSolapiSmsConfig } = require('../config');
 
 const DOCTOR_NOTIFICATIONS = 'doctor_notifications';
 const FOLLOW_UP_PUSHES = 'follow_up_pushes';
 const PATIENT_CHANNEL_PUSHES = 'patient_channel_pushes';
+const PATIENT_SMS_NOTIFICATIONS = 'patient_sms_notifications';
 const MESSENGER_ROOMS = 'messenger_rooms';
 const DELIVERY_ROOMS = 'delivery_rooms';
 const DOCTOR_ROOM_DOC_ID = 'doctor_room';
 const DOCTOR_ROOM_KIND = 'doctor_group';
 const DOCTOR_NOTIFICATION_LEASE_MS = 60 * 1000;
 const PATIENT_PUSH_LEASE_MS = 60 * 1000;
+const PATIENT_SMS_LEASE_MS = getPatientSmsRuntimeConfig().leaseMs || 60 * 1000;
 const DEFAULT_DOCTOR_REMINDER_DELAYS_MINUTES = Object.freeze([0, 5, 15]);
 const DEFAULT_DOCTOR_REPLY_REMINDER_DELAYS_MINUTES = Object.freeze([0, 5, 15]);
+const DEFAULT_DOCTOR_REPLY_SMS_REMINDER_DELAYS_MINUTES = Object.freeze([0, 5, 15]);
 const DOCTOR_NOTIFICATION_DUPLICATE_WINDOW_MS = 20 * 60 * 1000;
 const DOCTOR_NOTIFICATION_CATCHUP_GAP_MS = 5 * 60 * 1000;
 const DOCTOR_ROOM_BLOCKED_PATTERNS = Object.freeze([
@@ -94,6 +98,27 @@ function normalizePatientPushReminderDelaysMinutes(delays = [0]) {
 
   if (sourceDelays === 'doctor_reply_default') {
     return [...DEFAULT_DOCTOR_REPLY_REMINDER_DELAYS_MINUTES];
+  }
+
+  const values = Array.isArray(sourceDelays) ? sourceDelays : [sourceDelays];
+  const normalized = values
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value) && value >= 0)
+    .map((value) => Math.round(value));
+
+  if (normalized.length === 0) {
+    return fallback;
+  }
+
+  return [...new Set(normalized)].sort((a, b) => a - b);
+}
+
+function normalizePatientSmsReminderDelaysMinutes(delays = [0]) {
+  const sourceDelays = typeof delays === 'undefined' ? [0] : delays;
+  const fallback = [0];
+
+  if (sourceDelays === 'doctor_reply_default') {
+    return [...DEFAULT_DOCTOR_REPLY_SMS_REMINDER_DELAYS_MINUTES];
   }
 
   const values = Array.isArray(sourceDelays) ? sourceDelays : [sourceDelays];
@@ -855,6 +880,224 @@ async function clearPatientChannelPushes(userId, type = null) {
   return docs.length;
 }
 
+async function enqueuePatientSmsNotification(userId, phoneNumber, message, type = 'general', options = {}) {
+  const db = getDb();
+  if (!db) {
+    console.warn('[Patient SMS] Firestore unavailable, skipping enqueue.');
+    return false;
+  }
+
+  if (!getSolapiSmsConfig()) {
+    console.warn('[Patient SMS] SOLAPI config missing, skipping SMS enqueue.');
+    return false;
+  }
+
+  const normalizedPhoneNumber = typeof phoneNumber === 'string'
+    ? phoneNumber.trim().replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '')
+    : '';
+  if (!normalizedPhoneNumber) {
+    console.warn(`[Patient SMS] No phone number found for ${userId}.`);
+    return false;
+  }
+
+  const reminderDelaysMinutes = normalizePatientSmsReminderDelaysMinutes(
+    typeof options.reminderDelaysMinutes === 'undefined'
+      ? (type === 'doctor_reply' ? 'doctor_reply_default' : [0])
+      : options.reminderDelaysMinutes,
+  );
+  const now = Date.now();
+
+  for (const [index, reminderDelayMinutes] of reminderDelaysMinutes.entries()) {
+    await db.collection(PATIENT_SMS_NOTIFICATIONS).add({
+      id: randomUUID(),
+      userId,
+      phoneNumber: normalizedPhoneNumber,
+      message,
+      type,
+      provider: 'solapi',
+      status: 'pending',
+      attemptCount: 0,
+      createdAt: getAdmin().firestore.FieldValue.serverTimestamp(),
+      availableAt: new Date(now + reminderDelayMinutes * 60 * 1000),
+      reminderDelayMinutes,
+      reminderStage: index + 1,
+    });
+  }
+
+  console.log(`[Patient SMS Enqueued] ${userId} -> ${normalizedPhoneNumber} (${type})`);
+  return true;
+}
+
+async function getDuePendingPatientSmsDocs(collection, limit = 20) {
+  const snapshot = await collection
+    .where('status', '==', 'pending')
+    .get();
+
+  if (snapshot.empty) return [];
+
+  const now = Date.now();
+  return snapshot.docs
+    .filter((doc) => {
+      const data = doc.data() || {};
+      const availableAt = toDate(data.availableAt);
+      return !availableAt || availableAt.getTime() <= now;
+    })
+    .sort((left, right) => {
+      const leftAvailableTime = toDate(left.data()?.availableAt)?.getTime() || 0;
+      const rightAvailableTime = toDate(right.data()?.availableAt)?.getTime() || 0;
+      if (leftAvailableTime !== rightAvailableTime) {
+        return leftAvailableTime - rightAvailableTime;
+      }
+
+      const leftCreatedTime = toDate(left.data()?.createdAt)?.getTime() || 0;
+      const rightCreatedTime = toDate(right.data()?.createdAt)?.getTime() || 0;
+      return leftCreatedTime - rightCreatedTime;
+    })
+    .slice(0, limit);
+}
+
+async function reclaimExpiredPatientSmsLeases() {
+  const collection = getCollection(PATIENT_SMS_NOTIFICATIONS);
+  if (!collection) return 0;
+
+  const snapshot = await collection
+    .where('status', '==', 'leased')
+    .limit(50)
+    .get();
+
+  if (snapshot.empty) return 0;
+
+  const now = Date.now();
+  const expiredDocs = snapshot.docs.filter((doc) => {
+    const data = doc.data() || {};
+    const leaseExpiresAt = toDate(data.leaseExpiresAt);
+    return leaseExpiresAt && leaseExpiresAt.getTime() <= now;
+  });
+
+  if (expiredDocs.length === 0) return 0;
+
+  const batch = getDb().batch();
+  const serverTimestamp = getAdmin().firestore.FieldValue.serverTimestamp();
+  expiredDocs.forEach((doc) => {
+    const data = doc.data() || {};
+    batch.update(doc.ref, {
+      status: 'pending',
+      leaseId: null,
+      leaseExpiresAt: null,
+      lastFailedAt: serverTimestamp,
+      lastFailureReason: data.lastFailureReason || 'lease_expired',
+    });
+  });
+  await batch.commit();
+
+  return expiredDocs.length;
+}
+
+async function claimPatientSmsNotification() {
+  const collection = getCollection(PATIENT_SMS_NOTIFICATIONS);
+  if (!collection) return null;
+
+  await reclaimExpiredPatientSmsLeases();
+  const docs = await getDuePendingPatientSmsDocs(collection, 20);
+  if (docs.length === 0) return null;
+
+  for (const doc of docs) {
+    const leaseId = randomUUID();
+    const leaseExpiresAt = new Date(Date.now() + PATIENT_SMS_LEASE_MS);
+    const claimed = await getDb().runTransaction(async (transaction) => {
+      const current = await transaction.get(doc.ref);
+      if (!current.exists) return null;
+
+      const data = current.data() || {};
+      if (data.status !== 'pending') {
+        return null;
+      }
+
+      transaction.update(doc.ref, {
+        status: 'leased',
+        leaseId,
+        leaseExpiresAt,
+        leasedAt: getAdmin().firestore.FieldValue.serverTimestamp(),
+        attemptCount: (data.attemptCount || 0) + 1,
+      });
+
+      return {
+        ...data,
+        notificationId: current.id,
+        leaseId,
+      };
+    });
+
+    if (claimed) {
+      return claimed;
+    }
+  }
+
+  return null;
+}
+
+async function acknowledgePatientSmsNotification(notificationId, payload = {}) {
+  const collection = getCollection(PATIENT_SMS_NOTIFICATIONS);
+  if (!collection || !notificationId) return false;
+
+  const docRef = collection.doc(notificationId);
+  const snapshot = await docRef.get();
+  if (!snapshot.exists) return false;
+
+  const delivered = payload.delivered !== false;
+  const update = delivered
+    ? {
+        status: 'delivered',
+        deliveredAt: getAdmin().firestore.FieldValue.serverTimestamp(),
+        leaseId: null,
+        leaseExpiresAt: null,
+        lastFailureReason: null,
+      }
+    : {
+        status: 'pending',
+        leaseId: null,
+        leaseExpiresAt: null,
+        lastFailedAt: getAdmin().firestore.FieldValue.serverTimestamp(),
+        lastFailureReason: payload.error || 'delivery_failed',
+      };
+
+  await docRef.update(update);
+  return true;
+}
+
+async function clearPatientSmsNotifications(userId, type = null) {
+  const collection = getCollection(PATIENT_SMS_NOTIFICATIONS);
+  if (!collection || !userId) return 0;
+
+  const snapshot = await collection
+    .where('userId', '==', userId)
+    .get();
+
+  const docs = snapshot.docs.filter((doc) => {
+    const data = doc.data() || {};
+    if (data.status !== 'pending' && data.status !== 'leased') return false;
+    if (type && data.type !== type) return false;
+    return true;
+  });
+
+  if (docs.length === 0) return 0;
+
+  const batch = getDb().batch();
+  const now = getAdmin().firestore.FieldValue.serverTimestamp();
+  docs.forEach((doc) => {
+    batch.update(doc.ref, {
+      status: 'cancelled',
+      cancelledAt: now,
+      leaseId: null,
+      leaseExpiresAt: null,
+      lastFailureReason: null,
+    });
+  });
+  await batch.commit();
+
+  return docs.length;
+}
+
 async function registerRoom(userId, roomName) {
   const db = getDb();
   if (!db) {
@@ -944,11 +1187,13 @@ async function getQueueStatus() {
 
   const doctorCollection = db.collection(DOCTOR_NOTIFICATIONS);
   const patientPushCollection = db.collection(PATIENT_CHANNEL_PUSHES);
+  const patientSmsCollection = db.collection(PATIENT_SMS_NOTIFICATIONS);
   const roomsCollection = db.collection(MESSENGER_ROOMS);
 
-  const [pendingCount, patientPushPending, registeredRooms] = await Promise.all([
+  const [pendingCount, patientPushPending, patientSmsPending, registeredRooms] = await Promise.all([
     countDocuments(doctorCollection.where('status', '==', 'pending')),
     countDocuments(patientPushCollection.where('status', '==', 'pending')),
+    countDocuments(patientSmsCollection.where('status', '==', 'pending')),
     countDocuments(roomsCollection),
   ]);
 
@@ -956,6 +1201,7 @@ async function getQueueStatus() {
     pendingCount,
     fuPushPending: patientPushPending,
     patientPushPending,
+    patientSmsPending,
     registeredRooms,
   };
 }
@@ -973,6 +1219,11 @@ module.exports = {
   acknowledgePatientChannelPush,
   dequeuePatientChannelPush,
   clearPatientChannelPushes,
+  enqueuePatientSmsNotification,
+  claimPatientSmsNotification,
+  acknowledgePatientSmsNotification,
+  clearPatientSmsNotifications,
+  reclaimExpiredPatientSmsLeases,
   registerRoom,
   registerDoctorRoom,
   getRoomName,

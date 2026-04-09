@@ -155,6 +155,7 @@ test('public create route stores an optional consented notification phone for we
       },
       clearDoctorNotifications: async () => {},
       clearPatientChannelPushes: async () => {},
+      clearPatientSmsNotifications: async () => {},
     },
     [CONFIG_PATH]: {
       appSiteUrl: 'https://app.happydoctor.kr',
@@ -223,6 +224,7 @@ test('public create route rejects notification consent without a phone number', 
       enqueueDoctorNotification: async () => true,
       clearDoctorNotifications: async () => {},
       clearPatientChannelPushes: async () => {},
+      clearPatientSmsNotifications: async () => {},
     },
     [CONFIG_PATH]: {
       appSiteUrl: 'https://app.happydoctor.kr',
@@ -288,6 +290,9 @@ test('public follow-up route appends the question, queues a doctor notification,
       clearPatientChannelPushes: async (userId, pushType) => {
         calls.push({ type: 'clearPatientChannelPushes', userId, pushType });
       },
+      clearPatientSmsNotifications: async (userId, pushType) => {
+        calls.push({ type: 'clearPatientSmsNotifications', userId, pushType });
+      },
     },
     [CONFIG_PATH]: {
       appSiteUrl: 'https://app.happydoctor.kr',
@@ -324,6 +329,7 @@ test('public follow-up route appends the question, queues a doctor notification,
         },
       },
       { type: 'clearPatientChannelPushes', userId: 'public_user_1', pushType: 'doctor_reply' },
+      { type: 'clearPatientSmsNotifications', userId: 'public_user_1', pushType: 'doctor_reply' },
       {
         type: 'loadStatus',
         lookup: 'PCBXWN',
@@ -372,6 +378,9 @@ test('public status route acknowledges doctor replies and clears queued reply re
       clearPatientChannelPushes: async (userId, pushType) => {
         calls.push({ type: 'clearPatientChannelPushes', userId, pushType });
       },
+      clearPatientSmsNotifications: async (userId, pushType) => {
+        calls.push({ type: 'clearPatientSmsNotifications', userId, pushType });
+      },
     },
     [CONFIG_PATH]: {
       appSiteUrl: 'https://app.happydoctor.kr',
@@ -390,6 +399,7 @@ test('public status route acknowledges doctor replies and clears queued reply re
     assert.deepEqual(calls, [
       { type: 'getAcknowledgedPublicConsultationStatusByLookup', lookup: 'PCBXWN' },
       { type: 'clearPatientChannelPushes', userId: 'public_user_status_1', pushType: 'doctor_reply' },
+      { type: 'clearPatientSmsNotifications', userId: 'public_user_status_1', pushType: 'doctor_reply' },
     ]);
   } finally {
     await server.close();
@@ -433,6 +443,9 @@ test('public close route clears durable follow-up and reply delivery state befor
       clearPatientChannelPushes: async (userId, pushType) => {
         calls.push({ type: 'clearPatientChannelPushes', userId, pushType });
       },
+      clearPatientSmsNotifications: async (userId, pushType) => {
+        calls.push({ type: 'clearPatientSmsNotifications', userId, pushType });
+      },
     },
     [CONFIG_PATH]: {
       appSiteUrl: 'https://app.happydoctor.kr',
@@ -456,6 +469,7 @@ test('public close route clears durable follow-up and reply delivery state befor
       { type: 'cancelFollowUp', userId: 'public_user_2' },
       { type: 'clearDoctorNotifications', userId: 'public_user_2' },
       { type: 'clearPatientChannelPushes', userId: 'public_user_2', pushType: 'doctor_reply' },
+      { type: 'clearPatientSmsNotifications', userId: 'public_user_2', pushType: 'doctor_reply' },
       { type: 'loadStatus', lookup: 'PCBXWN' },
     ]);
   } finally {
@@ -490,6 +504,7 @@ test('public status routes reject malformed lookup values before hitting the dat
       enqueueDoctorNotification: async () => true,
       clearDoctorNotifications: async () => {},
       clearPatientChannelPushes: async () => {},
+      clearPatientSmsNotifications: async () => {},
     },
     [CONFIG_PATH]: {
       appSiteUrl: 'https://app.happydoctor.kr',
@@ -730,8 +745,15 @@ test('portal reply route authenticates the doctor and enqueues the patient reply
         calls.push({ type: 'enqueuePatientChannelPush', userId, message, pushType, options });
         return true;
       },
+      enqueuePatientSmsNotification: async (userId, phoneNumber, message, pushType, options) => {
+        calls.push({ type: 'enqueuePatientSmsNotification', userId, phoneNumber, message, pushType, options });
+        return true;
+      },
       clearPatientChannelPushes: async (userId, pushType) => {
         calls.push({ type: 'clearPatientChannelPushes', userId, pushType });
+      },
+      clearPatientSmsNotifications: async (userId, pushType) => {
+        calls.push({ type: 'clearPatientSmsNotifications', userId, pushType });
       },
       clearDoctorNotifications: async (userId) => {
         calls.push({ type: 'clearDoctorNotifications', userId });
@@ -796,10 +818,182 @@ test('portal reply route authenticates the doctor and enqueues the patient reply
       },
       { type: 'getConsultationTrackingById', consultationId: 'consult-1' },
       { type: 'clearPatientChannelPushes', userId: 'public_user_3', pushType: 'doctor_reply' },
+      { type: 'clearPatientSmsNotifications', userId: 'public_user_3', pushType: 'doctor_reply' },
       pushCall,
       { type: 'cancelFollowUp', userId: 'public_user_3' },
       { type: 'clearDoctorNotifications', userId: 'public_user_3' },
       { type: 'awardHDT', email: 'doctor@example.com', name: '김의사', points: 50, reason: 'reply' },
+    ]);
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});
+
+test('portal reply route falls back to SMS queue for consented web contacts when no Kakao room is registered', { concurrency: false }, async () => {
+  const calls = [];
+  const routeModule = loadRouteWithMocks(PORTAL_ROUTE_PATH, {
+    [DB_SERVICE_PATH]: {
+      getConsultationById: async (consultationId) => {
+        calls.push({ type: 'getConsultationById', consultationId });
+        return {
+          id: consultationId,
+          userId: 'public_user_sms',
+          aiAction: 'ESCALATE',
+          status: 'ACTIVE',
+          patientNotificationContact: {
+            consented: true,
+            phone: '010-1234-5678',
+            normalizedPhone: '01012345678',
+          },
+        };
+      },
+      saveDoctorReply: async (consultationId, userId, message, doctorName, doctorEmail) => {
+        calls.push({
+          type: 'saveDoctorReply',
+          consultationId,
+          userId,
+          message,
+          doctorName,
+          doctorEmail,
+        });
+        return 'reply-sms-1';
+      },
+      getConsultationTrackingById: async (consultationId) => {
+        calls.push({ type: 'getConsultationTrackingById', consultationId });
+        return {
+          trackingCode: 'PCBXWN',
+          trackingToken: 'token-1',
+        };
+      },
+      awardHDT: async (email, name, points, reason) => {
+        calls.push({ type: 'awardHDT', email, name, points, reason });
+      },
+      getDoctorStats: async () => null,
+      getAdmin: () => ({
+        auth() {
+          return {
+            verifyIdToken: async (token) => {
+              calls.push({ type: 'verifyIdToken', token });
+              return {
+                uid: 'doctor-uid',
+                email: 'doctor@example.com',
+                name: '源?섏궗',
+              };
+            },
+          };
+        },
+      }),
+      getDoctorAccessRecordByEmail: async (email) => {
+        calls.push({ type: 'getDoctorAccessRecordByEmail', email });
+        return null;
+      },
+      ensureApprovedDoctorAccess: async (doctor) => {
+        calls.push({ type: 'ensureApprovedDoctorAccess', doctor });
+        return {
+          status: 'approved',
+          email: doctor.email,
+        };
+      },
+      upsertDoctorAccessRequest: async () => {
+        throw new Error('not_used');
+      },
+      approveDoctorAccessRequest: async () => {
+        throw new Error('not_used');
+      },
+      listPendingDoctorAccessRequests: async () => [],
+      HDT_REPLY: 50,
+    },
+    [NOTIFY_SERVICE_PATH]: {
+      enqueuePatientChannelPush: async (userId, message, pushType, options) => {
+        calls.push({ type: 'enqueuePatientChannelPush', userId, message, pushType, options });
+        return false;
+      },
+      enqueuePatientSmsNotification: async (userId, phoneNumber, message, pushType, options) => {
+        calls.push({ type: 'enqueuePatientSmsNotification', userId, phoneNumber, message, pushType, options });
+        return true;
+      },
+      clearPatientChannelPushes: async (userId, pushType) => {
+        calls.push({ type: 'clearPatientChannelPushes', userId, pushType });
+      },
+      clearPatientSmsNotifications: async (userId, pushType) => {
+        calls.push({ type: 'clearPatientSmsNotifications', userId, pushType });
+      },
+      clearDoctorNotifications: async (userId) => {
+        calls.push({ type: 'clearDoctorNotifications', userId });
+      },
+    },
+    [FOLLOW_UP_SERVICE_PATH]: {
+      cancelFollowUp: async (userId) => {
+        calls.push({ type: 'cancelFollowUp', userId });
+      },
+    },
+    [CONFIG_PATH]: {
+      appSiteUrl: 'https://app.happydoctor.kr',
+      getAllowedDoctorEmails: () => ['doctor@example.com'],
+      getPortalAdminEmails: () => [],
+    },
+  });
+
+  const server = await startServer(routeModule.router, '/api/portal');
+
+  try {
+    const response = await postJson(
+      `${server.baseUrl}/consultations/consult-sms/reply`,
+      { message: '?됲넻??吏?띾릺硫??ㅻ뒛 吏꾨즺 蹂댁꽭??' },
+      {
+        headers: {
+          Authorization: 'Bearer portal-token',
+        },
+      },
+    );
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, { ok: true, replyId: 'reply-sms-1' });
+
+    const pushCall = calls.find((entry) => entry.type === 'enqueuePatientChannelPush');
+    const smsCall = calls.find((entry) => entry.type === 'enqueuePatientSmsNotification');
+
+    assert.ok(pushCall);
+    assert.ok(smsCall);
+    assert.equal(smsCall.userId, 'public_user_sms');
+    assert.equal(smsCall.phoneNumber, '01012345678');
+    assert.equal(smsCall.pushType, 'doctor_reply');
+    assert.deepEqual(smsCall.options, { reminderDelaysMinutes: [0, 5, 15] });
+    assert.ok(smsCall.message.includes('[해피닥터]'));
+    assert.ok(smsCall.message.includes('답변'));
+    assert.ok(smsCall.message.split('\n').length >= 4);
+    assert.match(smsCall.message, /https:\/\/app\.happydoctor\.kr\/status\?code=PCBXWN/);
+    assert.match(smsCall.message, /PCBXWN/);
+
+    assert.deepEqual(calls, [
+      { type: 'verifyIdToken', token: 'portal-token' },
+      { type: 'getDoctorAccessRecordByEmail', email: 'doctor@example.com' },
+      {
+        type: 'ensureApprovedDoctorAccess',
+        doctor: {
+          uid: 'doctor-uid',
+          email: 'doctor@example.com',
+          name: '源?섏궗',
+        },
+      },
+      { type: 'getConsultationById', consultationId: 'consult-sms' },
+      {
+        type: 'saveDoctorReply',
+        consultationId: 'consult-sms',
+        userId: 'public_user_sms',
+        message: '?됲넻??吏?띾릺硫??ㅻ뒛 吏꾨즺 蹂댁꽭??',
+        doctorName: '源?섏궗',
+        doctorEmail: 'doctor@example.com',
+      },
+      { type: 'getConsultationTrackingById', consultationId: 'consult-sms' },
+      { type: 'clearPatientChannelPushes', userId: 'public_user_sms', pushType: 'doctor_reply' },
+      { type: 'clearPatientSmsNotifications', userId: 'public_user_sms', pushType: 'doctor_reply' },
+      pushCall,
+      smsCall,
+      { type: 'cancelFollowUp', userId: 'public_user_sms' },
+      { type: 'clearDoctorNotifications', userId: 'public_user_sms' },
+      { type: 'awardHDT', email: 'doctor@example.com', name: '源?섏궗', points: 50, reason: 'reply' },
     ]);
   } finally {
     await server.close();

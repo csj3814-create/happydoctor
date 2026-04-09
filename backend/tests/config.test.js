@@ -5,6 +5,8 @@ const {
   ConfigurationError,
   getFirebaseServiceAccount,
   getFollowUpRuntimeConfig,
+  getPatientSmsRuntimeConfig,
+  getSolapiSmsConfig,
   isKeepAliveDisabled,
   validateStartupConfig,
 } = require('../config');
@@ -44,6 +46,12 @@ test('getFollowUpRuntimeConfig uses defaults and boolean parsing stays stable wh
     FOLLOW_UP_LEASE_MS: undefined,
     FOLLOW_UP_POLL_INTERVAL_MS: undefined,
     FOLLOW_UP_PROCESS_BATCH_SIZE: undefined,
+    PATIENT_SMS_LEASE_MS: undefined,
+    PATIENT_SMS_POLL_INTERVAL_MS: undefined,
+    PATIENT_SMS_PROCESS_BATCH_SIZE: undefined,
+    SOLAPI_API_KEY: undefined,
+    SOLAPI_API_SECRET: undefined,
+    SOLAPI_SENDER: undefined,
     DISABLE_KEEP_ALIVE: undefined,
   }, async () => {
     assert.deepEqual(getFollowUpRuntimeConfig(), {
@@ -51,6 +59,12 @@ test('getFollowUpRuntimeConfig uses defaults and boolean parsing stays stable wh
       pollIntervalMs: 30 * 1000,
       batchSize: 10,
     });
+    assert.deepEqual(getPatientSmsRuntimeConfig(), {
+      leaseMs: 60 * 1000,
+      pollIntervalMs: 30 * 1000,
+      batchSize: 10,
+    });
+    assert.equal(getSolapiSmsConfig(), null);
     assert.equal(isKeepAliveDisabled(), false);
   });
 });
@@ -118,7 +132,39 @@ test('validateStartupConfig requires the backend secrets and surfaces missing-ke
     GEMINI_API_KEY: 'gemini-secret',
     MESSENGER_API_KEY: 'messenger-secret',
     FIREBASE_SERVICE_ACCOUNT: undefined,
+    SOLAPI_API_KEY: undefined,
+    SOLAPI_API_SECRET: undefined,
+    SOLAPI_SENDER: undefined,
   }, async () => {
     assert.equal(validateStartupConfig(), true);
+  });
+});
+
+test('getSolapiSmsConfig rejects partial SMS provider config and validates complete sets', { concurrency: false }, async () => {
+  await withEnv({
+    SOLAPI_API_KEY: 'api-key',
+    SOLAPI_API_SECRET: undefined,
+    SOLAPI_SENDER: '01012345678',
+  }, async () => {
+    assert.throws(
+      () => getSolapiSmsConfig(),
+      (error) => {
+        assert.ok(error instanceof ConfigurationError);
+        assert.match(error.message, /SOLAPI_API_KEY, SOLAPI_API_SECRET, and SOLAPI_SENDER/);
+        return true;
+      },
+    );
+  });
+
+  await withEnv({
+    SOLAPI_API_KEY: 'api-key',
+    SOLAPI_API_SECRET: 'api-secret',
+    SOLAPI_SENDER: '01012345678',
+  }, async () => {
+    assert.deepEqual(getSolapiSmsConfig(), {
+      apiKey: 'api-key',
+      apiSecret: 'api-secret',
+      sender: '01012345678',
+    });
   });
 });

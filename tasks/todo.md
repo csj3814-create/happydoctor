@@ -1436,3 +1436,12 @@
   - Result: `frontend/app/components/WebConsultationStartForm.tsx` now captures optional consent + phone input, clears the field when consent is turned off, and shows a direct validation error before submit if the contact data is incomplete.
   - Result: `backend/routes/public.js` and `backend/services/dbService.js` now normalize/store only explicit opt-in contact info via `patientNotificationContact`, and the create route returns `400` instead of `500` for consent validation errors.
   - Result: `frontend/portal/app/patient/[id]/page.tsx` now shows the consented alert phone and consent timestamp in the doctor portal detail view, and `backend/tests/publicPortal.routes.integration.test.js` covers the multipart web start route for both valid opt-in and invalid missing-phone cases.
+- [x] Stage 97 opt-in SMS doctor-reply delivery (2026-04-10)
+  - Keep the current Kakao room delivery flow as the first path for existing Kakao-linked patients.
+  - Add a durable SMS queue for web consultations that explicitly opted into reply alerts, so doctor replies can reach consented phone numbers even when no Kakao room is registered.
+  - Use a provider-backed sender abstraction with config gating, retry-safe lease/ack processing, and focused integration coverage for reply enqueue + SMS dispatch behavior.
+  - Verification: `backend npm run verify:ci`, inspect production `/api/version`, and confirm the new queue can no-op safely when SMS provider config is absent.
+  - Result: `backend/services/notifyService.js` now owns a durable `patient_sms_notifications` queue with SOLAPI config gating, lease/ack handling, cancellation helpers, and queue status counting for consented web SMS reply alerts.
+  - Result: `backend/services/patientSmsService.js` now runs the SOLAPI-backed SMS worker loop at server startup and safely disables itself when SMS provider secrets are absent.
+  - Result: `backend/routes/portal.js`, `backend/routes/public.js`, and `backend/routes/kakaoWebhook.js` now clear stale doctor-reply SMS reminders on reply/view/follow-up/close flows, and the portal reply route falls back to SMS only when no Kakao room delivery was queued.
+  - Result: `backend/tests/notifyService.patientPush.test.js`, `backend/tests/patientSmsService.test.js`, `backend/tests/publicPortal.routes.integration.test.js`, and `backend/tests/config.test.js` now lock the SMS enqueue, no-config, worker, and fallback reply contracts in place.
