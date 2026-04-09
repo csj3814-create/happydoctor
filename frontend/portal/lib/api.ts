@@ -107,6 +107,35 @@ export async function getConsultations(options?: ConsultationQueryOptions): Prom
   return data.consultations;
 }
 
+export async function getAllConsultations(
+  options: Omit<ConsultationQueryOptions, 'offset' | 'limit'> = {},
+): Promise<Consultation[]> {
+  const consultations: Consultation[] = [];
+  const limit = 100;
+  let offset = 0;
+  let total = Number.POSITIVE_INFINITY;
+
+  while (offset < total) {
+    const page = await getConsultationPage({
+      ...options,
+      status: options.status ?? 'all',
+      offset,
+      limit,
+    });
+
+    consultations.push(...page.consultations);
+    total = page.total;
+
+    if (page.consultations.length === 0) {
+      break;
+    }
+
+    offset += page.consultations.length;
+  }
+
+  return consultations;
+}
+
 export async function getConsultationSummary(): Promise<ConsultationSummary> {
   const headers = await authHeader();
   const res = await fetch(`${BASE}/api/portal/consultations/summary`, { headers });

@@ -706,13 +706,13 @@ function applyConsultationViewOptions(docs, options = {}) {
   let filtered = docs;
 
   if (status === 'active') {
-    filtered = filtered.filter((doc) => doc.status === 'ACTIVE' && !doc.doctorRepliedAt);
+    filtered = filtered.filter((doc) => getPortalInboxStage(doc) === 'pending');
   } else if (status === 'followup') {
-    filtered = filtered.filter((doc) => Array.isArray(doc.followUpLogs) && doc.followUpLogs.length > 0);
+    filtered = filtered.filter((doc) => getPortalInboxStage(doc) === 'followup');
   } else if (status === 'replied') {
-    filtered = filtered.filter((doc) => doc.status === 'ACTIVE' && !!doc.doctorRepliedAt);
+    filtered = filtered.filter((doc) => getPortalInboxStage(doc) === 'replied');
   } else if (status === 'closed') {
-    filtered = filtered.filter((doc) => doc.status === 'COMPLETED' || !!doc.closedAt);
+    filtered = filtered.filter((doc) => getPortalInboxStage(doc) === 'closed');
   }
 
   if (normalizedSearch) {
@@ -747,9 +747,30 @@ function applyConsultationViewOptions(docs, options = {}) {
   };
 }
 
-function getFollowUpSortTimestamp(doc) {
+function getCreatedAtTimestamp(doc) {
+  if (doc?.createdAt?.toMillis) return doc.createdAt.toMillis();
+
+  const parsed = doc?.createdAt ? new Date(doc.createdAt).getTime() : NaN;
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function getDoctorReplyTimestamp(doc) {
+  if (doc?.doctorRepliedAt?.toMillis) return doc.doctorRepliedAt.toMillis();
+
+  const parsed = doc?.doctorRepliedAt ? new Date(doc.doctorRepliedAt).getTime() : NaN;
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function getClosedTimestamp(doc) {
+  if (doc?.closedAt?.toMillis) return doc.closedAt.toMillis();
+
+  const parsed = doc?.closedAt ? new Date(doc.closedAt).getTime() : NaN;
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function getLatestFollowUpTimestamp(doc) {
   const logs = Array.isArray(doc?.followUpLogs) ? doc.followUpLogs : [];
-  const latest = logs
+  return logs
     .map((log) => {
       if (log?.timestamp?.toMillis) return log.timestamp.toMillis();
 
@@ -757,8 +778,43 @@ function getFollowUpSortTimestamp(doc) {
       return Number.isNaN(parsed) ? 0 : parsed;
     })
     .reduce((max, current) => Math.max(max, current), 0);
+}
 
-  return latest || doc?.createdAt?.toMillis?.() || 0;
+function getFollowUpSortTimestamp(doc) {
+  return getLatestFollowUpTimestamp(doc) || getCreatedAtTimestamp(doc);
+}
+
+function hasPendingConsultationFollowUp(doc) {
+  const latestFollowUp = getLatestFollowUpTimestamp(doc);
+  if (!latestFollowUp) return false;
+  return latestFollowUp > getDoctorReplyTimestamp(doc);
+}
+
+function isConsultationClosed(doc) {
+  return doc?.status === 'COMPLETED' || Boolean(doc?.closedAt);
+}
+
+function hasConsultationDoctorReply(doc) {
+  return Boolean(doc?.doctorRepliedAt);
+}
+
+function getPortalInboxStage(doc) {
+  if (isConsultationClosed(doc)) {
+    return 'closed';
+  }
+
+  // Keep portal inbox tabs mutually exclusive:
+  // only consultations with a newer follow-up than the last doctor reply
+  // should stay in the follow-up tab.
+  if (hasPendingConsultationFollowUp(doc)) {
+    return 'followup';
+  }
+
+  if (hasConsultationDoctorReply(doc)) {
+    return 'replied';
+  }
+
+  return 'pending';
 }
 
 function getConsultationSortTimestamp(doc, status) {
@@ -766,7 +822,15 @@ function getConsultationSortTimestamp(doc, status) {
     return getFollowUpSortTimestamp(doc);
   }
 
-  return doc?.createdAt?.toMillis?.() || 0;
+  if (status === 'replied') {
+    return getDoctorReplyTimestamp(doc) || getCreatedAtTimestamp(doc);
+  }
+
+  if (status === 'closed') {
+    return getClosedTimestamp(doc) || getDoctorReplyTimestamp(doc) || getCreatedAtTimestamp(doc);
+  }
+
+  return getCreatedAtTimestamp(doc);
 }
 
 async function getActiveConsultations(options = {}) {
@@ -814,19 +878,16 @@ async function getConsultationSummary() {
     const docs = await getEscalatedConsultationDocs();
 
     return docs.reduce((summary, doc) => {
-      const isClosed = doc.status === 'COMPLETED' || Boolean(doc.closedAt);
-      const hasReply = Boolean(doc.doctorRepliedAt);
+      const stage = getPortalInboxStage(doc);
 
-      if (isClosed) {
+      if (stage === 'closed') {
         summary.closed += 1;
-      } else if (hasReply) {
+      } else if (stage === 'followup') {
+        summary.followUp += 1;
+      } else if (stage === 'replied') {
         summary.replied += 1;
       } else {
         summary.pending += 1;
-      }
-
-      if (Array.isArray(doc.followUpLogs) && doc.followUpLogs.length > 0) {
-        summary.followUp += 1;
       }
 
       return summary;
