@@ -21,6 +21,7 @@ export type ActiveConsultationSession = {
   lookup: string
   trackingCode: string | null
   statusUrl: string
+  uiLanguage?: 'ko' | 'en'
   chatbotReply?: string | null
   savedAt: number
 }

@@ -8,6 +8,13 @@ const dbService = require('../services/dbService');
 const followUpService = require('../services/followUpService');
 const { analyzeAndRouteTriage } = require('../services/llmService');
 const {
+  TRANSLATION_PROVIDER,
+  detectLanguage,
+  isKoreanLanguage,
+  translatePatientDataToKorean,
+  translateText,
+} = require('../services/translationService');
+const {
   enqueueDoctorNotification,
   clearDoctorNotifications,
   clearPatientChannelPushes,
@@ -86,7 +93,7 @@ function handleConsultationImageUpload(req, res, next) {
 
 function sanitizeNrs(value) {
   const sanitized = sanitizeSingleLine(value, 8);
-  if (!sanitized) return '미상';
+  if (!sanitized) return '';
 
   const numeric = Number(sanitized);
   if (!Number.isNaN(numeric)) {
@@ -98,14 +105,14 @@ function sanitizeNrs(value) {
 
 function buildPublicPatientData(body) {
   return {
-    age: sanitizeSingleLine(body.age, 40) || '미상',
-    gender: sanitizeSingleLine(body.gender, 20) || '미상',
+    age: sanitizeSingleLine(body.age, 40),
+    gender: sanitizeSingleLine(body.gender, 20),
     cc: sanitizeSingleLine(body.chiefComplaint, 120),
-    onset: sanitizeSingleLine(body.onset, 120) || '알 수 없음',
+    onset: sanitizeSingleLine(body.onset, 120),
     symptom: sanitizeMultiline(body.symptomDetail, 1200),
     nrs: sanitizeNrs(body.nrs),
-    associated: sanitizeMultiline(body.associatedSymptom, 600) || '없음',
-    pmhx: sanitizeMultiline(body.pastMedicalHistory, 600) || '특이사항 없음',
+    associated: sanitizeMultiline(body.associatedSymptom, 600),
+    pmhx: sanitizeMultiline(body.pastMedicalHistory, 600),
   };
 }
 
@@ -190,12 +197,106 @@ function buildInitialReply(analysisResult) {
   return analysisResult.replyToPatient;
 }
 
+function mapGenderForDoctor(value) {
+  switch ((value || '').trim().toLowerCase()) {
+    case 'male':
+    case 'm':
+      return '남성';
+    case 'female':
+    case 'f':
+      return '여성';
+    case 'other':
+      return '기타';
+    case 'prefer_not_to_say':
+      return '밝히지 않음';
+    default:
+      return sanitizeSingleLine(value, 20);
+  }
+}
+
+function normalizeUiLanguage(value) {
+  return sanitizeSingleLine(value, 8).toLowerCase() === 'en' ? 'en' : 'ko';
+}
+
+function getTranslationFailureMessage(uiLanguage) {
+  if (uiLanguage === 'en') {
+    return 'Automatic translation is unavailable right now. Please try again in English or Korean.';
+  }
+
+  return '자동 번역을 준비하지 못했습니다. 영어 또는 한국어로 다시 입력해 주세요.';
+}
+
+function buildDoctorFacingPatientData(patientData, translatedPatientDataKo = null) {
+  const translated = translatedPatientDataKo || {};
+  return {
+    age: patientData.age || translated.age || '미상',
+    gender: translated.gender || mapGenderForDoctor(patientData.gender) || '미상',
+    cc: translated.cc || patientData.cc || '미상',
+    onset: translated.onset || patientData.onset || '알 수 없음',
+    symptom: translated.symptom || patientData.symptom || '설명 없음',
+    nrs: patientData.nrs || translated.nrs || '미상',
+    associated: translated.associated || patientData.associated || '없음',
+    pmhx: translated.pmhx || patientData.pmhx || '특이사항 없음',
+  };
+}
+
+function buildLanguageDetectionText(patientData) {
+  return [
+    patientData.cc,
+    patientData.onset,
+    patientData.symptom,
+    patientData.associated,
+    patientData.pmhx,
+  ]
+    .filter(Boolean)
+    .join('\n')
+    .trim();
+}
+
+function hasKoreanCharacters(value) {
+  return /[가-힣]/.test(value || '');
+}
+
+async function resolveTranslationContext(patientData, uiLanguage) {
+  const fallbackSourceLanguage = uiLanguage === 'en' ? 'en' : 'ko';
+  const detectionText = buildLanguageDetectionText(patientData);
+  const detectedSourceLanguage = !detectionText
+    ? fallbackSourceLanguage
+    : hasKoreanCharacters(detectionText)
+      ? 'ko'
+      : await detectLanguage(detectionText);
+  const sourceLanguage = detectedSourceLanguage || fallbackSourceLanguage;
+  const needsTranslation = !isKoreanLanguage(sourceLanguage);
+  const patientReplyLanguage = needsTranslation ? sourceLanguage : 'ko';
+
+  if (!needsTranslation) {
+    return {
+      sourceLanguage,
+      patientReplyLanguage,
+      translatedPatientDataKo: null,
+      translationProvider: null,
+      translationStatus: 'not_required',
+    };
+  }
+
+  const translatedPatientDataKo = await translatePatientDataToKorean(patientData, sourceLanguage);
+
+  return {
+    sourceLanguage,
+    patientReplyLanguage,
+    translatedPatientDataKo,
+    translationProvider: TRANSLATION_PROVIDER,
+    translationStatus: 'translated',
+  };
+}
+
 router.post('/consultations', handleConsultationImageUpload, async (req, res) => {
   try {
     if (!isPlainObject(req.body)) {
       return res.status(400).json({ error: '상담 정보를 다시 입력해 주세요.' });
     }
 
+    const uiLanguage = normalizeUiLanguage(req.body.uiLanguage);
     const patientData = buildPublicPatientData(req.body);
     const patientNotificationContact = buildReplyNotificationContact(req.body);
     const validationError = validatePublicPatientData(patientData);
@@ -204,9 +305,38 @@ router.post('/consultations', handleConsultationImageUpload, async (req, res) =>
       return res.status(400).json({ error: validationError });
     }
 
-    const analysisResult = await analyzeAndRouteTriage(patientData);
+    let translationContext;
+    try {
+      translationContext = await resolveTranslationContext(patientData, uiLanguage);
+    } catch (error) {
+      console.error('[Public Consultation Translation Error]', error);
+      return res.status(503).json({ error: getTranslationFailureMessage(uiLanguage) });
+    }
+
+    const triagePatientData = buildDoctorFacingPatientData(
+      patientData,
+      translationContext.translatedPatientDataKo,
+    );
+
+    const analysisResult = await analyzeAndRouteTriage(triagePatientData);
     if (!analysisResult?.action || !analysisResult?.replyToPatient) {
       throw new Error('Invalid triage analysis response');
+    }
+
+    const internalPatientReply = buildInitialReply(analysisResult);
+    let patientDeliveredReply = internalPatientReply;
+
+    if (!isKoreanLanguage(translationContext.patientReplyLanguage)) {
+      try {
+        patientDeliveredReply = await translateText(
+          internalPatientReply,
+          translationContext.patientReplyLanguage,
+          { sourceLanguage: 'ko' },
+        );
+      } catch (error) {
+        console.error('[Public Consultation Reply Translation Error]', error);
+        return res.status(503).json({ error: getTranslationFailureMessage(uiLanguage) });
+      }
     }
 
     const userId = `public_${randomUUID()}`;
@@ -214,6 +344,13 @@ router.post('/consultations', handleConsultationImageUpload, async (req, res) =>
       entryChannel: 'web',
       entrySurface: sanitizeSingleLine(req.body.entrySurface, 40) || 'app',
       patientNotificationContact,
+      uiLanguage,
+      sourceLanguage: translationContext.sourceLanguage,
+      patientReplyLanguage: translationContext.patientReplyLanguage,
+      translatedPatientDataKo: translationContext.translatedPatientDataKo,
+      translationProvider: translationContext.translationProvider,
+      translationStatus: translationContext.translationStatus,
+      patientDeliveredChatbotReply: patientDeliveredReply,
     });
 
     if (!saved?.consultationId) {
@@ -254,7 +391,10 @@ router.post('/consultations', handleConsultationImageUpload, async (req, res) =>
       statusUrl,
       status: analysisResult.action === 'ESCALATE' ? 'waiting_doctor' : 'guidance_delivered',
       requiresDoctorReview: analysisResult.action === 'ESCALATE',
-      replyToPatient: buildInitialReply(analysisResult),
+      uiLanguage,
+      sourceLanguage: translationContext.sourceLanguage,
+      patientReplyLanguage: translationContext.patientReplyLanguage,
+      replyToPatient: patientDeliveredReply,
     });
   } catch (error) {
     if (error?.statusCode) {
@@ -376,6 +516,7 @@ router.post('/consultations/status/:lookup/follow-up', async (req, res) => {
   try {
     const lookup = parseLookupParam(req.params.lookup);
     const question = sanitizeMultiline(req.body?.question, 1200);
+    const uiLanguage = normalizeUiLanguage(req.body?.uiLanguage);
 
     if (!question || question.length < 2) {
       return res.status(400).json({ error: '추가 질문 내용을 조금 더 적어 주세요.' });
@@ -426,6 +567,10 @@ router.post('/consultations/status/:lookup/follow-up', async (req, res) => {
         return res.status(400).json({ error: '종료된 상담에는 추가 질문을 남길 수 없습니다.' });
       case 'FOLLOW_UP_REQUIRED':
         return res.status(400).json({ error: '추가 질문 내용을 조금 더 적어 주세요.' });
+      case 'TRANSLATION_NOT_CONFIGURED':
+      case 'TRANSLATION_DETECT_FAILED':
+      case 'TRANSLATION_FAILED':
+        return res.status(503).json({ error: getTranslationFailureMessage(uiLanguage) });
       default:
         return res.status(500).json({ error: '추가 질문을 보내지 못했습니다. 잠시 후 다시 시도해 주세요.' });
     }

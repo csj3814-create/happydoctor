@@ -5,24 +5,78 @@ import { useEffect, useMemo, useState } from 'react'
 import { onAuthStateChanged, User } from 'firebase/auth'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+
 import { auth, firebaseConfigError } from '@/lib/firebase'
-import { Consultation, FollowUpLog, getConsultation, getConsultations, postReply } from '@/lib/api'
+import {
+  Consultation,
+  FollowUpLog,
+  PatientData,
+  getConsultation,
+  getConsultations,
+  postReply,
+} from '@/lib/api'
 
 function formatDate(iso: string): string {
-  const d = new Date(iso)
-  return d.toLocaleString('ko-KR', {
+  const parsed = new Date(iso)
+  if (Number.isNaN(parsed.getTime())) return '-'
+  return parsed.toLocaleString('ko-KR', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'Asia/Seoul',
   })
 }
 
 function genderLabel(gender: string): string {
-  if (gender === 'male' || gender === 'M' || gender === '남') return '남성'
-  if (gender === 'female' || gender === 'F' || gender === '여') return '여성'
-  return gender
+  switch (gender) {
+    case 'male':
+    case 'M':
+    case '남':
+    case '남성':
+      return '남성'
+    case 'female':
+    case 'F':
+    case '여':
+    case '여성':
+      return '여성'
+    case 'other':
+      return '기타'
+    case 'prefer_not_to_say':
+      return '밝히지 않음'
+    default:
+      return gender || '미상'
+  }
+}
+
+function languageLabel(language?: string | null): string {
+  switch ((language || '').trim().toLowerCase()) {
+    case 'ko':
+      return '한국어'
+    case 'en':
+      return '영어'
+    case 'vi':
+      return '베트남어'
+    case 'zh-cn':
+    case 'zh':
+      return '중국어 간체'
+    case 'zh-tw':
+      return '중국어 번체'
+    case 'ja':
+      return '일본어'
+    case 'mn':
+      return '몽골어'
+    case 'ru':
+      return '러시아어'
+    case 'th':
+      return '태국어'
+    case 'tl':
+    case 'fil':
+      return '타갈로그어'
+    default:
+      return language?.trim() || '미상'
+  }
 }
 
 function timestampMs(value?: string | null): number {
@@ -43,12 +97,20 @@ function hasPendingFollowUp(consultation: Consultation): boolean {
   return latestFollowUp > timestampMs(consultation.doctorRepliedAt)
 }
 
-function LabelValue({ label, value }: { label: string; value?: string | null }) {
+function LabelValue({
+  label,
+  value,
+  multiline = false,
+}: {
+  label: string
+  value?: string | null
+  multiline?: boolean
+}) {
   if (!value) return null
   return (
     <div className="flex gap-2 text-sm leading-6">
-      <span className="w-24 shrink-0 font-medium text-zinc-500">{label}</span>
-      <span className="text-zinc-800">{value}</span>
+      <span className="w-28 shrink-0 font-medium text-zinc-500">{label}</span>
+      <span className={multiline ? 'whitespace-pre-wrap text-zinc-800' : 'text-zinc-800'}>{value}</span>
     </div>
   )
 }
@@ -99,6 +161,8 @@ function followUpActionLabel(action?: string): string {
       return '자동 종료'
     case 'COMPLETE':
       return '상담 정리'
+    case 'PATIENT_FOLLOW_UP_QUESTION':
+      return '환자 추가 질문'
     default:
       return action || '기록'
   }
@@ -120,11 +184,11 @@ function FollowUpItem({ log, index }: { log: FollowUpLog; index: number }) {
           {log.timestamp ? formatDate(log.timestamp) : '시각 정보 없음'}
         </span>
       </div>
-      {log.alertMessage && (
+      {log.alertMessage ? (
         <pre className="mt-3 whitespace-pre-wrap break-words rounded-xl border border-zinc-200 bg-white p-3 text-sm leading-relaxed text-zinc-700">
           {log.alertMessage}
         </pre>
-      )}
+      ) : null}
     </li>
   )
 }
@@ -155,6 +219,14 @@ function SummaryCard({
   )
 }
 
+function getDoctorFacingPatientData(consultation: Consultation): PatientData {
+  return consultation.translatedPatientDataKo || consultation.patientData
+}
+
+function hasDeliveredTranslation(replyMessage?: string | null, deliveredMessage?: string | null) {
+  return Boolean(deliveredMessage && deliveredMessage !== replyMessage)
+}
+
 interface PatientPageProps {
   params: Promise<{ id: string }>
 }
@@ -174,9 +246,8 @@ export default function PatientPage({ params }: PatientPageProps) {
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [patientId, setPatientId] = useState<string | null>(null)
 
-  // Resolve params (Promise in Next.js 16+)
   useEffect(() => {
-    params.then((p) => setPatientId(p.id))
+    params.then((resolved) => setPatientId(resolved.id))
   }, [params])
 
   useEffect(() => {
@@ -186,13 +257,15 @@ export default function PatientPage({ params }: PatientPageProps) {
       router.replace('/')
       return
     }
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u)
+
+    const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
+      setUser(nextUser)
       setAuthLoading(false)
-      if (!u) {
+      if (!nextUser) {
         router.replace('/')
       }
     })
+
     return unsubscribe
   }, [router])
 
@@ -215,8 +288,8 @@ export default function PatientPage({ params }: PatientPageProps) {
           setConsultation(data)
           setFetchLoading(false)
           return
-        } catch (err) {
-          const message = err instanceof Error ? err.message : '상담 정보를 불러오지 못했습니다.'
+        } catch (error) {
+          const message = error instanceof Error ? error.message : '상담 정보를 불러오지 못했습니다.'
           if (message !== '상담을 찾을 수 없습니다.') {
             if (cancelled) return
             setFetchError(message)
@@ -243,9 +316,9 @@ export default function PatientPage({ params }: PatientPageProps) {
         setConsultation(fallback)
         setFallbackNotice('상세 회신 이력은 아직 불러오지 못했지만, 기본 상담 정보는 먼저 표시하고 있습니다.')
         setFetchLoading(false)
-      } catch (err) {
+      } catch (error) {
         if (cancelled) return
-        setFetchError(err instanceof Error ? err.message : '상담 정보를 불러오지 못했습니다.')
+        setFetchError(error instanceof Error ? error.message : '상담 정보를 불러오지 못했습니다.')
         setFetchLoading(false)
       }
     }
@@ -255,7 +328,7 @@ export default function PatientPage({ params }: PatientPageProps) {
     return () => {
       cancelled = true
     }
-  }, [user, patientId, searchParams])
+  }, [patientId, searchParams, user])
 
   const derivedState = useMemo(() => {
     if (!consultation) {
@@ -291,11 +364,21 @@ export default function PatientPage({ params }: PatientPageProps) {
       status: statusMeta(consultation),
     }
   }, [consultation])
-  const mediaItems = consultation?.mediaItems ?? []
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  const mediaItems = consultation?.mediaItems ?? []
+  const sourceLanguage = consultation?.sourceLanguage || null
+  const patientReplyLanguage = consultation?.patientReplyLanguage || sourceLanguage || 'ko'
+  const hasTranslatedPatientData = Boolean(
+    consultation?.translatedPatientDataKo
+    && sourceLanguage
+    && sourceLanguage.toLowerCase() !== 'ko',
+  )
+  const doctorFacingPatientData = consultation ? getDoctorFacingPatientData(consultation) : null
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault()
     if (!patientId || !replyText.trim() || derivedState.closed || fallbackNotice) return
+
     setSubmitting(true)
     setSubmitError(null)
     setSubmitSuccess(false)
@@ -303,11 +386,10 @@ export default function PatientPage({ params }: PatientPageProps) {
       await postReply(patientId, replyText.trim())
       setReplyText('')
       setSubmitSuccess(true)
-      // Refresh consultation to show new reply
       const updated = await getConsultation(patientId)
       setConsultation(updated)
-    } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : '전송에 실패했습니다.')
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : '전송에 실패했습니다.')
     } finally {
       setSubmitting(false)
     }
@@ -315,17 +397,16 @@ export default function PatientPage({ params }: PatientPageProps) {
 
   if (authLoading || (!user && !authLoading)) {
     return (
-      <div className="flex flex-1 items-center justify-center min-h-screen bg-zinc-50">
-        <p className="text-zinc-500 text-sm">인증 확인 중...</p>
+      <div className="flex min-h-screen flex-1 items-center justify-center bg-zinc-50">
+        <p className="text-sm text-zinc-500">인증 확인 중...</p>
       </div>
     )
   }
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      {/* Header */}
-      <header className="sticky top-0 z-10 bg-white border-b border-zinc-200">
-        <div className="max-w-3xl mx-auto px-4 h-14 flex items-center gap-3">
+      <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white">
+        <div className="mx-auto flex h-14 max-w-4xl items-center gap-3 px-4">
           <Link
             href="/"
             className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 transition hover:bg-zinc-50"
@@ -336,41 +417,52 @@ export default function PatientPage({ params }: PatientPageProps) {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-6 flex flex-col gap-6">
-        {fetchLoading && (
+      <main className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-6">
+        {fetchLoading ? (
           <div className="flex items-center justify-center py-20">
             <p className="text-sm text-zinc-400">불러오는 중...</p>
           </div>
-        )}
+        ) : null}
 
-        {fetchError && (
-          <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+        {fetchError ? (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {fetchError}
           </div>
-        )}
+        ) : null}
 
-        {fallbackNotice && (
+        {fallbackNotice ? (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             {fallbackNotice}
           </div>
-        )}
+        ) : null}
 
-        {consultation && (
+        {consultation ? (
           <>
-            {/* Patient Data Card */}
-            <section className={`rounded-2xl border shadow-sm px-5 py-5 ${derivedState.status.cardClass}`}>
+            <section className={`rounded-2xl border px-5 py-5 shadow-sm ${derivedState.status.cardClass}`}>
               <div className="flex flex-col gap-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">상담 요약</p>
                     <h2 className="mt-2 text-lg font-semibold text-zinc-900">
-                      {consultation.patientData.age}세 / {genderLabel(consultation.patientData.gender)} 환자
+                      {consultation.patientData.age || '나이 미상'} / {genderLabel(consultation.patientData.gender)} 환자
                     </h2>
                     <p className="mt-1 text-sm text-zinc-600">{derivedState.status.description}</p>
                   </div>
-                  <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${derivedState.status.badgeClass}`}>
-                    {derivedState.status.label}
-                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${derivedState.status.badgeClass}`}>
+                      {derivedState.status.label}
+                    </span>
+                    {sourceLanguage ? (
+                      <span className="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
+                        원문 {languageLabel(sourceLanguage)}
+                      </span>
+                    ) : null}
+                    {patientReplyLanguage ? (
+                      <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                        환자 전달 {languageLabel(patientReplyLanguage)}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -409,12 +501,12 @@ export default function PatientPage({ params }: PatientPageProps) {
               </div>
             </section>
 
-            <section className="rounded-2xl bg-white border border-zinc-200 shadow-sm px-5 py-5">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-bold text-zinc-800">환자 정보</h2>
+            <section className="rounded-2xl border border-zinc-200 bg-white px-5 py-5 shadow-sm">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-sm font-bold text-zinc-800">환자 입력 원문</h2>
                 <div className="flex items-center gap-2">
                   <span className="inline-flex items-center rounded-md bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
-                    ESCALATE
+                    {consultation.aiAction}
                   </span>
                   <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${derivedState.status.badgeClass}`}>
                     {derivedState.status.label}
@@ -422,37 +514,48 @@ export default function PatientPage({ params }: PatientPageProps) {
                 </div>
               </div>
               <div className="flex flex-col gap-2">
-                <LabelValue label="나이 / 성별" value={`${consultation.patientData.age}세 / ${genderLabel(consultation.patientData.gender)}`} />
-                <LabelValue label="주소 (CC)" value={consultation.patientData.cc} />
+                <LabelValue label="원문 언어" value={languageLabel(sourceLanguage)} />
+                <LabelValue label="나이 / 성별" value={`${consultation.patientData.age || '미상'} / ${genderLabel(consultation.patientData.gender)}`} />
+                <LabelValue label="주호소 (CC)" value={consultation.patientData.cc} />
+                <LabelValue label="발생 시기" value={consultation.patientData.onset} />
                 <LabelValue label="통증 NRS" value={consultation.patientData.nrs} />
-                <LabelValue label="증상 양상" value={consultation.patientData.symptom} />
-                <LabelValue label="동반 증상" value={consultation.patientData.associated} />
-                <LabelValue label="과거력" value={consultation.patientData.pmhx} />
+                <LabelValue label="증상 양상" value={consultation.patientData.symptom} multiline />
+                <LabelValue label="동반 증상" value={consultation.patientData.associated} multiline />
+                <LabelValue label="과거력 / 복용약" value={consultation.patientData.pmhx} multiline />
                 <LabelValue label="접수 시각" value={formatDate(consultation.createdAt)} />
-                {consultation.patientNotificationContact?.consented && (
-                  <LabelValue
-                    label="알림 동의 연락처"
-                    value={consultation.patientNotificationContact.phone}
-                  />
-                )}
-                {consultation.patientNotificationContact?.consentedAt && (
-                  <LabelValue
-                    label="알림 동의 시각"
-                    value={formatDate(consultation.patientNotificationContact.consentedAt)}
-                  />
-                )}
-                {consultation.closedAt && (
+                {consultation.patientNotificationContact?.consented ? (
+                  <LabelValue label="알림 동의 연락처" value={consultation.patientNotificationContact.phone} />
+                ) : null}
+                {consultation.patientNotificationContact?.consentedAt ? (
+                  <LabelValue label="알림 동의 시각" value={formatDate(consultation.patientNotificationContact.consentedAt)} />
+                ) : null}
+                {consultation.closedAt ? (
                   <LabelValue label="종료 시각" value={formatDate(consultation.closedAt)} />
-                )}
-                {consultation.closeReason && (
-                  <LabelValue label="종료 사유" value={consultation.closeReason} />
-                )}
+                ) : null}
+                {consultation.closeReason ? (
+                  <LabelValue label="종료 사유" value={consultation.closeReason} multiline />
+                ) : null}
               </div>
             </section>
 
-            {mediaItems.length > 0 && (
-              <section className="rounded-2xl bg-white border border-zinc-200 shadow-sm px-5 py-5">
-                <h2 className="text-sm font-bold text-zinc-800 mb-3">첨부 사진</h2>
+            {hasTranslatedPatientData && doctorFacingPatientData ? (
+              <section className="rounded-2xl border border-blue-200 bg-blue-50 px-5 py-5 shadow-sm">
+                <h2 className="mb-4 text-sm font-bold text-zinc-800">의사용 한국어 번역본</h2>
+                <div className="flex flex-col gap-2">
+                  <LabelValue label="나이 / 성별" value={`${doctorFacingPatientData.age || '미상'} / ${doctorFacingPatientData.gender || '미상'}`} />
+                  <LabelValue label="주호소 (CC)" value={doctorFacingPatientData.cc} />
+                  <LabelValue label="발생 시기" value={doctorFacingPatientData.onset} />
+                  <LabelValue label="통증 NRS" value={doctorFacingPatientData.nrs} />
+                  <LabelValue label="증상 양상" value={doctorFacingPatientData.symptom} multiline />
+                  <LabelValue label="동반 증상" value={doctorFacingPatientData.associated} multiline />
+                  <LabelValue label="과거력 / 복용약" value={doctorFacingPatientData.pmhx} multiline />
+                </div>
+              </section>
+            ) : null}
+
+            {mediaItems.length > 0 ? (
+              <section className="rounded-2xl border border-zinc-200 bg-white px-5 py-5 shadow-sm">
+                <h2 className="mb-3 text-sm font-bold text-zinc-800">첨부 사진</h2>
                 <div className="grid gap-3 sm:grid-cols-2">
                   {mediaItems
                     .filter((item) => item.kind === 'image' && item.url)
@@ -476,31 +579,44 @@ export default function PatientPage({ params }: PatientPageProps) {
                     ))}
                 </div>
               </section>
-            )}
+            ) : null}
 
-            {/* SOAP Chart Card */}
-            {consultation.doctorChart && (
-              <section className="rounded-2xl bg-white border border-zinc-200 shadow-sm px-5 py-5">
-                <h2 className="text-sm font-bold text-zinc-800 mb-3">SOAP 차트</h2>
-                <pre className="whitespace-pre-wrap break-words text-sm text-zinc-700 font-mono leading-relaxed bg-zinc-50 rounded-xl p-4 border border-zinc-100">
+            {consultation.doctorChart ? (
+              <section className="rounded-2xl border border-zinc-200 bg-white px-5 py-5 shadow-sm">
+                <h2 className="mb-3 text-sm font-bold text-zinc-800">SOAP 차트</h2>
+                <pre className="whitespace-pre-wrap break-words rounded-xl border border-zinc-100 bg-zinc-50 p-4 font-mono text-sm leading-relaxed text-zinc-700">
                   {consultation.doctorChart}
                 </pre>
               </section>
-            )}
+            ) : null}
 
-            {/* Chatbot Reply */}
-            {consultation.chatbotReply && (
-              <section className="rounded-2xl bg-white border border-zinc-200 shadow-sm px-5 py-5">
-                <h2 className="text-sm font-bold text-zinc-800 mb-3">챗봇 응답</h2>
-                <p className="text-sm text-zinc-700 leading-relaxed whitespace-pre-wrap">
-                  {consultation.chatbotReply}
-                </p>
+            {consultation.chatbotReply ? (
+              <section className="rounded-2xl border border-zinc-200 bg-white px-5 py-5 shadow-sm">
+                <h2 className="mb-3 text-sm font-bold text-zinc-800">초기 답변 기록</h2>
+                <div className="space-y-4">
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">내부 한국어 초안</p>
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-700">
+                      {consultation.chatbotReply}
+                    </p>
+                  </div>
+                  {consultation.patientDeliveredChatbotReply
+                  && consultation.patientDeliveredChatbotReply !== consultation.chatbotReply ? (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4">
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                        환자에게 전달된 번역본 ({languageLabel(patientReplyLanguage)})
+                      </p>
+                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-700">
+                        {consultation.patientDeliveredChatbotReply}
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
               </section>
-            )}
+            ) : null}
 
-            {/* Follow-up History */}
-            <section className="rounded-2xl bg-white border border-zinc-200 shadow-sm px-5 py-5">
-              <div className="flex items-center justify-between gap-3 mb-4">
+            <section className="rounded-2xl border border-zinc-200 bg-white px-5 py-5 shadow-sm">
+              <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
                   <h2 className="text-sm font-bold text-zinc-800">Follow-up 기록</h2>
                   <p className="mt-1 text-xs text-zinc-400">추가 문진, 재분석, 알림 메시지 흐름을 한 번에 확인할 수 있습니다.</p>
@@ -525,15 +641,14 @@ export default function PatientPage({ params }: PatientPageProps) {
               )}
             </section>
 
-            {/* Doctor Reply History */}
-            <section className="rounded-2xl bg-white border border-zinc-200 shadow-sm px-5 py-5">
-              <h2 className="text-sm font-bold text-zinc-800 mb-4">
+            <section className="rounded-2xl border border-zinc-200 bg-white px-5 py-5 shadow-sm">
+              <h2 className="mb-4 text-sm font-bold text-zinc-800">
                 답변 내역
-                {consultation.doctorReplies && consultation.doctorReplies.length > 0 && (
+                {consultation.doctorReplies && consultation.doctorReplies.length > 0 ? (
                   <span className="ml-2 text-xs font-normal text-zinc-400">
                     {consultation.doctorReplies.length}건
                   </span>
-                )}
+                ) : null}
               </h2>
 
               {!consultation.doctorReplies || consultation.doctorReplies.length === 0 ? (
@@ -543,9 +658,9 @@ export default function PatientPage({ params }: PatientPageProps) {
                   {consultation.doctorReplies.map((reply) => (
                     <li
                       key={reply.id}
-                      className="rounded-xl bg-blue-50 border border-blue-100 px-4 py-3"
+                      className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3"
                     >
-                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <div className="mb-1.5 flex items-center justify-between gap-2">
                         <span className="text-xs font-semibold text-blue-700">
                           {reply.doctorName}
                         </span>
@@ -568,69 +683,90 @@ export default function PatientPage({ params }: PatientPageProps) {
                           </span>
                         </div>
                       </div>
-                      <p className="text-sm text-zinc-700 leading-relaxed whitespace-pre-wrap">
-                        {reply.message}
-                      </p>
+                      <div className="space-y-3">
+                        <div>
+                          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">의사 작성 원문</p>
+                          <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-700">
+                            {reply.message}
+                          </p>
+                        </div>
+                        {hasDeliveredTranslation(reply.message, reply.patientDeliveredMessage) ? (
+                          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3">
+                            <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                              환자에게 전달된 번역본 ({languageLabel(reply.patientDeliveredLanguage)})
+                            </p>
+                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-700">
+                              {reply.patientDeliveredMessage}
+                            </p>
+                          </div>
+                        ) : null}
+                      </div>
                     </li>
                   ))}
                 </ul>
               )}
             </section>
 
-            {/* Reply Form */}
-            <section className="rounded-2xl bg-white border border-zinc-200 shadow-sm px-5 py-5">
+            <section className="rounded-2xl border border-zinc-200 bg-white px-5 py-5 shadow-sm">
               <div className="mb-4 flex flex-col gap-1">
                 <h2 className="text-sm font-bold text-zinc-800">답변 전송</h2>
-                {derivedState.closed && (
+                {patientReplyLanguage && patientReplyLanguage.toLowerCase() !== 'ko' ? (
                   <p className="text-xs text-zinc-500">
-                    종료된 상담은 추가 회신을 보낼 수 없습니다.
+                    한국어로 작성하면 환자에게는 {languageLabel(patientReplyLanguage)}로 자동 번역되어 전달됩니다.
+                  </p>
+                ) : (
+                  <p className="text-xs text-zinc-500">
+                    한국어로 바로 작성해 전달할 수 있습니다.
                   </p>
                 )}
-                {!derivedState.closed && fallbackNotice && (
+                {derivedState.closed ? (
+                  <p className="text-xs text-zinc-500">종료된 상담은 추가 회신을 보낼 수 없습니다.</p>
+                ) : null}
+                {!derivedState.closed && fallbackNotice ? (
                   <p className="text-xs text-zinc-500">
                     상세 데이터 동기화가 완료되면 답변 전송을 다시 사용할 수 있습니다.
                   </p>
-                )}
+                ) : null}
               </div>
               <form onSubmit={handleSubmit} className="flex flex-col gap-3">
                 <textarea
                   value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
+                  onChange={(event) => setReplyText(event.target.value)}
                   placeholder={
                     derivedState.closed
                       ? '종료된 상담입니다.'
                       : fallbackNotice
                         ? '상세 데이터 동기화 후 답변 전송을 사용할 수 있습니다.'
-                      : '환자에게 전달할 답변을 입력하세요...'
+                        : '환자에게 전달할 답변을 한국어로 입력하세요...'
                   }
                   rows={5}
                   disabled={submitting || derivedState.closed || Boolean(fallbackNotice)}
-                  className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-800 placeholder:text-zinc-400 focus:border-blue-400 focus:bg-white focus:outline-none transition disabled:opacity-50"
+                  className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-800 placeholder:text-zinc-400 transition focus:border-blue-400 focus:bg-white focus:outline-none disabled:opacity-50"
                 />
 
-                {submitError && (
-                  <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
+                {submitError ? (
+                  <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
                     {submitError}
                   </p>
-                )}
+                ) : null}
 
-                {submitSuccess && (
-                  <p className="text-sm text-green-700 bg-green-50 rounded-lg px-3 py-2">
+                {submitSuccess ? (
+                  <p className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
                     답변이 전송되었습니다.
                   </p>
-                )}
+                ) : null}
 
                 <button
                   type="submit"
                   disabled={submitting || !replyText.trim() || derivedState.closed || Boolean(fallbackNotice)}
-                  className="self-end rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="self-end rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {submitting ? '전송 중...' : '환자에게 전송'}
                 </button>
               </form>
             </section>
           </>
-        )}
+        ) : null}
       </main>
     </div>
   )

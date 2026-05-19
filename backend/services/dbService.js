@@ -5,6 +5,7 @@ const {
   getFirebaseServiceAccount,
   getFirebaseStorageBucket,
 } = require('../config');
+const { isKoreanLanguage, translateText } = require('./translationService');
 
 const PUBLIC_STATS_PATH = ['system', 'public_stats'];
 const FOLLOW_UP_SESSIONS = 'follow_up_sessions';
@@ -448,7 +449,8 @@ function mapDoctorReplyForPatient(reply) {
   return {
     id: reply.id,
     doctorName: reply.doctorName || '해피닥터 의료진',
-    message: reply.message || '',
+    message: reply.patientDeliveredMessage || reply.message || '',
+    patientDeliveredLanguage: reply.patientDeliveredLanguage || null,
     createdAt: toIsoString(reply.createdAt),
     seen: Boolean(reply.seen),
     seenAt: toIsoString(reply.seenAt),
@@ -479,8 +481,11 @@ async function buildPublicConsultationStatus(consultation, replies) {
     consultationId: consultation.id,
     trackingCode: consultation.publicTrackingCode || null,
     status: stage,
+    uiLanguage: consultation.uiLanguage === 'en' ? 'en' : 'ko',
+    sourceLanguage: consultation.sourceLanguage || null,
+    patientReplyLanguage: consultation.patientReplyLanguage || null,
     chiefComplaint: consultation.patientData?.cc || null,
-    chatbotReply: consultation.chatbotReply || null,
+    chatbotReply: consultation.patientDeliveredChatbotReply || consultation.chatbotReply || null,
     createdAt: toIsoString(consultation.createdAt),
     doctorRepliedAt: toIsoString(consultation.doctorRepliedAt),
     closedAt: toIsoString(consultation.closedAt),
@@ -564,8 +569,10 @@ async function logConsultation(userId, patientData, analysisResult, options = {}
     await docRef.set({
       userId,
       patientData,
+      translatedPatientDataKo: options.translatedPatientDataKo || null,
       aiAction: analysisResult.action,
       chatbotReply: analysisResult.replyToPatient,
+      patientDeliveredChatbotReply: options.patientDeliveredChatbotReply || analysisResult.replyToPatient,
       doctorChart: analysisResult.soapChartForDoctor || 'None',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       status: 'ACTIVE',
@@ -577,6 +584,11 @@ async function logConsultation(userId, patientData, analysisResult, options = {}
       publicTrackingCodeIssuedAt: admin.firestore.FieldValue.serverTimestamp(),
       entryChannel: options.entryChannel || 'kakao',
       entrySurface: options.entrySurface || null,
+      uiLanguage: options.uiLanguage === 'en' ? 'en' : 'ko',
+      sourceLanguage: options.sourceLanguage || 'ko',
+      patientReplyLanguage: options.patientReplyLanguage || 'ko',
+      translationProvider: options.translationProvider || null,
+      translationStatus: options.translationStatus || 'not_required',
       patientNotificationContact,
     });
 
@@ -658,7 +670,7 @@ async function closeConsultation(userId, reason) {
   }
 }
 
-async function saveDoctorReply(consultationId, userId, message, doctorName, doctorEmail) {
+async function saveDoctorReply(consultationId, userId, message, doctorName, doctorEmail, options = {}) {
   if (!db) return null;
 
   try {
@@ -668,6 +680,8 @@ async function saveDoctorReply(consultationId, userId, message, doctorName, doct
       consultationId,
       userId,
       message,
+      patientDeliveredMessage: options.patientDeliveredMessage || message,
+      patientDeliveredLanguage: options.patientDeliveredLanguage || 'ko',
       doctorName: doctorName || '담당 의사',
       doctorEmail: doctorEmail || '',
       seen: false,
@@ -741,6 +755,10 @@ function applyConsultationViewOptions(docs, options = {}) {
         doc.patientData?.cc,
         doc.patientData?.symptom,
         doc.patientData?.associated,
+        doc.translatedPatientDataKo?.cc,
+        doc.translatedPatientDataKo?.symptom,
+        doc.translatedPatientDataKo?.associated,
+        doc.translatedPatientDataKo?.pmhx,
         doc.patientNotificationContact?.phone,
         doc.patientNotificationContact?.normalizedPhone,
       ]
@@ -1107,8 +1125,13 @@ function sanitizeFollowUpQuestion(value) {
   return value.trim().replace(/\r\n/g, '\n').slice(0, 1200);
 }
 
-function buildDoctorFollowUpNotificationMessage(consultationData = {}, question = '') {
-  const patientData = consultationData.patientData || {};
+function buildDoctorFollowUpNotificationMessage(
+  consultationData = {},
+  question = '',
+  translatedQuestionKo = null,
+  sourceLanguage = 'ko',
+) {
+  const patientData = consultationData.translatedPatientDataKo || consultationData.patientData || {};
 
   return [
     '📩 환자 추가 질문이 도착했습니다.',
@@ -1120,8 +1143,9 @@ function buildDoctorFollowUpNotificationMessage(consultationData = {}, question 
       ? `직전 의료진 답변 시각: ${toIsoString(consultationData.doctorRepliedAt) || '기록 없음'}`
       : '직전 의료진 답변: 아직 없음',
     '',
-    '[환자 메시지]',
+    translatedQuestionKo ? `[환자 메시지 원문 - ${sourceLanguage}]` : '[환자 메시지]',
     question,
+    translatedQuestionKo ? `\n[의사용 한국어 번역]\n${translatedQuestionKo}` : null,
     consultationData.doctorChart
       ? `\n[기존 차트]\n${consultationData.doctorChart}`
       : null,
@@ -1413,11 +1437,22 @@ async function appendPublicFollowUpQuestionByLookup(trackingLookup, question, op
 
   const consultationData = consultationDoc.data() || {};
   ensureConsultationCanAcceptUpdates(consultationData);
+  const sourceLanguage = consultationData.patientReplyLanguage || consultationData.sourceLanguage || 'ko';
+
+  let translatedQuestionKo = null;
+  if (!isKoreanLanguage(sourceLanguage)) {
+    translatedQuestionKo = await translateText(normalizedQuestion, 'ko', {
+      sourceLanguage,
+    });
+  }
 
   const logEntry = {
     action: 'PATIENT_FOLLOW_UP_QUESTION',
     timestamp: admin.firestore.Timestamp.now(),
-    alertMessage: normalizedQuestion,
+    alertMessage: translatedQuestionKo || normalizedQuestion,
+    originalQuestion: normalizedQuestion,
+    translatedQuestionKo: translatedQuestionKo || null,
+    language: sourceLanguage,
     source: options.source || 'web_status',
   };
 
@@ -1430,7 +1465,14 @@ async function appendPublicFollowUpQuestionByLookup(trackingLookup, question, op
     consultationId: consultationDoc.id,
     userId: consultationData.userId || null,
     question: normalizedQuestion,
-    doctorNotificationMessage: buildDoctorFollowUpNotificationMessage(consultationData, normalizedQuestion),
+    sourceLanguage,
+    translatedQuestionKo,
+    doctorNotificationMessage: buildDoctorFollowUpNotificationMessage(
+      consultationData,
+      normalizedQuestion,
+      translatedQuestionKo,
+      sourceLanguage,
+    ),
   };
 }
 

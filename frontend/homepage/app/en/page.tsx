@@ -2,7 +2,40 @@ import type { Metadata } from 'next'
 import Image from 'next/image'
 
 const KAKAO_CHAT_URL = 'https://pf.kakao.com/_PxaTxhX/chat'
+const WEB_START_URL = 'https://app.happydoctor.kr/start?source=homepage&lang=en'
 const KO_HOME_URL = '/ko'
+const ENGLISH_HOME_ABSOLUTE_URL = 'https://happydoctor.kr/en'
+
+const autoTranslationLanguages = [
+  { code: 'es', label: 'Español' },
+  { code: 'vi', label: 'Tiếng Việt' },
+  { code: 'zh-CN', label: '简体中文' },
+  { code: 'zh-TW', label: '繁體中文' },
+  { code: 'ja', label: '日本語' },
+  { code: 'mn', label: 'Монгол' },
+  { code: 'ru', label: 'Русский' },
+  { code: 'th', label: 'ไทย' },
+  { code: 'tl', label: 'Filipino' },
+  { code: 'ne', label: 'नेपाली' },
+  { code: 'km', label: 'ខ្មែរ' },
+  { code: 'id', label: 'Bahasa Indonesia' },
+  { code: 'uz', label: 'O‘zbek' },
+  { code: 'ar', label: 'العربية' },
+  { code: 'fr', label: 'Français' },
+  { code: 'de', label: 'Deutsch' },
+  { code: 'pt', label: 'Português' },
+  { code: 'it', label: 'Italiano' },
+  { code: 'hi', label: 'हिन्दी' },
+  { code: 'tr', label: 'Türkçe' },
+]
+
+function buildGoogleTranslateUrl(languageCode: string) {
+  const url = new URL('https://translate.google.com/translate')
+  url.searchParams.set('sl', 'en')
+  url.searchParams.set('tl', languageCode)
+  url.searchParams.set('u', ENGLISH_HOME_ABSOLUTE_URL)
+  return url.toString()
+}
 
 export const metadata: Metadata = {
   title: 'Happy Doctor | Free Online Medical Support',
@@ -55,7 +88,13 @@ export default function EnglishHomepage() {
               We provide free online guidance with AI-assisted triage and doctor-reviewed responses.
             </p>
 
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <a
+                href={WEB_START_URL}
+                className="inline-flex items-center justify-center rounded-full bg-white px-6 py-3 text-sm font-bold text-[#0C447C] shadow-lg shadow-black/15 transition hover:-translate-y-0.5"
+              >
+                Start Consultation on Web
+              </a>
               <a
                 href={KAKAO_CHAT_URL}
                 target="_blank"
@@ -70,6 +109,33 @@ export default function EnglishHomepage() {
               >
                 View Korean Homepage
               </a>
+            </div>
+
+            <div className="mt-8 rounded-[1.75rem] border border-white/15 bg-white/10 p-5 backdrop-blur">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/64">
+                Language support
+              </p>
+              <h2 className="mt-3 text-xl font-semibold">View this page in your language</h2>
+              <p className="mt-3 text-sm leading-7 text-white/76">
+                English is our official international homepage. If you need another language, you can open an
+                automatically translated view powered by Google Translate.
+              </p>
+              <p className="mt-2 text-xs leading-6 text-white/56">
+                Automatic translations are provided as accessibility support and may not perfectly reflect medical nuance.
+              </p>
+              <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                {autoTranslationLanguages.map((language) => (
+                  <a
+                    key={language.code}
+                    href={buildGoogleTranslateUrl(language.code)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-2xl border border-white/12 bg-white/8 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/14"
+                  >
+                    {language.label}
+                  </a>
+                ))}
+              </div>
             </div>
           </div>
 

@@ -19,11 +19,14 @@ async function parseError(res: Response): Promise<string> {
 export interface PatientData {
   age: string; gender: string; cc: string; nrs: string;
   symptom: string; associated: string; pmhx: string;
+  onset?: string;
 }
 
 export interface DoctorReply {
   id: string; message: string; doctorName: string;
   createdAt: string; seen: boolean; seenAt?: string; doctorEmail?: string;
+  patientDeliveredMessage?: string | null;
+  patientDeliveredLanguage?: string | null;
 }
 
 export interface FollowUpLog {
@@ -57,6 +60,7 @@ export interface Consultation {
   id: string;
   userId: string;
   patientData: PatientData;
+  translatedPatientDataKo?: PatientData | null;
   aiAction: string;
   doctorChart: string;
   chatbotReply: string;
@@ -64,6 +68,12 @@ export interface Consultation {
   createdAt: string;
   closedAt?: string;
   closeReason?: string;
+  uiLanguage?: 'ko' | 'en';
+  sourceLanguage?: string | null;
+  patientReplyLanguage?: string | null;
+  translationProvider?: string | null;
+  translationStatus?: string | null;
+  patientDeliveredChatbotReply?: string | null;
   followUpLogs?: FollowUpLog[];
   doctorReplies?: DoctorReply[];
   doctorRepliedAt?: string;

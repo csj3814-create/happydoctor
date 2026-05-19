@@ -145,6 +145,10 @@ function getGeminiApiKey() {
   return getRequiredEnv('GEMINI_API_KEY');
 }
 
+function getGoogleTranslateApiKey() {
+  return getEnv('GOOGLE_TRANSLATE_API_KEY');
+}
+
 function getMessengerApiKey() {
   return getRequiredEnv('MESSENGER_API_KEY');
 }
@@ -225,6 +229,7 @@ module.exports = {
   getPortalOrigins,
   getRuntimeRevision,
   getGeminiApiKey,
+  getGoogleTranslateApiKey,
   getMessengerApiKey,
   getFirebaseServiceAccount,
   getFirebaseStorageBucket,

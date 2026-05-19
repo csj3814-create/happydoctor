@@ -24,6 +24,7 @@ const {
   clearPatientChannelPushes,
   clearPatientSmsNotifications,
 } = require('../services/notifyService');
+const { isKoreanLanguage, translateText } = require('../services/translationService');
 const { appSiteUrl, getAllowedDoctorEmails, getPortalAdminEmails } = require('../config');
 const followUpService = require('../services/followUpService');
 
@@ -166,53 +167,100 @@ function serializeTimestamps(value) {
   );
 }
 
-function buildPatientStatusUrl(trackingInfo) {
+function normalizeUiLanguage(value) {
+  return typeof value === 'string' && value.trim().toLowerCase() === 'en' ? 'en' : 'ko';
+}
+
+function buildPatientStatusUrl(trackingInfo, uiLanguage = 'ko') {
   const trackingCode = trackingInfo?.trackingCode || '';
   const trackingToken = trackingInfo?.trackingToken || '';
   if (!trackingCode && !trackingToken) return '';
 
   const queryKey = trackingCode ? 'code' : 'token';
   const queryValue = trackingCode || trackingToken;
-  return `${appSiteUrl.replace(/\/$/, '')}/status?${queryKey}=${encodeURIComponent(queryValue)}`;
+  const params = new URLSearchParams({ [queryKey]: queryValue });
+  if (normalizeUiLanguage(uiLanguage) === 'en') {
+    params.set('lang', 'en');
+  }
+  return `${appSiteUrl.replace(/\/$/, '')}/status?${params.toString()}`;
+}
+
+function getReplyCopy(uiLanguage = 'ko') {
+  if (normalizeUiLanguage(uiLanguage) === 'en') {
+    return {
+      pushTitle: 'A doctor reply is ready.',
+      doctorReplyPrefix: 'Reply from',
+      doctorReplySuffix: '',
+      statusLabel: 'Check status',
+      codeLabel: 'Lookup code',
+      footerPrimary: 'When you are done, you can close the consultation from the status page.',
+      footerSecondary: 'If you need more explanation, you can continue from the status page.',
+      smsTitle: '[Happy Doctor] A doctor reply is ready.',
+      smsDoctorReplyPrefix: 'Doctor reply from',
+      smsDoctorReplySuffix: '',
+    };
+  }
+
+  return {
+    pushTitle: '의료진 답변이 도착했습니다.',
+    doctorReplyPrefix: '',
+    doctorReplySuffix: '선생님의 답변',
+    statusLabel: '상태 확인',
+    codeLabel: '직접 입력 코드',
+    footerPrimary: '답변을 충분히 확인하셨다면 상태 화면에서 상담을 종료할 수 있습니다.',
+    footerSecondary: '추가 설명이 필요하면 상태 확인 화면에서 다시 이어서 문의하실 수 있습니다.',
+    smsTitle: '[해피닥터] 의료진 답변이 도착했습니다.',
+    smsDoctorReplyPrefix: '',
+    smsDoctorReplySuffix: '답변',
+  };
+}
+
+function buildReplyLabel(name, prefix, suffix, fallback) {
+  const resolvedName = name || fallback;
+  return [prefix, resolvedName, suffix].filter(Boolean).join(' ');
 }
 
 function buildPatientReplyPushMessage({
+  uiLanguage,
   doctorName,
   message,
   statusUrl,
   trackingCode,
 }) {
+  const copy = getReplyCopy(uiLanguage);
   return [
-    '의료진 답변이 도착했습니다.',
+    copy.pushTitle,
     '',
-    `${doctorName || '해피닥터 의료진'} 선생님의 답변`,
+    buildReplyLabel(doctorName, copy.doctorReplyPrefix, copy.doctorReplySuffix, '해피닥터 의료진'),
     '',
     message,
     '',
-    statusUrl ? `상태 확인: ${statusUrl}` : null,
-    trackingCode ? `직접 입력 코드: ${trackingCode}` : null,
+    statusUrl ? `${copy.statusLabel}: ${statusUrl}` : null,
+    trackingCode ? `${copy.codeLabel}: ${trackingCode}` : null,
     '',
-    '답변을 충분히 확인하셨다면 카카오톡에서 상담종료라고 보내 상담을 마무리해 주세요.',
-    '추가 설명이 필요하면 상태 확인 화면이나 채널에서 다시 이어서 문의하실 수 있습니다.',
+    copy.footerPrimary,
+    copy.footerSecondary,
   ]
     .filter(Boolean)
     .join('\n');
 }
 
 function buildPatientReplySmsMessage({
+  uiLanguage,
   doctorName,
   message,
   statusUrl,
   trackingCode,
 }) {
+  const copy = getReplyCopy(uiLanguage);
   return [
-    '[해피닥터] 의료진 답변이 도착했습니다.',
-    `${doctorName || '의료진'} 답변`,
+    copy.smsTitle,
+    buildReplyLabel(doctorName, copy.smsDoctorReplyPrefix, copy.smsDoctorReplySuffix, '해피닥터 의료진'),
     '',
     message,
     '',
-    statusUrl ? `상태 확인: ${statusUrl}` : null,
-    trackingCode ? `직접 입력 코드: ${trackingCode}` : null,
+    statusUrl ? `${copy.statusLabel}: ${statusUrl}` : null,
+    trackingCode ? `${copy.codeLabel}: ${trackingCode}` : null,
   ]
     .filter(Boolean)
     .join('\n');
@@ -422,6 +470,22 @@ router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
     const consultationId = parseConsultationId(req.params.id);
     const message = parseReplyMessage(req.body?.message);
     const consultation = assertConsultationCanReceiveDoctorReply(await getConsultationById(consultationId));
+    const uiLanguage = normalizeUiLanguage(consultation.uiLanguage);
+    const patientReplyLanguage = consultation.patientReplyLanguage || consultation.sourceLanguage || 'ko';
+
+    let patientDeliveredMessage = message;
+    if (!isKoreanLanguage(patientReplyLanguage)) {
+      try {
+        patientDeliveredMessage = await translateText(message, patientReplyLanguage, {
+          sourceLanguage: 'ko',
+        });
+      } catch (error) {
+        console.error('[Portal Reply Translation Error]', error);
+        return res.status(503).json({
+          error: '자동 번역 준비가 아직 끝나지 않아 답변을 보낼 수 없습니다. 잠시 후 다시 시도해 주세요.',
+        });
+      }
+    }
 
     const replyId = await saveDoctorReply(
       consultationId,
@@ -429,10 +493,14 @@ router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
       message,
       req.doctor.name,
       req.doctor.email,
+      {
+        patientDeliveredMessage,
+        patientDeliveredLanguage: patientReplyLanguage,
+      },
     );
 
     const trackingInfo = await getConsultationTrackingById(consultationId);
-    const statusUrl = buildPatientStatusUrl(trackingInfo);
+    const statusUrl = buildPatientStatusUrl(trackingInfo, uiLanguage);
     try {
       await clearPatientChannelPushes(consultation.userId, 'doctor_reply');
     } catch (error) {
@@ -446,8 +514,9 @@ router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
     const patientNotificationQueued = await enqueuePatientChannelPush(
       consultation.userId,
       buildPatientReplyPushMessage({
+        uiLanguage,
         doctorName: req.doctor.name,
-        message,
+        message: patientDeliveredMessage,
         statusUrl,
         trackingCode: trackingInfo?.trackingCode || null,
       }),
@@ -462,8 +531,9 @@ router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
         consultation.userId,
         optedInPhoneNumber,
         buildPatientReplySmsMessage({
+          uiLanguage,
           doctorName: req.doctor.name,
-          message,
+          message: patientDeliveredMessage,
           statusUrl,
           trackingCode: trackingInfo?.trackingCode || null,
         }),

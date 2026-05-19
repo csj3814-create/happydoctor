@@ -3,22 +3,66 @@
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
+import type { UiLanguage } from '@/lib/ui-language'
+
 type StatusCloseActionsProps = {
   lookup: string
   canClose: boolean
   isClosed: boolean
+  uiLanguage: UiLanguage
   allowFollowUp?: boolean
   onUpdated?: () => void
 }
+
+const copyByLanguage = {
+  ko: {
+    closedTitle: '상담 상태',
+    closedBody: '이 상담은 이미 종료되었습니다. 다시 도움이 필요하면 새 상담을 시작해 주세요.',
+    title: '다음 행동',
+    body: '의료진 답변 뒤에 더 궁금한 점이 있으면 같은 상담 안에서 추가 질문을 남길 수 있습니다.',
+    closeBodySuffix: '답변을 충분히 확인했다면 상담 종료도 바로 진행할 수 있습니다.',
+    placeholder:
+      '예: 약은 어떻게 먹으면 되는지, 언제 다시 병원에 가야 하는지처럼 이어서 궁금한 점을 적어 주세요.',
+    followUpSending: '추가 질문을 보내고 있습니다...',
+    followUpSubmit: '추가 질문 보내기',
+    closeSending: '상담을 종료하고 있습니다...',
+    closeSubmit: '답변 확인 후 상담 종료',
+    closeSuccess: '상담이 종료되었습니다. 다시 도움이 필요하면 새 상담을 시작해 주세요.',
+    closeError: '상담을 종료하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+    followUpSuccess:
+      '추가 질문이 의료진에게 전달되었습니다. 답변이 준비되면 이 화면에서 바로 확인할 수 있습니다.',
+    followUpError: '추가 질문을 보내지 못했습니다. 잠시 후 다시 시도해 주세요.',
+  },
+  en: {
+    closedTitle: 'Consultation status',
+    closedBody: 'This consultation is already closed. Please start a new one if you still need help.',
+    title: 'Next steps',
+    body: 'If you still have questions after the doctor reply, you can leave a follow-up message in this consultation.',
+    closeBodySuffix: 'If the reply was enough, you can also close the consultation here.',
+    placeholder:
+      'Example: when should I visit a clinic again, or what should I watch for next?',
+    followUpSending: 'Sending your follow-up question...',
+    followUpSubmit: 'Send follow-up question',
+    closeSending: 'Closing the consultation...',
+    closeSubmit: 'Close consultation',
+    closeSuccess: 'This consultation is now closed. Please start a new one if you need more help.',
+    closeError: 'We could not close the consultation right now. Please try again shortly.',
+    followUpSuccess:
+      'Your follow-up question was sent to the doctors. You can check this page again when a reply is ready.',
+    followUpError: 'We could not send your follow-up question right now. Please try again shortly.',
+  },
+} as const
 
 export default function StatusCloseActions({
   lookup,
   canClose,
   isClosed,
+  uiLanguage,
   allowFollowUp = false,
   onUpdated,
 }: StatusCloseActionsProps) {
   const router = useRouter()
+  const copy = copyByLanguage[uiLanguage]
   const [closing, setClosing] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -31,10 +75,10 @@ export default function StatusCloseActions({
     return (
       <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
         <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
-          상담 상태
+          {copy.closedTitle}
         </p>
         <p className="mt-4 text-sm leading-7 text-[var(--muted)]">
-          이 상담은 이미 종료되었습니다. 다시 도움이 필요하면 새 상담을 시작해 주세요.
+          {copy.closedBody}
         </p>
       </div>
     )
@@ -57,23 +101,20 @@ export default function StatusCloseActions({
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            reason: '답변 확인 후 종료',
-          }),
+          body: JSON.stringify({}),
         },
       )
 
-      const payload = (await response.json()) as { error?: string }
       if (!response.ok) {
-        setError(payload.error || '상담을 종료하지 못했습니다. 잠시 후 다시 시도해 주세요.')
+        setError(copy.closeError)
         return
       }
 
-      setMessage('상담을 종료했습니다. 다시 도움이 필요하면 새 상담을 시작해 주세요.')
+      setMessage(copy.closeSuccess)
       router.refresh()
       onUpdated?.()
     } catch {
-      setError('상담을 종료하지 못했습니다. 잠시 후 다시 시도해 주세요.')
+      setError(copy.closeError)
     } finally {
       setClosing(false)
     }
@@ -97,22 +138,22 @@ export default function StatusCloseActions({
           },
           body: JSON.stringify({
             question: followUpQuestion.trim(),
+            uiLanguage,
           }),
         },
       )
 
-      const payload = (await response.json()) as { error?: string }
       if (!response.ok) {
-        setFollowUpError(payload.error || '추가 질문을 보내지 못했습니다. 잠시 후 다시 시도해 주세요.')
+        setFollowUpError(copy.followUpError)
         return
       }
 
       setFollowUpQuestion('')
-      setFollowUpMessage('추가 질문을 의료진에게 전달했습니다. 답변이 준비되면 이 화면에서 바로 확인할 수 있습니다.')
+      setFollowUpMessage(copy.followUpSuccess)
       router.refresh()
       onUpdated?.()
     } catch {
-      setFollowUpError('추가 질문을 보내지 못했습니다. 잠시 후 다시 시도해 주세요.')
+      setFollowUpError(copy.followUpError)
     } finally {
       setSendingFollowUp(false)
     }
@@ -121,11 +162,11 @@ export default function StatusCloseActions({
   return (
     <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
       <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
-        다음 행동
+        {copy.title}
       </p>
       <p className="mt-4 text-sm leading-7 text-[var(--muted)]">
-        의료진 답변 뒤에 더 궁금한 점이 있으면 같은 상담 안에서 추가 질문을 남길 수 있습니다.
-        {canClose ? ' 도움이 충분했다면 상담 종료도 바로 진행할 수 있습니다.' : ''}
+        {copy.body}
+        {canClose ? ` ${copy.closeBodySuffix}` : ''}
       </p>
 
       {allowFollowUp ? (
@@ -133,7 +174,7 @@ export default function StatusCloseActions({
           <textarea
             value={followUpQuestion}
             onChange={(event) => setFollowUpQuestion(event.target.value)}
-            placeholder="예: 약은 어떻게 먹으면 되는지, 언제 다시 병원에 가야 하는지처럼 이어서 궁금한 점을 적어 주세요."
+            placeholder={copy.placeholder}
             rows={4}
             disabled={sendingFollowUp}
             className="w-full rounded-[1.2rem] border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm leading-7 text-[var(--ink)] outline-none transition focus:border-[var(--blue)] focus:bg-white"
@@ -144,7 +185,7 @@ export default function StatusCloseActions({
             disabled={sendingFollowUp || !followUpQuestion.trim()}
             className="w-full rounded-[1.2rem] border border-[var(--navy)] bg-white px-5 py-3 text-sm font-semibold text-[var(--navy)] transition hover:bg-[var(--soft-blue)] disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400"
           >
-            {sendingFollowUp ? '추가 질문을 보내고 있습니다...' : '추가 질문 보내기'}
+            {sendingFollowUp ? copy.followUpSending : copy.followUpSubmit}
           </button>
         </form>
       ) : null}
@@ -157,7 +198,7 @@ export default function StatusCloseActions({
           className="mt-4 w-full rounded-[1.2rem] bg-[var(--navy)] px-5 py-3 text-sm font-semibold text-white visited:text-white transition hover:bg-[#123c67] disabled:cursor-not-allowed disabled:bg-slate-400"
           style={{ color: '#ffffff' }}
         >
-          {closing ? '상담을 종료하고 있습니다...' : '답변 확인 후 상담 종료'}
+          {closing ? copy.closeSending : copy.closeSubmit}
         </button>
       ) : null}
 

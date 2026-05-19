@@ -5,6 +5,7 @@ export interface PublicDoctorReply {
   id: string
   doctorName: string
   message: string
+  patientDeliveredLanguage?: string | null
   createdAt: string | null
   seen: boolean
   seenAt: string | null
@@ -33,6 +34,9 @@ export interface PublicConsultationStatus {
   consultationId: string
   trackingCode: string | null
   status: PublicConsultationStage
+  uiLanguage: 'ko' | 'en'
+  sourceLanguage: string | null
+  patientReplyLanguage: string | null
   chiefComplaint: string | null
   chatbotReply: string | null
   createdAt: string | null
@@ -67,6 +71,9 @@ export interface PublicConsultationCreateResponse {
   statusUrl: string
   status: PublicConsultationStage
   requiresDoctorReview: boolean
+  uiLanguage?: 'ko' | 'en'
+  sourceLanguage?: string | null
+  patientReplyLanguage?: string | null
   replyToPatient: string
 }
 

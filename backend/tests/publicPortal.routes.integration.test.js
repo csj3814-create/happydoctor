@@ -8,6 +8,7 @@ const DB_SERVICE_PATH = path.resolve(__dirname, '../services/dbService.js');
 const FOLLOW_UP_SERVICE_PATH = path.resolve(__dirname, '../services/followUpService.js');
 const NOTIFY_SERVICE_PATH = path.resolve(__dirname, '../services/notifyService.js');
 const LLM_SERVICE_PATH = path.resolve(__dirname, '../services/llmService.js');
+const TRANSLATION_SERVICE_PATH = path.resolve(__dirname, '../services/translationService.js');
 const CONFIG_PATH = path.resolve(__dirname, '../config.js');
 const PUBLIC_ROUTE_PATH = path.resolve(__dirname, '../routes/public.js');
 const PORTAL_ROUTE_PATH = path.resolve(__dirname, '../routes/portal.js');
@@ -115,6 +116,17 @@ async function getJson(url, options = {}) {
   };
 }
 
+function createTranslationServiceMock(overrides = {}) {
+  return {
+    TRANSLATION_PROVIDER: 'google-cloud-translation',
+    detectLanguage: async () => 'ko',
+    isKoreanLanguage: (language) => String(language || '').toLowerCase() === 'ko',
+    translatePatientDataToKorean: async (patientData) => patientData,
+    translateText: async (text) => text,
+    ...overrides,
+  };
+}
+
 test('public create route stores an optional consented notification phone for web consultations', { concurrency: false }, async () => {
   const calls = [];
   const routeModule = loadRouteWithMocks(PUBLIC_ROUTE_PATH, {
@@ -148,6 +160,7 @@ test('public create route stores an optional consented notification phone for we
         };
       },
     },
+    [TRANSLATION_SERVICE_PATH]: createTranslationServiceMock(),
     [NOTIFY_SERVICE_PATH]: {
       enqueueDoctorNotification: async (...args) => {
         calls.push({ type: 'enqueueDoctorNotification', args });
@@ -220,6 +233,7 @@ test('public create route rejects notification consent without a phone number', 
         };
       },
     },
+    [TRANSLATION_SERVICE_PATH]: createTranslationServiceMock(),
     [NOTIFY_SERVICE_PATH]: {
       enqueueDoctorNotification: async () => true,
       clearDoctorNotifications: async () => {},
@@ -281,6 +295,7 @@ test('public follow-up route appends the question, queues a doctor notification,
         throw new Error('not_used');
       },
     },
+    [TRANSLATION_SERVICE_PATH]: createTranslationServiceMock(),
     [NOTIFY_SERVICE_PATH]: {
       enqueueDoctorNotification: async (message, userId, options) => {
         calls.push({ type: 'enqueueDoctorNotification', message, userId, options });
@@ -372,6 +387,7 @@ test('public status route acknowledges doctor replies and clears queued reply re
         throw new Error('not_used');
       },
     },
+    [TRANSLATION_SERVICE_PATH]: createTranslationServiceMock(),
     [NOTIFY_SERVICE_PATH]: {
       enqueueDoctorNotification: async () => true,
       clearDoctorNotifications: async () => {},
@@ -435,6 +451,7 @@ test('public close route clears durable follow-up and reply delivery state befor
         throw new Error('not_used');
       },
     },
+    [TRANSLATION_SERVICE_PATH]: createTranslationServiceMock(),
     [NOTIFY_SERVICE_PATH]: {
       enqueueDoctorNotification: async () => true,
       clearDoctorNotifications: async (userId) => {
@@ -500,6 +517,7 @@ test('public status routes reject malformed lookup values before hitting the dat
         throw new Error('not_used');
       },
     },
+    [TRANSLATION_SERVICE_PATH]: createTranslationServiceMock(),
     [NOTIFY_SERVICE_PATH]: {
       enqueueDoctorNotification: async () => true,
       clearDoctorNotifications: async () => {},
