@@ -1567,8 +1567,11 @@
   - Verification: `frontend/app npm run verify:ci`.
   - Result: 영어 UI에서는 `Choose files`, `No file selected` 또는 선택 파일명이 일관되게 표시되고, 시스템 기본 로캘 문구가 섞이지 않게 되었다.
 
-- [ ] Stage 111 selected-language full start-page translation (2026-05-21)
+- [x] Stage 111 selected-language full start-page translation (2026-05-21)
   - 다국어 카드에서 `inputLanguage`를 고른 뒤에도 환자 시작 화면 전체가 영어에 머물고, 선택 언어는 입력 힌트로만 쓰이는 문제를 수정한다.
   - 백엔드에 시작 화면 UI 번역 복사본 API를 추가하고, 프런트가 선택 언어 기준으로 페이지/폼 전체 문구를 받아 렌더링하도록 연결한다.
   - `언어 안내`, 파일 선택 상태, 하단 지원 문구처럼 남아 있던 폼 내부 정적 문구도 모두 선택 언어 번역본을 따르게 정리한다.
   - Verification: `frontend/app npm run verify:ci`, `backend npm run verify:ci`, 라이브 `https://app.happydoctor.kr/start?source=homepage&lang=en&inputLanguage=vi`.
+  - Result: `backend/routes/public.js`, `backend/services/uiCopyService.js`에 선택 언어별 시작 화면 번역 복사본 API를 추가해 영어 원문 묶음을 런타임에 번역하고 캐시하도록 정리했다.
+  - Result: `frontend/app/app/start/page.tsx`, `frontend/app/lib/start-copy.ts`, `frontend/app/components/WebConsultationStartForm.tsx`에서 페이지 상단, 진행 안내, 폼 라벨, 파일 선택 상태, 하단 안내를 모두 선택 언어 번역본으로 렌더링하도록 연결했다.
+  - Result: 라이브 `https://app.happydoctor.kr/start?source=homepage&lang=en&inputLanguage=vi` HTML 기준 `Bắt đầu tư vấn trực tuyến`, `Bạn có thể viết vào Tiếng Việt.`, `Chọn tập tin` 등 베트남어 문구가 시작 화면 전반에 반영된 것을 확인했다.
