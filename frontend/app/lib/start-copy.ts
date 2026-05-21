@@ -1,3 +1,5 @@
+import { localizedStartCopyByInputLanguage } from './start-copy-localized'
+
 const BACKEND_URL = process.env.HAPPYDOCTOR_BACKEND_URL || 'https://happydoctor.onrender.com'
 
 export type StartPageCopy = {
@@ -214,9 +216,31 @@ export const startCopyByLanguage: Record<'ko' | 'en', LocalizedStartCopyBundle> 
   },
 }
 
+function cloneCopyBundle(bundle: LocalizedStartCopyBundle): LocalizedStartCopyBundle {
+  return JSON.parse(JSON.stringify(bundle)) as LocalizedStartCopyBundle
+}
+
+function normalizeLocalizedCopyLanguage(value: string) {
+  const trimmed = value.trim().toLowerCase()
+  if (trimmed === 'zh-cn') return 'zh-cn'
+  if (trimmed === 'zh-tw') return 'zh-tw'
+  return trimmed
+}
+
+export function getBuiltInLocalizedStartCopy(targetLanguage: string): LocalizedStartCopyBundle | null {
+  const normalizedLanguage = normalizeLocalizedCopyLanguage(targetLanguage)
+  const bundle = localizedStartCopyByInputLanguage[normalizedLanguage]
+  return bundle ? cloneCopyBundle(bundle) : null
+}
+
 export async function fetchLocalizedStartCopy(targetLanguage: string): Promise<LocalizedStartCopyBundle | null> {
   const trimmed = targetLanguage.trim()
   if (!trimmed) return null
+
+  const builtInCopy = getBuiltInLocalizedStartCopy(trimmed)
+  if (builtInCopy) {
+    return builtInCopy
+  }
 
   try {
     const response = await fetch(
@@ -232,7 +256,7 @@ export async function fetchLocalizedStartCopy(targetLanguage: string): Promise<L
     }
 
     const payload = (await response.json()) as { copy?: LocalizedStartCopyBundle }
-    return payload.copy || null
+    return payload.copy ? cloneCopyBundle(payload.copy) : null
   } catch {
     return null
   }
