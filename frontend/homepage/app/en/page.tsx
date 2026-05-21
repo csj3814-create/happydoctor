@@ -74,8 +74,8 @@ export default function EnglishHomepage() {
           </a>
         </div>
 
-        <div className="grid items-center gap-10 lg:grid-cols-[1.05fr_0.95fr]">
-          <div>
+        <div className="grid items-start gap-8 lg:grid-cols-[1.02fr_0.98fr] lg:gap-10">
+          <div className="order-1 max-w-2xl">
             <p className="mb-4 text-xs font-semibold uppercase tracking-[0.28em] text-white/70">Mission</p>
             <h1 className="text-4xl font-bold leading-tight md:text-6xl md:leading-[1.06]">
               Healthcare that reaches people who need it most
@@ -107,49 +107,82 @@ export default function EnglishHomepage() {
                 View Korean Homepage
               </a>
             </div>
+          </div>
 
-            <div className="mt-8 rounded-[1.75rem] border border-white/15 bg-white/10 p-5 backdrop-blur">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/64">
-                Language support
-              </p>
-              <h2 className="mt-3 text-xl font-semibold">Start in your language</h2>
-              <p className="mt-3 text-sm leading-7 text-white/76">
-                Some Google webpage translation routes are unavailable in certain regions. Instead of sending you to
-                a broken translation page, we can take you straight to the consultation form where you may type in
-                your own language.
-              </p>
-              <p className="mt-2 text-xs leading-6 text-white/56">
-                The consultation UI will stay in English, but our system will try to translate your message for our
-                doctors and return a translated reply when possible.
-              </p>
-              <div className="mt-5 grid gap-2 sm:grid-cols-2">
-                {consultationLanguages.map((language) => (
-                  <a
-                    key={language.code}
-                    href={buildConsultationUrl(language.code)}
-                    className="rounded-2xl border border-white/12 bg-white/8 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/14"
-                  >
-                    <span className="block">{language.label}</span>
-                    <span className="mt-1 block text-xs font-medium text-white/56">
-                      Open consultation form
-                    </span>
-                  </a>
-                ))}
+          <div className="order-2 relative mx-auto w-full max-w-[33rem] lg:mt-1">
+            <div className="overflow-hidden rounded-[2rem] border border-white/14 bg-white/10 p-3 shadow-[0_40px_90px_rgba(3,15,30,0.35)]">
+              <div className="relative aspect-[16/11] overflow-hidden rounded-[1.5rem]">
+                <Image
+                  src="/design/hero-header.png"
+                  alt="Happy Doctor visual"
+                  fill
+                  priority
+                  sizes="(max-width: 1024px) 100vw, 48vw"
+                  className="object-cover"
+                />
+              </div>
+            </div>
+
+            <div className="absolute inset-x-4 -bottom-5 rounded-[1.6rem] bg-white p-4 text-slate-900 shadow-2xl shadow-slate-950/25 sm:left-6 sm:right-auto sm:w-[320px]">
+              <div className="flex items-center gap-3">
+                <div className="relative h-14 w-14 overflow-hidden rounded-2xl bg-sky-50">
+                  <Image
+                    src="/design/chatbot-badge.png"
+                    alt="Bodeum assistant icon"
+                    fill
+                    sizes="56px"
+                    className="object-cover"
+                  />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Bodeum + volunteer doctors</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    AI-assisted triage first, doctor-reviewed replies when more support is needed.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="absolute right-3 top-6 hidden rounded-2xl border border-white/16 bg-white/12 px-4 py-3 text-white shadow-lg backdrop-blur md:block">
+              <p className="text-[11px] uppercase tracking-[0.25em] text-white/60">Access</p>
+              <p className="mt-1 text-sm font-semibold">Web + KakaoTalk</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-[1.85rem] border border-white/15 bg-white/10 p-5 backdrop-blur sm:p-6">
+          <div className="max-w-3xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/64">
+              Language support
+            </p>
+            <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <h2 className="text-xl font-semibold sm:text-2xl">Start in your language</h2>
+                <p className="mt-3 text-sm leading-7 text-white/76">
+                  Choose the language you are most comfortable with and we will open the consultation form in that
+                  language first.
+                </p>
+                <p className="mt-2 text-xs leading-6 text-white/56">
+                  Your message can still be translated for our doctors, and translated replies will be returned when
+                  possible.
+                </p>
               </div>
             </div>
           </div>
 
-          <div className="relative overflow-hidden rounded-[2rem] border border-white/14 bg-white/10 p-3 shadow-[0_40px_90px_rgba(3,15,30,0.35)]">
-            <div className="relative aspect-[16/11] overflow-hidden rounded-[1.5rem]">
-              <Image
-                src="/design/hero-header.png"
-                alt="Happy Doctor visual"
-                fill
-                priority
-                sizes="(max-width: 1024px) 100vw, 48vw"
-                className="object-cover"
-              />
-            </div>
+          <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {consultationLanguages.map((language) => (
+              <a
+                key={language.code}
+                href={buildConsultationUrl(language.code)}
+                className="rounded-2xl border border-white/12 bg-white/8 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/14"
+              >
+                <span className="block">{language.label}</span>
+                <span className="mt-1 block text-xs font-medium text-white/56">
+                  Open consultation form
+                </span>
+              </a>
+            ))}
           </div>
         </div>
       </section>

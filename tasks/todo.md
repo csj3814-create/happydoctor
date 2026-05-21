@@ -1575,3 +1575,13 @@
   - Result: `backend/routes/public.js`, `backend/services/uiCopyService.js`에 선택 언어별 시작 화면 번역 복사본 API를 추가해 영어 원문 묶음을 런타임에 번역하고 캐시하도록 정리했다.
   - Result: `frontend/app/app/start/page.tsx`, `frontend/app/lib/start-copy.ts`, `frontend/app/components/WebConsultationStartForm.tsx`에서 페이지 상단, 진행 안내, 폼 라벨, 파일 선택 상태, 하단 안내를 모두 선택 언어 번역본으로 렌더링하도록 연결했다.
   - Result: 라이브 `https://app.happydoctor.kr/start?source=homepage&lang=en&inputLanguage=vi` HTML 기준 `Bắt đầu tư vấn trực tuyến`, `Bạn có thể viết vào Tiếng Việt.`, `Chọn tập tin` 등 베트남어 문구가 시작 화면 전반에 반영된 것을 확인했다.
+
+- [x] Stage 112 English homepage hero rebalance (2026-05-21)
+  - 영어 홈페이지 히어로에서 왼쪽 텍스트 스택이 너무 길어 오른쪽 비주얼 카드가 첫 화면 아래로 밀리고, 로고 중심 비주얼이 한쪽에만 떠 보이는 균형 문제를 수정한다.
+  - `Language support` 카드를 히어로 본문 아래 별도 전폭 섹션으로 내리고, 메인 2열은 `미션 + CTA`와 `비주얼 구성`만 남겨 첫 화면 집중도를 높인다.
+  - 오른쪽 비주얼에는 한국어 홈에서 검증된 방식처럼 보조 오버레이 카드와 접근성 칩을 추가해 단일 이미지 카드보다 풍성한 구도로 재구성한다.
+  - Verification: `frontend/homepage npm run verify:ci`, `https://happydoctor.kr/en` 데스크톱/모바일 렌더 확인.
+  - Result: `frontend/homepage/app/en/page.tsx`에서 메인 히어로를 `items-start` 2열로 재배치하고, 언어 지원 카드를 히어로 아래 전폭 섹션으로 분리해 첫 화면에서 미션/CTA와 우측 비주얼만 남도록 정리했다.
+  - Result: 우측 비주얼에 `Bodeum + volunteer doctors` 오버레이 카드와 `Web + KakaoTalk` 접근 칩을 추가해, 단일 로고 이미지처럼 보이던 구도를 보조 정보가 있는 시각 구성으로 바꿨다.
+  - Result: 언어 지원 섹션 설명을 현재 제품 동작에 맞게 갱신해, 선택한 언어로 상담 폼이 먼저 열리고 필요한 경우 의료진용 번역과 번역 답변이 이어진다는 내용으로 정리했다.
+  - Result: 라이브 `https://happydoctor.kr/en`에서 `1920x1080`, `1440x900`, `390x844` 기준으로 히어로 균형을 확인했고, `Tiếng Việt` 카드 클릭 시 `https://app.happydoctor.kr/start?source=homepage&lang=en&inputLanguage=vi`로 이동하는 것도 검증했다.
