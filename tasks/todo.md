@@ -1592,3 +1592,13 @@
   - Verification: `frontend/homepage npm run verify:ci`, `https://happydoctor.kr/en` 태블릿/모바일 렌더 확인.
   - Result: `frontend/homepage/app/en/page.tsx`에서 미션 컬럼을 `lg` 미만 구간에만 `items-center`와 `text-center`로 바꾸고, CTA 묶음도 같은 구간에서 가운데 정렬되도록 조정했다.
   - Result: 라이브 `https://happydoctor.kr/en`에서 `960x1023`, `390x844` 기준으로 미션 라벨, 헤드라인, 설명, CTA가 모두 가운데 축으로 정렬된 것을 확인했다.
+
+- [x] Stage 114 선택 언어 시작 화면 정적 번역 fallback 보강 (2026-05-21)
+  - 일본어 등 일부 선택 언어에서 시작 화면 UI 번역 API가 실패해 영어로 fallback 되는 문제를 재현하고 원인을 정리한다.
+  - 환자 앱 시작 화면은 홈페이지 카드에 노출한 언어들에 대해 프런트 내부의 안정적인 번역 사전을 우선 사용하고, 런타임 번역 API는 보조 경로로만 남긴다.
+  - 일본어를 포함한 선택 언어에서 제목, 진행 안내, 폼 라벨, 파일 선택 문구, 하단 보조 문구가 전부 해당 언어로 보이는지 라이브에서 다시 검증한다.
+  - Verification: `frontend/app npm run verify:ci`, 라이브 `https://app.happydoctor.kr/start?source=homepage&lang=en&inputLanguage=ja` 및 대표 언어 샘플 확인.
+  - Result: 라이브 `/api/public/ui-copy/start?lang=ja`는 실패하지만 `vi`, `es`, `tr` 등 일부 언어만 성공하는 불안정 상태를 재현했고, 시작 화면 번역을 런타임 백엔드 API에만 의존하면 언어별로 영어 fallback이 섞일 수 있음을 확인했다.
+  - Result: `frontend/app/lib/start-copy-localized.ts`에 홈페이지 카드 20개 언어용 시작 화면 번역 사전을 추가하고, `frontend/app/lib/start-copy.ts`가 이 내장 사전을 먼저 읽도록 바꿔 선택 언어 화면이 백엔드 번역 상태와 무관하게 안정적으로 렌더링되게 했다.
+  - Result: 로컬 `http://127.0.0.1:3100/start?source=homepage&lang=en&inputLanguage=ja`와 라이브 `https://app.happydoctor.kr/start?source=homepage&lang=en&inputLanguage=ja`에서 `ウェブで相談を始める`, `ご自身の言葉で書いてください`, `ファイルを選択` 문구를 직접 확인했다.
+  - Result: 추가 라이브 점검으로 `fr`, `ar` 선택 언어 화면도 제목, 진행 안내, 파일 선택 문구가 모두 현지 언어로 노출되는 것을 브라우저로 확인했다.
