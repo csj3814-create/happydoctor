@@ -9,6 +9,7 @@ const FOLLOW_UP_SERVICE_PATH = path.resolve(__dirname, '../services/followUpServ
 const NOTIFY_SERVICE_PATH = path.resolve(__dirname, '../services/notifyService.js');
 const LLM_SERVICE_PATH = path.resolve(__dirname, '../services/llmService.js');
 const TRANSLATION_SERVICE_PATH = path.resolve(__dirname, '../services/translationService.js');
+const UI_COPY_SERVICE_PATH = path.resolve(__dirname, '../services/uiCopyService.js');
 const CONFIG_PATH = path.resolve(__dirname, '../config.js');
 const PUBLIC_ROUTE_PATH = path.resolve(__dirname, '../routes/public.js');
 const PORTAL_ROUTE_PATH = path.resolve(__dirname, '../routes/portal.js');
@@ -126,6 +127,109 @@ function createTranslationServiceMock(overrides = {}) {
     ...overrides,
   };
 }
+
+test('public start UI copy route returns the translated bundle for the selected language', { concurrency: false }, async () => {
+  const routeModule = loadRouteWithMocks(PUBLIC_ROUTE_PATH, {
+    [DB_SERVICE_PATH]: {},
+    [FOLLOW_UP_SERVICE_PATH]: {
+      cancelFollowUp: async () => {},
+      scheduleFollowUpWithOptions: async () => {},
+    },
+    [LLM_SERVICE_PATH]: {
+      analyzeAndRouteTriage: async () => {
+        throw new Error('not used');
+      },
+    },
+    [TRANSLATION_SERVICE_PATH]: createTranslationServiceMock(),
+    [UI_COPY_SERVICE_PATH]: {
+      getLocalizedStartUiCopy: async (language) => ({
+        page: {
+          eyebrow: 'Happy Doctor Start',
+          title: 'Bat dau tu van truc tuyen',
+          description: 'translated description',
+          homeLabel: 'Trang chu tieng Anh',
+          statusLabel: 'Kiem tra trang thai',
+          homeHref: 'https://happydoctor.kr/en',
+          heroEyebrow: 'Care Access',
+          heroTitle: 'translated hero title',
+          heroBody: 'translated hero body',
+          infoTitle: 'translated info title',
+          infoItems: ['item 1', 'item 2', 'item 3'],
+          supportEyebrow: 'How this works',
+          supportTitle: 'translated support title',
+          supportItems: ['support 1', 'support 2', 'support 3'],
+        },
+        form: {
+          recentEyebrow: 'recent eyebrow',
+          recentBody: 'recent {code}',
+          recentLink: 'recent link',
+          restoredDraft: 'restored draft',
+          languageHintEyebrow: 'language hint eyebrow',
+          languageHintTitle: 'title {language}',
+          languageHintBody: 'body {language}',
+          phoneConsentRequired: 'phone required',
+          phoneConsentMismatch: 'phone mismatch',
+          submitError: 'submit error',
+          ageLabel: 'age label',
+          agePlaceholder: 'age placeholder',
+          genderLabel: 'gender label',
+          genderPlaceholder: 'gender placeholder',
+          genderOptions: [{ value: 'male', label: 'Nam' }],
+          chiefComplaintLabel: 'chief label',
+          chiefComplaintPlaceholder: 'chief placeholder',
+          onsetLabel: 'onset label',
+          onsetPlaceholder: 'onset placeholder',
+          nrsLabel: 'nrs label',
+          nrsUnknown: 'nrs unknown',
+          symptomDetailLabel: 'detail label',
+          symptomDetailPlaceholder: 'detail placeholder',
+          associatedLabel: 'associated label',
+          associatedPlaceholder: 'associated placeholder',
+          historyLabel: 'history label',
+          historyPlaceholder: 'history placeholder',
+          imageLabel: 'image label',
+          imageDescription: 'image description',
+          imageChooseLabel: 'image choose',
+          imageEmptyLabel: 'image empty',
+          imageSelectedLabel: '{count} selected',
+          notificationTitle: 'notification title',
+          notificationDescription: 'notification description',
+          phoneLabel: 'phone label',
+          phonePlaceholder: 'phone placeholder',
+          policyNote: 'policy note',
+          submitLoading: 'submit loading',
+          submitIdle: 'submit idle',
+          englishSupportNote: 'translated support note',
+        },
+        requestedLanguage: language,
+      }),
+    },
+    [NOTIFY_SERVICE_PATH]: {
+      enqueueDoctorNotification: async () => true,
+      clearDoctorNotifications: async () => {},
+      clearPatientChannelPushes: async () => {},
+      clearPatientSmsNotifications: async () => {},
+    },
+    [CONFIG_PATH]: {
+      appSiteUrl: 'https://app.happydoctor.kr',
+    },
+  });
+
+  const server = await startServer(routeModule.router, '/api/public');
+
+  try {
+    const response = await getJson(`${server.baseUrl}/ui-copy/start?lang=vi`);
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.ok, true);
+    assert.equal(response.body.lang, 'vi');
+    assert.equal(response.body.copy.page.title, 'Bat dau tu van truc tuyen');
+    assert.equal(response.body.copy.form.languageHintTitle, 'title {language}');
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});
 
 test('public create route stores an optional consented notification phone for web consultations', { concurrency: false }, async () => {
   const calls = [];

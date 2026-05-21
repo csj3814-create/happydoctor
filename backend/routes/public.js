@@ -14,6 +14,7 @@ const {
   translatePatientDataToKorean,
   translateText,
 } = require('../services/translationService');
+const { getLocalizedStartUiCopy } = require('../services/uiCopyService');
 const {
   enqueueDoctorNotification,
   clearDoctorNotifications,
@@ -225,6 +226,26 @@ function getTranslationFailureMessage(uiLanguage) {
 
   return '자동 번역을 준비하지 못했습니다. 영어 또는 한국어로 다시 입력해 주세요.';
 }
+
+router.get('/ui-copy/start', async (req, res) => {
+  const targetLanguage = sanitizeSingleLine(req.query?.lang, 16).toLowerCase();
+
+  if (!targetLanguage) {
+    return res.status(400).json({ error: 'Language is required.' });
+  }
+
+  try {
+    const copy = await getLocalizedStartUiCopy(targetLanguage);
+    return res.json({
+      ok: true,
+      lang: targetLanguage,
+      copy,
+    });
+  } catch (error) {
+    console.error('[Public Start UI Copy Translation Error]', error);
+    return res.status(503).json({ error: 'Localized UI copy is unavailable right now.' });
+  }
+});
 
 function buildDoctorFacingPatientData(patientData, translatedPatientDataKo = null) {
   const translated = translatedPatientDataKo || {};

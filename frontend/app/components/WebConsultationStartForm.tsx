@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import type { PublicConsultationCreateResponse } from '@/lib/status'
+import type { StartFormCopy } from '@/lib/start-copy'
 import {
   ActiveConsultationSession,
   WebConsultationDraft,
@@ -19,6 +20,7 @@ type WebConsultationStartFormProps = {
   entrySurface: string
   uiLanguage: UiLanguage
   inputLanguageLabel?: string | null
+  copyOverride?: StartFormCopy | null
 }
 
 type ConsultationFormState = WebConsultationDraft
@@ -43,8 +45,8 @@ const copyByLanguage = {
     recentLink: '최근 상담 이어보기',
     restoredDraft: '방금 입력하던 내용을 다시 불러왔습니다. 이어서 작성한 뒤 상담을 시작할 수 있습니다.',
     languageHintEyebrow: '언어 안내',
-    languageHintTitle: (label: string) => `${label} 로 적어도 괜찮습니다.`,
-    languageHintBody: (label: string) => `${label} 로 입력한 내용은 자동으로 감지되어 의료진에게는 한국어 번역으로 전달되고, 가능한 경우 같은 언어로 답변이 돌아갑니다.`,
+    languageHintTitle: '{language} 로 적어도 괜찮습니다.',
+    languageHintBody: '{language} 로 입력한 내용은 자동으로 감지되어 의료진에게는 한국어 번역으로 전달되고, 가능한 경우 같은 언어로 답변이 돌아갑니다.',
     phoneConsentRequired: '답변 알림을 받으려면 휴대폰 번호를 입력해 주세요.',
     phoneConsentMismatch: '답변 알림 연락처는 동의한 경우에만 저장할 수 있습니다.',
     submitError: '상담을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.',
@@ -74,7 +76,7 @@ const copyByLanguage = {
     imageDescription: '상처, 발진, 복용 중인 약 포장처럼 사진이 있으면 처음 상담을 더 정확하게 이어갈 수 있습니다.\n최대 3장, 장당 10MB 이하 사진을 올릴 수 있습니다.',
     imageChooseLabel: '파일 선택',
     imageEmptyLabel: '선택된 파일 없음',
-    imageSelectedLabel: (count: number) => `${count}개 파일 선택됨`,
+    imageSelectedLabel: '{count}개 파일 선택됨',
     notificationTitle: '의료진 답변 알림 연락처 남기기',
     notificationDescription: '선택 사항입니다. 동의한 경우에만 의료진 답변 알림 연락처로 사용됩니다.',
     phoneLabel: '휴대폰 번호',
@@ -82,6 +84,7 @@ const copyByLanguage = {
     policyNote: '응급 상황이라고 느껴지면 신고나 119 또는 가까운 응급실 이용이 우선입니다. 해피닥터는 응급실을 대신하는 서비스가 아니라 의료가 멀게 느껴지는 분들이 온라인으로 먼저 도움을 청할 수 있게 돕는 상담 서비스입니다.',
     submitLoading: '보듬이가 내용을 정리하고 있습니다...',
     submitIdle: '웹으로 상담 시작',
+    englishSupportNote: '한국어와 영어 UI는 완전 지원됩니다. 다른 언어는 가능한 범위에서 자동 번역을 시도합니다.',
   },
   en: {
     recentEyebrow: 'Recent consultation',
@@ -89,8 +92,8 @@ const copyByLanguage = {
     recentLink: 'Continue recent consultation',
     restoredDraft: 'We restored the details you were typing so you can continue and submit the consultation.',
     languageHintEyebrow: 'Language support',
-    languageHintTitle: (label: string) => `You can write in ${label}.`,
-    languageHintBody: (label: string) => `We will try to detect ${label} input automatically, translate it into Korean for our doctors, and send a translated reply back in the same language when possible.`,
+    languageHintTitle: 'You can write in {language}.',
+    languageHintBody: 'We will try to detect {language} input automatically, translate it into Korean for our doctors, and send a translated reply back in the same language when possible.',
     phoneConsentRequired: 'Please enter a phone number if you want reply notifications.',
     phoneConsentMismatch: 'We only save a reply notification contact when you opt in.',
     submitError: 'We could not start the consultation right now. Please try again shortly.',
@@ -120,7 +123,7 @@ const copyByLanguage = {
     imageDescription: 'If you have photos such as a rash, wound, or medicine package, they can help us understand your situation better.\nYou can upload up to 3 images, up to 10MB each.',
     imageChooseLabel: 'Choose files',
     imageEmptyLabel: 'No file selected',
-    imageSelectedLabel: (count: number) => `${count} file${count === 1 ? '' : 's'} selected`,
+    imageSelectedLabel: '{count} files selected',
     notificationTitle: 'Leave a phone number for reply alerts',
     notificationDescription: 'Optional. We only use this contact if you opt in to receive a reply alert.',
     phoneLabel: 'Phone number',
@@ -128,6 +131,7 @@ const copyByLanguage = {
     policyNote: 'If this feels urgent, please use emergency services first. Happy Doctor does not replace emergency care. It is an online support service for people who need to ask for help before healthcare becomes harder to reach.',
     submitLoading: 'Bodeum is organizing your consultation...',
     submitIdle: 'Start consultation on the web',
+    englishSupportNote: 'Korean and English UI are fully supported. Other languages are accepted on a best-effort basis and may be translated automatically for our doctors.',
   },
 } as const
 
@@ -183,12 +187,19 @@ function getSelectionLabel(
   return selectedLabel(files.length)
 }
 
+function formatTemplate(template: string, replacements: Record<string, string | number | null | undefined>) {
+  return Object.entries(replacements).reduce((current, [key, value]) => {
+    return current.replaceAll(`{${key}}`, value == null ? '' : String(value))
+  }, template)
+}
+
 export default function WebConsultationStartForm({
   entrySurface,
   uiLanguage,
   inputLanguageLabel,
+  copyOverride = null,
 }: WebConsultationStartFormProps) {
-  const copy = copyByLanguage[uiLanguage]
+  const copy = copyOverride || copyByLanguage[uiLanguage]
   const [formState, setFormState] = useState(INITIAL_FORM_STATE)
   const [draftReady, setDraftReady] = useState(false)
   const [restoredDraft, setRestoredDraft] = useState(false)
@@ -337,10 +348,10 @@ export default function WebConsultationStartForm({
               {copy.languageHintEyebrow}
             </p>
             <p className="mt-2 text-sm font-semibold leading-7">
-              {copy.languageHintTitle(inputLanguageLabel)}
+              {formatTemplate(copy.languageHintTitle, { language: inputLanguageLabel })}
             </p>
             <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
-              {copy.languageHintBody(inputLanguageLabel)}
+              {formatTemplate(copy.languageHintBody, { language: inputLanguageLabel })}
             </p>
           </div>
         ) : null}
@@ -466,7 +477,11 @@ export default function WebConsultationStartForm({
             <LocalizedFilePicker
               buttonLabel={copy.imageChooseLabel}
               emptyLabel={copy.imageEmptyLabel}
-              selectedLabel={getSelectionLabel(files, copy.imageEmptyLabel, copy.imageSelectedLabel)}
+              selectedLabel={getSelectionLabel(
+                files,
+                copy.imageEmptyLabel,
+                (count) => formatTemplate(copy.imageSelectedLabel, { count }),
+              )}
               accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
               multiple
               disabled={submitting}
@@ -556,8 +571,7 @@ export default function WebConsultationStartForm({
 
         {isEnglishUiLanguage(uiLanguage) ? (
           <p className="mt-4 text-xs leading-6 text-[var(--muted)]">
-            Korean and English UI are fully supported. Other languages are accepted on a best-effort
-            basis and may be translated automatically for our doctors.
+            {copy.englishSupportNote}
           </p>
         ) : null}
       </form>
