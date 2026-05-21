@@ -7,7 +7,39 @@ type StartPageProps = {
   searchParams: Promise<{
     source?: string
     lang?: string
+    inputLanguage?: string
   }>
+}
+
+const consultationLanguageOptions = [
+  { code: 'es', label: 'Español' },
+  { code: 'vi', label: 'Tiếng Việt' },
+  { code: 'zh-CN', label: '简体中文' },
+  { code: 'zh-TW', label: '繁體中文' },
+  { code: 'ja', label: '日本語' },
+  { code: 'mn', label: 'Монгол' },
+  { code: 'ru', label: 'Русский' },
+  { code: 'th', label: 'ไทย' },
+  { code: 'tl', label: 'Filipino' },
+  { code: 'ne', label: 'नेपाली' },
+  { code: 'km', label: 'ខ្មែរ' },
+  { code: 'id', label: 'Bahasa Indonesia' },
+  { code: 'uz', label: 'O‘zbek' },
+  { code: 'ar', label: 'العربية' },
+  { code: 'fr', label: 'Français' },
+  { code: 'de', label: 'Deutsch' },
+  { code: 'pt', label: 'Português' },
+  { code: 'it', label: 'Italiano' },
+  { code: 'hi', label: 'हिन्दी' },
+  { code: 'tr', label: 'Türkçe' },
+] as const
+
+function getInputLanguageLabel(value?: string) {
+  const trimmed = value?.trim()
+  if (!trimmed) return null
+
+  const matched = consultationLanguageOptions.find((option) => option.code.toLowerCase() === trimmed.toLowerCase())
+  return matched?.label || null
 }
 
 function normalizeEntrySurface(value?: string) {
@@ -86,6 +118,7 @@ export default async function StartPage({ searchParams }: StartPageProps) {
   const resolvedSearchParams = await searchParams
   const entrySurface = normalizeEntrySurface(resolvedSearchParams.source)
   const uiLanguage = normalizeUiLanguage(resolvedSearchParams.lang)
+  const inputLanguageLabel = getInputLanguageLabel(resolvedSearchParams.inputLanguage)
   const copy = copyByLanguage[uiLanguage]
 
   return (
@@ -163,7 +196,11 @@ export default async function StartPage({ searchParams }: StartPageProps) {
         </section>
 
         <section className="mt-8">
-          <WebConsultationStartForm entrySurface={entrySurface} uiLanguage={uiLanguage} />
+          <WebConsultationStartForm
+            entrySurface={entrySurface}
+            uiLanguage={uiLanguage}
+            inputLanguageLabel={inputLanguageLabel}
+          />
         </section>
       </div>
     </main>

@@ -17,6 +17,7 @@ import { UiLanguage, isEnglishUiLanguage, saveUiLanguage, withUiLanguage } from 
 type WebConsultationStartFormProps = {
   entrySurface: string
   uiLanguage: UiLanguage
+  inputLanguageLabel?: string | null
 }
 
 type ConsultationFormState = WebConsultationDraft
@@ -40,6 +41,9 @@ const copyByLanguage = {
     recentBody: '최근 시작한 상담은 1시간 동안 유지됩니다.\n코드 {code} 로 바로 이어서 확인할 수 있습니다.',
     recentLink: '최근 상담 이어보기',
     restoredDraft: '방금 입력하던 내용을 다시 불러왔습니다. 이어서 작성한 뒤 상담을 시작할 수 있습니다.',
+    languageHintEyebrow: '언어 안내',
+    languageHintTitle: (label: string) => `${label} 로 적어도 괜찮습니다.`,
+    languageHintBody: (label: string) => `${label} 로 입력한 내용은 자동으로 감지되어 의료진에게는 한국어 번역으로 전달되고, 가능한 경우 같은 언어로 답변이 돌아갑니다.`,
     phoneConsentRequired: '답변 알림을 받으려면 휴대폰 번호를 입력해 주세요.',
     phoneConsentMismatch: '답변 알림 연락처는 동의한 경우에만 저장할 수 있습니다.',
     submitError: '상담을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.',
@@ -80,6 +84,9 @@ const copyByLanguage = {
     recentBody: 'Your most recent consultation stays available for one hour.\nYou can continue with code {code}.',
     recentLink: 'Continue recent consultation',
     restoredDraft: 'We restored the details you were typing so you can continue and submit the consultation.',
+    languageHintEyebrow: 'Language support',
+    languageHintTitle: (label: string) => `You can write in ${label}.`,
+    languageHintBody: (label: string) => `We will try to detect ${label} input automatically, translate it into Korean for our doctors, and send a translated reply back in the same language when possible.`,
     phoneConsentRequired: 'Please enter a phone number if you want reply notifications.',
     phoneConsentMismatch: 'We only save a reply notification contact when you opt in.',
     submitError: 'We could not start the consultation right now. Please try again shortly.',
@@ -162,6 +169,7 @@ function localizeStatusUrl(statusUrl: string, uiLanguage: UiLanguage) {
 export default function WebConsultationStartForm({
   entrySurface,
   uiLanguage,
+  inputLanguageLabel,
 }: WebConsultationStartFormProps) {
   const copy = copyByLanguage[uiLanguage]
   const [formState, setFormState] = useState(INITIAL_FORM_STATE)
@@ -305,6 +313,20 @@ export default function WebConsultationStartForm({
             {copy.restoredDraft}
           </div>
         )}
+
+        {inputLanguageLabel ? (
+          <div className="mb-5 rounded-[1.4rem] border border-[#c9dcff] bg-[#f4f8ff] px-4 py-4 text-[var(--ink)]">
+            <p className="display-face text-xs font-semibold uppercase tracking-[0.18em] text-[var(--blue)]">
+              {copy.languageHintEyebrow}
+            </p>
+            <p className="mt-2 text-sm font-semibold leading-7">
+              {copy.languageHintTitle(inputLanguageLabel)}
+            </p>
+            <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
+              {copy.languageHintBody(inputLanguageLabel)}
+            </p>
+          </div>
+        ) : null}
 
         <div className="grid gap-5 md:grid-cols-2">
           <label className="block">

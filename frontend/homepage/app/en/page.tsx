@@ -4,9 +4,8 @@ import Image from 'next/image'
 const KAKAO_CHAT_URL = 'https://pf.kakao.com/_PxaTxhX/chat'
 const WEB_START_URL = 'https://app.happydoctor.kr/start?source=homepage&lang=en'
 const KO_HOME_URL = '/ko'
-const ENGLISH_HOME_ABSOLUTE_URL = 'https://happydoctor.kr/en'
 
-const autoTranslationLanguages = [
+const consultationLanguages = [
   { code: 'es', label: 'Español' },
   { code: 'vi', label: 'Tiếng Việt' },
   { code: 'zh-CN', label: '简体中文' },
@@ -29,11 +28,9 @@ const autoTranslationLanguages = [
   { code: 'tr', label: 'Türkçe' },
 ]
 
-function buildGoogleTranslateUrl(languageCode: string) {
-  const url = new URL('https://translate.google.com/translate')
-  url.searchParams.set('sl', 'en')
-  url.searchParams.set('tl', languageCode)
-  url.searchParams.set('u', ENGLISH_HOME_ABSOLUTE_URL)
+function buildConsultationUrl(languageCode: string) {
+  const url = new URL(WEB_START_URL)
+  url.searchParams.set('inputLanguage', languageCode)
   return url.toString()
 }
 
@@ -115,24 +112,27 @@ export default function EnglishHomepage() {
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/64">
                 Language support
               </p>
-              <h2 className="mt-3 text-xl font-semibold">View this page in your language</h2>
+              <h2 className="mt-3 text-xl font-semibold">Start in your language</h2>
               <p className="mt-3 text-sm leading-7 text-white/76">
-                English is our official international homepage. If you need another language, you can open an
-                automatically translated view powered by Google Translate.
+                Some Google webpage translation routes are unavailable in certain regions. Instead of sending you to
+                a broken translation page, we can take you straight to the consultation form where you may type in
+                your own language.
               </p>
               <p className="mt-2 text-xs leading-6 text-white/56">
-                Automatic translations are provided as accessibility support and may not perfectly reflect medical nuance.
+                The consultation UI will stay in English, but our system will try to translate your message for our
+                doctors and return a translated reply when possible.
               </p>
               <div className="mt-5 grid gap-2 sm:grid-cols-2">
-                {autoTranslationLanguages.map((language) => (
+                {consultationLanguages.map((language) => (
                   <a
                     key={language.code}
-                    href={buildGoogleTranslateUrl(language.code)}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href={buildConsultationUrl(language.code)}
                     className="rounded-2xl border border-white/12 bg-white/8 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/14"
                   >
-                    {language.label}
+                    <span className="block">{language.label}</span>
+                    <span className="mt-1 block text-xs font-medium text-white/56">
+                      Open consultation form
+                    </span>
                   </a>
                 ))}
               </div>

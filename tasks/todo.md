@@ -238,13 +238,13 @@
 ## 오늘 우선 작업 정리 (2026.04.09)
 
 ### 실제 우선순위
-- [ ] Render 서비스 Events를 다시 확인한다.
-- [ ] `Deploy latest commit` 또는 `Clear build cache & deploy`를 재시도한다.
-- [ ] `https://happydoctor.onrender.com/api/version`가 `eda0c36` 이상으로 올라왔는지 확인한다.
-- [ ] 환자 앱 `/status` 실제 브라우저 화면에서 사진 업로드 UI를 다시 확인한다.
-- [ ] 포털 상세 화면에서 같은 이미지가 보이는지 확인한다.
-- [ ] 필요하면 Render 환경변수 `FIREBASE_STORAGE_BUCKET` 값을 다시 점검한다.
-- [ ] 백엔드 반영 뒤 포털 `follow-up` 탭이 실제 데이터를 제대로 보여주는지 확인한다.
+- [x] Render 서비스 Events를 다시 확인한다.
+- [x] `Deploy latest commit` 또는 `Clear build cache & deploy`를 재시도한다.
+- [x] `https://happydoctor.onrender.com/api/version`가 `eda0c36` 이상으로 올라왔는지 확인한다.
+- [x] 환자 앱 `/status` 실제 브라우저 화면에서 사진 업로드 UI를 다시 확인한다.
+- [x] 포털 상세 화면에서 같은 이미지가 보이는지 확인한다.
+- [x] 필요하면 Render 환경변수 `FIREBASE_STORAGE_BUCKET` 값을 다시 점검한다.
+- [x] 백엔드 반영 뒤 포털 `follow-up` 탭이 실제 데이터를 제대로 보여주는지 확인한다.
 
 ### 메모
 - [x] Render 자동 배포 브랜치는 최신 handoff 기준 이미 `main`이다.
@@ -1300,7 +1300,7 @@
 - [x] `frontend/app`: `npm run build`
 - [x] `frontend/portal`: `npm run build`
 - [x] 라이브 API 기준 사진 업로드 생성/조회/서명 URL/종료/정리까지 확인
-- [ ] Render 최신 리비전 반영과 포털 인증 화면 시각 검증은 아직 남음
+- [x] 2026-04-10 재배포 성공, 사진 업로드 정상, 포털 `follow-up` 데이터 확인 완료를 사용자 기준으로 재확인했다.
 - [x] Stage 75 public status flow regression fix shipped on 2026-04-09
   - Restored the initial Bodeum reply on the status page by persisting `replyToPatient` in the active web consultation session and exposing `chatbotReply` from the public status API.
   - Kept the Bodeum reply card above the waiting-doctor status card, including the first redirected load before the status payload finishes loading.
@@ -1445,3 +1445,118 @@
   - Result: `backend/services/patientSmsService.js` now runs the SOLAPI-backed SMS worker loop at server startup and safely disables itself when SMS provider secrets are absent.
   - Result: `backend/routes/portal.js`, `backend/routes/public.js`, and `backend/routes/kakaoWebhook.js` now clear stale doctor-reply SMS reminders on reply/view/follow-up/close flows, and the portal reply route falls back to SMS only when no Kakao room delivery was queued.
   - Result: `backend/tests/notifyService.patientPush.test.js`, `backend/tests/patientSmsService.test.js`, `backend/tests/publicPortal.routes.integration.test.js`, and `backend/tests/config.test.js` now lock the SMS enqueue, no-config, worker, and fallback reply contracts in place.
+
+- [x] Stage 98 홍보 실행 문서 패키지 작성 (2026-04-17)
+  - 해피닥터를 널리 알리기 위한 채널 우선순위, 대상별 메시지, 30일 실행 순서를 한 문서로 정리한다.
+  - 기관 제휴용 원페이지 소개서 초안을 만들어 가족센터, 다누리 연계 기관, 외국인주민센터, 무료진료소, 노숙인 지원기관에 바로 보낼 수 있게 한다.
+  - 언론사·후원자용 소개문 초안을 만들어 보도 제안과 후원 미팅 소개에 바로 쓸 수 있게 한다.
+  - Verification: `docs/happydoctor_growth_outreach_plan_2026-04-17.md`, `docs/happydoctor_partner_outreach_onepager_2026-04-17.md`, `docs/happydoctor_press_support_intro_2026-04-17.md` 내용 재검토.
+  - Result: `docs/happydoctor_growth_outreach_plan_2026-04-17.md`에 기관 제휴 중심의 채널 우선순위, 대상별 메시지, 30일 실행 순서, KPI, 표현 주의사항을 정리했다.
+  - Result: `docs/happydoctor_partner_outreach_onepager_2026-04-17.md`에 기관 제휴용 소개 문안, 제안 메일, 실무자 전달 문구를 넣어 바로 발송 가능한 초안으로 만들었다.
+  - Result: `docs/happydoctor_press_support_intro_2026-04-17.md`에 언론·후원자용 소개문, 메일 제목/본문, 인터뷰 포인트를 정리했다.
+  - Result: 라이브 `https://happydoctor.onrender.com/api/stats`를 확인해 2026-04-17 기준 누적 상담 390건, 의료진 직접 회신 328건을 문서에 반영했다.
+
+- [x] Stage 99 1차 제휴 기관 리스트업 및 발송 초안 작성 (2026-04-17)
+  - 가족센터, 외국인주민센터, 무료진료소, 노숙인 지원기관, 장애인·농아인 지원기관 중심으로 1차 제휴 대상 20곳을 정리한다.
+  - 각 기관의 공식 사이트 기준 기본 정보, 추천 이유, 1차 연락 경로를 한 문서에 정리한다.
+  - 기관 유형별 또는 기관별 1차 발송 메일 초안을 만들어 바로 복붙해 보낼 수 있게 한다.
+  - Verification: 공식 사이트 기준 정보 재확인, `docs/happydoctor_partner_target_list_2026-04-17.md`, `docs/happydoctor_partner_firstwave_emails_2026-04-17.md` 내용 재검토.
+  - Result: `docs/happydoctor_partner_target_list_2026-04-17.md`에 1차 제휴 대상 20곳을 A/B 우선순위와 추천 이유, 공식 경로, 1차 연락 경로, 발송 순서까지 포함해 정리했다.
+  - Result: `docs/happydoctor_partner_firstwave_emails_2026-04-17.md`에 기관별 제목/첫 문장, 유형별 완성형 메일, 후속 메일, 통화 후 메모 문구를 넣어 바로 발송 가능한 초안으로 만들었다.
+  - Result: 두 문서 모두 발송 직전 공식 사이트 기준 연락처 재확인 원칙을 명시해 실무 사용 시 오발송 위험을 줄였다.
+
+- [x] Stage 100 A우선순위 8개 기관 실제 발송본 작성 (2026-04-17)
+  - 서울외국인주민센터, 서울글로벌센터, 동부외국인주민센터, 영등포구 가족센터, 성북구 가족센터, 요셉의원, 라파엘클리닉, 시립서대문농아인복지관 대상의 실제 발송본을 완성한다.
+  - 각 기관 공식 사이트 기준 대표 연락 경로와 담당 톤을 다시 확인한 뒤 제목, 수신처 메모, 본문, 후속 연락 포인트를 기관별로 고정한다.
+  - 실무자가 그대로 복붙해 메일과 전화 후속에 쓸 수 있도록 한 문서로 정리한다.
+  - Verification: 공식 사이트 기준 A우선순위 8곳 정보 재확인, `docs/happydoctor_partner_priority8_sendpack_2026-04-17.md` 내용 재검토.
+  - Result: `docs/happydoctor_partner_priority8_sendpack_2026-04-17.md`에 A우선순위 8개 기관별 공개 연락처, 수신처 메모, 실제 제목, 실제 본문, 후속 전화 멘트를 묶은 발송 패키지를 작성했다.
+  - Result: 서울외국인주민센터, 서울글로벌센터, 영등포구 가족센터, 성북구 가족센터, 요셉의원, 라파엘클리닉은 공식 공개 연락 경로 기준 메일 우선 발송 흐름으로 정리했다.
+  - Result: 동부외국인주민센터와 시립서대문농아인복지관은 공개 메일 노출 신뢰도를 함께 메모하고, 메일과 대표전화 후속을 병행하는 보수적 발송 방식으로 정리했다.
+
+- [x] Stage 101 승인 대기 1차 발송 큐 정리 (2026-04-17)
+  - 사용자 승인 전에는 외부 메일을 실제 발송하지 않는 원칙을 명시한다.
+  - 오늘 바로 검토할 수 있는 1차 발송 후보 4곳을 추려 수신처, 제목, 첨부물, 발송 방식, 승인 상태를 한 문서에 정리한다.
+  - 승인되면 바로 보낼 수 있도록 발송 순서와 후속 일정도 같이 정리한다.
+  - Verification: `docs/happydoctor_partner_approval_queue_2026-04-17.md` 내용 재검토.
+  - Result: `docs/happydoctor_partner_approval_queue_2026-04-17.md`에 승인 전 외부 발송 금지 원칙과 승인 대기 상태를 명시했다.
+  - Result: 오늘 바로 검토할 1차 발송 후보를 서울외국인주민센터, 서울글로벌센터, 영등포구 가족센터, 요셉의원 4곳으로 추려 수신처, 제목, 첨부물, 후속 일정까지 정리했다.
+  - Result: 사용자 승인 문구 예시를 같이 적어 두어 승인 후 즉시 발송 단계로 넘어갈 수 있게 만들었다.
+
+- [x] Stage 102 happydoctor.kr 무료 대표메일 포워딩 준비 (2026-05-19)
+  - `Forward Email` 무료 플랜 기준으로 `president@happydoctor.kr` 대표메일 포워딩 구성을 정리한다.
+  - Vercel DNS에 넣을 MX/TXT 레코드와 Gmail `Send mail as` 연동 흐름을 공식 문서 기준으로 확인한다.
+  - 실제 수신 Gmail 주소만 정해지면 바로 적용할 수 있도록 설정 문서와 체크리스트를 만든다.
+  - Verification: `docs/happydoctor_forward_email_setup_2026-05-19.md` 내용 재검토, 현재 `happydoctor.kr` MX 상태 확인.
+  - Result: `docs/happydoctor_forward_email_setup_2026-05-19.md`에 실제 포워딩 주소를 `csj3814@gmail.com`으로 확정하고 Vercel DNS 최종 입력값을 복붙 가능한 형태로 정리했다.
+  - Result: `president@happydoctor.kr -> csj3814@gmail.com` 무료 포워딩 구성을 기준으로 MX 2개, TXT 1개, 권장 SPF 1개를 확정했다.
+
+- [x] Stage 103 happydoctor.kr 대표메일 포워딩 실제 적용 (2026-05-19)
+  - Vercel DNS에 Forward Email용 MX 2개와 TXT 2개를 실제 추가한다.
+  - `president@happydoctor.kr`가 `csj3814@gmail.com`으로 포워딩되도록 최종 구성을 반영한다.
+  - 외부 DNS 조회 기준으로 MX/TXT 응답이 보이는지 검증한다.
+  - Verification: `vercel dns ls happydoctor.kr`, `nslookup -type=mx happydoctor.kr`, `nslookup -type=txt happydoctor.kr`.
+  - Result: `happydoctor.kr`에 `mx1.forwardemail.net`, `mx2.forwardemail.net`, `forward-email=president:csj3814@gmail.com`, `v=spf1 a include:spf.forwardemail.net -all` 레코드를 실제 반영했다.
+  - Result: 외부 `nslookup` 조회 기준으로 MX와 TXT가 모두 응답하는 것을 확인했다.
+  - Result: 실사용 테스트 기준 `president@happydoctor.kr` 수신 메일이 `csj3814@gmail.com`으로 정상 도착하는 것을 확인했다.
+  - Result: 현재 구성은 무료 포워딩이라 답장 발신은 기본적으로 `csj3814@gmail.com` 기준으로 나가며, 수신 목적은 달성했지만 `@happydoctor.kr` 발신 정체성은 별도 설정 또는 정식 메일 호스팅이 필요하다.
+
+- [x] Stage 104 기관 제휴 메일 소개 문안 강화 (2026-05-19)
+  - 기관 제휴 메일에 `행복한 의사` 단체 소개와 `해피닥터 앱` 작동 흐름이 더 분명히 드러나도록 공통 본문을 개정한다.
+  - 실제 발송 패키지와 원페이지 소개서에도 같은 핵심 설명을 반영해 문서 간 메시지를 맞춘다.
+  - 최석재 대표 서명을 발송용 문서에 반영한다.
+  - Verification: `docs/happydoctor_partner_firstwave_emails_2026-04-17.md`, `docs/happydoctor_partner_priority8_sendpack_2026-04-17.md`, `docs/happydoctor_partner_outreach_onepager_2026-04-17.md` 내용 재검토.
+  - Result: `docs/happydoctor_partner_firstwave_emails_2026-04-17.md`에 `행복한 의사 소개`, `해피닥터 앱 설명`, `공통 설명형 본문`을 새로 넣고, 완성형 메일 6종을 같은 구조로 다시 정리했다.
+  - Result: `docs/happydoctor_partner_priority8_sendpack_2026-04-17.md`에 A우선순위 8개 기관 실제 발송본을 `단체 소개 -> 앱 작동 흐름 -> 기관 맞춤 연결` 구조로 개정하고 최석재 대표 서명을 반영했다.
+  - Result: `docs/happydoctor_partner_outreach_onepager_2026-04-17.md`에 `행복한 의사는 어떤 단체인가`, `해피닥터 앱은 어떻게 작동하나`, `이미 쌓아온 협력 기반` 섹션을 추가해 기관 설명 자료를 보강했다.
+  - Result: 원페이지 운영 수치는 2026-05-19 라이브 확인값 기준 `누적 상담 393건`, `의료진 직접 회신 328건`으로 갱신했다.
+
+- [x] Stage 105 외국인 친화성 및 다국어 상담 준비도 점검 (2026-05-19)
+  - 웹앱이 외국인 사용자를 위해 어떤 언어와 입력 흐름을 실제로 지원하는지 코드 기준으로 점검한다.
+  - 백엔드가 영어 및 기타 언어 입력을 어떻게 처리하는지, 의료진 답변 전달 시 언어 장벽이 있는지 확인한다.
+  - 외국인주민센터 제휴 전에 우선 보완해야 할 다국어 준비 항목을 정리한다.
+  - Verification: `frontend/app`, `backend` 관련 코드 재검토 및 요약.
+  - Result: `frontend/app/app/page.tsx`, `frontend/app/components/WebConsultationStartForm.tsx`, `frontend/app/components/StatusPageClient.tsx` 기준 환자용 랜딩/시작/상태 화면 문구와 검증 메시지가 사실상 한국어 단일 언어로 고정되어 있어 외국인 사용자용 진입 경험이 준비되지 않았다.
+  - Result: `frontend/app/lib/consultation-session.ts`와 `backend/routes/public.js` 기준 공개 웹 상담 데이터에는 `preferredLanguage`, `locale`, `needsInterpreter` 같은 필드가 없어 환자 언어 선호를 수집·저장·전달하지 못한다.
+  - Result: `backend/services/llmService.js` 시스템 프롬프트와 fallback 응답이 한국어 중심으로 작성되어 있고, 환자 입력 언어로 `replyToPatient`를 반드시 돌려주라는 제약이 없어 영어/다국어 회신 품질을 신뢰하기 어렵다.
+  - Result: `backend/routes/portal.js` 및 환자 상태/알림 문구 기준 의료진 답변 푸시·SMS·후속 안내도 한국어 고정이라, 외국인 상담자가 접수 후 답변을 받아도 후속 경험에서 다시 언어 장벽이 생긴다.
+  - Result: 로컬 런타임에서 영어 샘플 triage를 직접 돌리려 했지만 `GEMINI_API_KEY` 부재로 `analyzeAndRouteTriage` 실험 실행은 못 했고, 따라서 실제 영문 답변 동작 평가는 코드 구조 기준 추정으로 남는다.
+
+- [ ] Stage 106 다국어 접근성 1차 구현 (2026-05-19)
+  - `frontend/homepage` 영어 홈페이지에 Google 번역 기반 다국어 보기 진입점을 추가하고, 영어 CTA가 `app` 영어 상담 흐름으로 들어가게 정리한다.
+  - `frontend/app` 환자 웹앱의 시작/상태 핵심 화면과 환자 액션 컴포넌트를 `ko/en` UI로 분리하고, 영어 화면에서 다른 언어 자유 입력을 받을 수 있게 한다.
+  - `backend` 공개 상담 생성/상태/의사 답변 전달 경로에 번역 메타데이터와 Google Translation 기반 언어 감지/번역 파이프라인을 추가한다.
+  - `frontend/portal` 상세 및 목록에서 환자 원문, 감지 언어, 한국어 번역, 환자 전달 번역본을 보여주도록 반영한다.
+  - Verification: `frontend/homepage npm run verify:ci`, `frontend/app npm run verify:ci`, `frontend/portal npm run verify:ci`, `backend npm run verify:ci`.
+
+- [x] Stage 106 review update (2026-05-19)
+  - Verification: `frontend/homepage npm run verify:ci`, `frontend/app npm run verify:ci`, `frontend/portal npm run verify:ci`, `backend npm run verify:ci`.
+  - Result: 영어 홈페이지에 Google 번역 기반 다국어 보기 진입점을 추가했고, 영어 CTA가 `?lang=en` 웹 상담 경로로 들어가도록 연결했다.
+  - Result: 환자용 웹앱 시작/상태 화면과 상태 액션, 사진 업로더를 `ko/en` UI로 분리하고 영어 화면에서 다른 언어 자유 입력을 받을 수 있도록 정리했다.
+  - Result: 백엔드에 Google Translation 기반 언어 감지/번역 서비스와 `uiLanguage`, `sourceLanguage`, `patientReplyLanguage`, `translatedPatientDataKo`, `patientDeliveredChatbotReply`, `patientDeliveredMessage` 저장 필드를 추가했다.
+  - Result: 포털 목록과 상세에서 원문 언어 배지, 의사용 한국어 번역본, 환자 전달 번역본을 함께 볼 수 있도록 반영했다.
+
+- [x] Stage 107 runtime translation auth verification (2026-05-19)
+  - Existing `FIREBASE_SERVICE_ACCOUNT`를 Google Cloud Translation fallback 자격 증명으로 재사용하도록 정리해서, 별도 `GOOGLE_TRANSLATE_API_KEY`는 선택 사항으로 만들었다.
+  - API key 인증, Firebase service account fallback 인증, 무자격 증명 실패 경로를 다루는 백엔드 테스트를 추가했다.
+  - Verification: `backend npm run verify:ci`; 현재 backend `.env` 기준 `detectLanguage()` / `translateText()` 런타임 스모크 스크립트.
+  - Result: translation auth fallback 변경 후에도 백엔드 검증은 모두 통과했다.
+  - Result: 실제 Google 호출은 인증까지는 통과했지만 `403 SERVICE_DISABLED`를 반환했고, 현재 서비스 계정이 연결된 GCP 프로젝트에서 Cloud Translation API가 아직 비활성 상태임을 확인했다.
+  - Result: 남은 수동 단계는 기존 프로젝트에서 `translate.googleapis.com`를 활성화하고 전파 시간을 기다린 뒤 다시 확인하는 것이다. 이 작업이 끝나면 fallback 경로 기준 추가 번역 비밀값은 필요 없다.
+
+- [x] Stage 108 multilingual production deploy (2026-05-19)
+  - Commit `00728ed89c1c8db6d647d5728e7dd9a4d8f8f5e8`를 `main`에 push해서 자동 배포를 시작했다.
+  - Vercel production deploy를 홈페이지, 환자 앱, 포털 프로젝트에 각각 직접 실행해 `happydoctor.kr`, `app.happydoctor.kr`, `portal.happydoctor.kr` 별칭 반영까지 확인했다.
+  - Verification: `frontend/homepage npm run verify:ci`, `frontend/app npm run verify:ci`, `frontend/portal npm run verify:ci`, `backend npm run verify:ci`, 라이브 `https://happydoctor.kr/en`, `https://app.happydoctor.kr/start?lang=en`, `https://portal.happydoctor.kr`, `https://happydoctor.onrender.com/api/version`.
+  - Result: `happydoctor.kr/en`에서 `Start Consultation on Web`, `View this page in your language` 문구가 보이는 최신 영어 홈페이지가 라이브 반영되었다.
+  - Result: `app.happydoctor.kr/start?lang=en`에서 `Start a consultation on the web`, `Korean and English UI are supported` 문구가 보이는 최신 영어 상담 UI가 라이브 반영되었다.
+  - Result: `portal.happydoctor.kr`는 `200` 응답으로 새 프로덕션 배포가 연결된 것을 확인했다.
+  - Result: Render `api/version` 응답 revision이 `00728ed89c1c8db6d647d5728e7dd9a4d8f8f5e8`로 올라와 백엔드도 같은 커밋이 반영되었다.
+
+- [x] Stage 109 region-safe language entry fix (2026-05-21)
+  - 영어 홈페이지의 `Google Translate` 웹페이지 번역 바로가기가 지역 제한으로 실패하는 문제를 확인했다.
+  - 다국어 카드의 동선을 `외부 번역 페이지 열기`에서 `영어 UI 상담 시작 + 해당 언어 입력 안내` 흐름으로 바꿨다.
+  - 환자 웹 상담 시작 화면에 선택 언어 안내 배너를 추가해, 사용자가 `Tiếng Việt`, `Español` 등 선택 언어로 바로 입력해도 된다는 점을 명확히 안내하도록 보강했다.
+  - Verification: `frontend/homepage npm run verify:ci`, `frontend/app npm run verify:ci`.
+  - Result: 더 이상 지역 제한이 있는 Google 웹페이지 번역 링크를 핵심 유입 경로에 사용하지 않게 되었다.
+  - Result: 다국어 사용자는 영어 홈페이지에서 자기 언어 카드를 눌렀을 때 바로 상담 폼으로 이동하고, 시작 화면에서 선택 언어 입력이 가능하다는 안내를 보게 된다.

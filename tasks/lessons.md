@@ -148,3 +148,14 @@
 - **Lesson**: Web-only public consultations should not promise SMS-style reply notifications unless the product actually collects a patient contact channel and has a real delivery integration behind it.
 - **Lesson**: Patient reply-notification contact capture must stay explicit opt-in; the intake flow should proceed normally when the patient skips it, and the backend should reject any phone/contact data that is sent without matching consent.
 - **Lesson**: When extending patient reply alerts beyond the existing Kakao room flow, keep Kakao as the primary path and treat opt-in phone delivery as a fallback queue that is cleared on any real patient view, follow-up, or close action.
+## 2026-04-11 추가 교훈
+- **교훈**: 오늘 할 일을 정리할 때는 `todo.md`의 미체크 항목만 그대로 읽지 말고, 최근 배포 성공 여부와 사용자가 이미 끝낸 운영 검증이 있는지 먼저 확인한 뒤 미완료로 제안한다.
+
+## 2026-04-17 추가 교훈
+- **교훈**: 외부 메일, 제휴 제안, 대외 연락처럼 실제 외부로 나가는 발송은 초안 작성과 발송 준비까지만 진행하고, 실제 전송은 반드시 사용자 승인 후에만 한다.
+
+## 2026-05-19 추가 교훈
+- **교훈**: `Forward Email` 무료 포워딩으로 대표 메일 수신은 빠르게 열 수 있지만, 답장 발신 주소까지 완전히 `@도메인`처럼 보이게 하려면 별도 `Send mail as` 또는 정식 메일 호스팅이 필요하다. 수신만 목적이면 무료 포워딩으로 충분하고, 발신 정체성까지 중요하면 처음부터 그 한계를 분명히 설명한다.
+
+## 2026-05-21 추가 교훈
+- **교훈**: 외부 번역 서비스의 웹페이지 번역 바로가기는 지역 제한이나 서비스 정책으로 깨질 수 있다. 환자 유입처럼 핵심 경로에는 제3자 웹 번역 링크를 의존하지 말고, 우리 제품 안에서 바로 동작하는 입력 흐름으로 연결해야 한다.
