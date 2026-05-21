@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 
 import type { UiLanguage } from '@/lib/ui-language'
+import LocalizedFilePicker from '@/components/LocalizedFilePicker'
 
 type ConsultationImageUploaderProps = {
   lookup: string
@@ -20,6 +21,16 @@ function formatFileSize(bytes: number) {
   return `${Math.max(1, Math.round(bytes / 1024))}KB`
 }
 
+function getSelectionLabel(
+  files: File[],
+  emptyLabel: string,
+  selectedLabel: (count: number) => string,
+) {
+  if (files.length === 0) return emptyLabel
+  if (files.length === 1) return files[0].name
+  return selectedLabel(files.length)
+}
+
 const copyByLanguage = {
   ko: {
     title: '사진 첨부',
@@ -28,6 +39,8 @@ const copyByLanguage = {
     disabled: '종료된 상담에는 사진을 추가할 수 없습니다.',
     full: '이 상담에는 이미 사진 3장이 등록되어 있습니다.',
     inputLabel: '사진 선택',
+    emptyLabel: '선택된 파일 없음',
+    selectedLabel: (count: number) => `${count}개 파일 선택됨`,
     uploadError: '사진을 업로드하지 못했습니다. 잠시 후 다시 시도해 주세요.',
     uploadSuccess: (count: number) => `사진 ${count}장을 저장했습니다.`,
     submitIdle: '사진 올리기',
@@ -40,6 +53,8 @@ const copyByLanguage = {
     disabled: 'Closed consultations cannot accept more photos.',
     full: 'This consultation already has the maximum 3 photos.',
     inputLabel: 'Choose photos',
+    emptyLabel: 'No file selected',
+    selectedLabel: (count: number) => `${count} file${count === 1 ? '' : 's'} selected`,
     uploadError: 'We could not upload the photos right now. Please try again shortly.',
     uploadSuccess: (count: number) => `Saved ${count} photo${count === 1 ? '' : 's'}.`,
     submitIdle: 'Upload photos',
@@ -124,18 +139,18 @@ export default function ConsultationImageUploader({
             <span className="text-sm font-semibold text-[var(--ink)]">
               {copy.inputLabel}
             </span>
-            <input
-              type="file"
+            <LocalizedFilePicker
+              buttonLabel={copy.inputLabel}
+              emptyLabel={copy.emptyLabel}
+              selectedLabel={getSelectionLabel(files, copy.emptyLabel, copy.selectedLabel)}
               accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
               multiple
               disabled={submitting || !canUpload}
-              onChange={(event) => {
-                const nextFiles = Array.from(event.target.files || []).slice(0, remainingSlots)
-                setFiles(nextFiles)
+              onChange={(nextFiles) => {
+                setFiles(nextFiles.slice(0, remainingSlots))
                 setError(null)
                 setSuccess(null)
               }}
-              className="mt-3 block w-full rounded-[1.1rem] border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--ink)] file:mr-4 file:rounded-full file:border-0 file:bg-[var(--navy)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
             />
           </label>
 

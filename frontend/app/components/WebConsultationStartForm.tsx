@@ -13,6 +13,7 @@ import {
   saveWebConsultationDraft,
 } from '@/lib/consultation-session'
 import { UiLanguage, isEnglishUiLanguage, saveUiLanguage, withUiLanguage } from '@/lib/ui-language'
+import LocalizedFilePicker from '@/components/LocalizedFilePicker'
 
 type WebConsultationStartFormProps = {
   entrySurface: string
@@ -71,6 +72,9 @@ const copyByLanguage = {
     historyPlaceholder: '앓고 있는 질환, 복용 중인 약이 있으면 적어 주세요.',
     imageLabel: '사진 첨부',
     imageDescription: '상처, 발진, 복용 중인 약 포장처럼 사진이 있으면 처음 상담을 더 정확하게 이어갈 수 있습니다.\n최대 3장, 장당 10MB 이하 사진을 올릴 수 있습니다.',
+    imageChooseLabel: '파일 선택',
+    imageEmptyLabel: '선택된 파일 없음',
+    imageSelectedLabel: (count: number) => `${count}개 파일 선택됨`,
     notificationTitle: '의료진 답변 알림 연락처 남기기',
     notificationDescription: '선택 사항입니다. 동의한 경우에만 의료진 답변 알림 연락처로 사용됩니다.',
     phoneLabel: '휴대폰 번호',
@@ -114,6 +118,9 @@ const copyByLanguage = {
     historyPlaceholder: 'Please tell us about chronic conditions or medicines you take.',
     imageLabel: 'Add photos',
     imageDescription: 'If you have photos such as a rash, wound, or medicine package, they can help us understand your situation better.\nYou can upload up to 3 images, up to 10MB each.',
+    imageChooseLabel: 'Choose files',
+    imageEmptyLabel: 'No file selected',
+    imageSelectedLabel: (count: number) => `${count} file${count === 1 ? '' : 's'} selected`,
     notificationTitle: 'Leave a phone number for reply alerts',
     notificationDescription: 'Optional. We only use this contact if you opt in to receive a reply alert.',
     phoneLabel: 'Phone number',
@@ -164,6 +171,16 @@ function normalizeDraftGender(value: string) {
 
 function localizeStatusUrl(statusUrl: string, uiLanguage: UiLanguage) {
   return withUiLanguage(statusUrl, uiLanguage)
+}
+
+function getSelectionLabel(
+  files: File[],
+  emptyLabel: string,
+  selectedLabel: (count: number) => string,
+) {
+  if (files.length === 0) return emptyLabel
+  if (files.length === 1) return files[0].name
+  return selectedLabel(files.length)
 }
 
 export default function WebConsultationStartForm({
@@ -446,17 +463,17 @@ export default function WebConsultationStartForm({
             <p className="mt-2 whitespace-pre-line text-sm leading-7 text-[var(--muted)]">
               {copy.imageDescription}
             </p>
-            <input
-              type="file"
+            <LocalizedFilePicker
+              buttonLabel={copy.imageChooseLabel}
+              emptyLabel={copy.imageEmptyLabel}
+              selectedLabel={getSelectionLabel(files, copy.imageEmptyLabel, copy.imageSelectedLabel)}
               accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
               multiple
               disabled={submitting}
-              onChange={(event) => {
-                const nextFiles = Array.from(event.target.files || []).slice(0, 3)
-                setFiles(nextFiles)
+              onChange={(nextFiles) => {
+                setFiles(nextFiles.slice(0, 3))
                 setError(null)
               }}
-              className="mt-3 block w-full rounded-[1.1rem] border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--ink)] file:mr-4 file:rounded-full file:border-0 file:bg-[var(--navy)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
             />
           </label>
 

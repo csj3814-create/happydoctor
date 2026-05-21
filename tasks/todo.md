@@ -1560,3 +1560,9 @@
   - Verification: `frontend/homepage npm run verify:ci`, `frontend/app npm run verify:ci`.
   - Result: 더 이상 지역 제한이 있는 Google 웹페이지 번역 링크를 핵심 유입 경로에 사용하지 않게 되었다.
   - Result: 다국어 사용자는 영어 홈페이지에서 자기 언어 카드를 눌렀을 때 바로 상담 폼으로 이동하고, 시작 화면에서 선택 언어 입력이 가능하다는 안내를 보게 된다.
+
+- [x] Stage 110 localized file picker UI fix (2026-05-21)
+  - 영어 상담 화면에서 브라우저 기본 파일 입력 UI가 `파일 선택`, `선택된 파일 없음` 같은 시스템 문구를 노출하는 문제를 확인했다.
+  - 환자 상담 시작 화면과 상태 화면 업로더를 모두 커스텀 파일 선택 UI로 바꿔 버튼/상태 문구를 앱 번역 문자열로 제어하도록 수정했다.
+  - Verification: `frontend/app npm run verify:ci`.
+  - Result: 영어 UI에서는 `Choose files`, `No file selected` 또는 선택 파일명이 일관되게 표시되고, 시스템 기본 로캘 문구가 섞이지 않게 되었다.
