@@ -1585,3 +1585,10 @@
   - Result: 우측 비주얼에 `Bodeum + volunteer doctors` 오버레이 카드와 `Web + KakaoTalk` 접근 칩을 추가해, 단일 로고 이미지처럼 보이던 구도를 보조 정보가 있는 시각 구성으로 바꿨다.
   - Result: 언어 지원 섹션 설명을 현재 제품 동작에 맞게 갱신해, 선택한 언어로 상담 폼이 먼저 열리고 필요한 경우 의료진용 번역과 번역 답변이 이어진다는 내용으로 정리했다.
   - Result: 라이브 `https://happydoctor.kr/en`에서 `1920x1080`, `1440x900`, `390x844` 기준으로 히어로 균형을 확인했고, `Tiếng Việt` 카드 클릭 시 `https://app.happydoctor.kr/start?source=homepage&lang=en&inputLanguage=vi`로 이동하는 것도 검증했다.
+
+- [x] Stage 113 English mission block centering tweak (2026-05-21)
+  - 영어 홈페이지에서 이미지가 아래로 스택되는 폭에서는 미션 블록도 가운데 축으로 맞춰, 상단 텍스트와 하단 비주얼의 시선 흐름을 더 자연스럽게 만든다.
+  - 큰 화면의 좌측 정렬 히어로는 유지하고, `lg` 미만에서만 미션 라벨/헤드라인/설명/CTA 묶음을 가운데 정렬하도록 보정한다.
+  - Verification: `frontend/homepage npm run verify:ci`, `https://happydoctor.kr/en` 태블릿/모바일 렌더 확인.
+  - Result: `frontend/homepage/app/en/page.tsx`에서 미션 컬럼을 `lg` 미만 구간에만 `items-center`와 `text-center`로 바꾸고, CTA 묶음도 같은 구간에서 가운데 정렬되도록 조정했다.
+  - Result: 라이브 `https://happydoctor.kr/en`에서 `960x1023`, `390x844` 기준으로 미션 라벨, 헤드라인, 설명, CTA가 모두 가운데 축으로 정렬된 것을 확인했다.

@@ -75,7 +75,7 @@ export default function EnglishHomepage() {
         </div>
 
         <div className="grid items-start gap-8 lg:grid-cols-[1.02fr_0.98fr] lg:gap-10">
-          <div className="order-1 max-w-2xl">
+          <div className="order-1 mx-auto flex max-w-2xl flex-col items-center text-center lg:mx-0 lg:items-start lg:text-left">
             <p className="mb-4 text-xs font-semibold uppercase tracking-[0.28em] text-white/70">Mission</p>
             <h1 className="text-4xl font-bold leading-tight md:text-6xl md:leading-[1.06]">
               Healthcare that reaches people who need it most
@@ -85,7 +85,7 @@ export default function EnglishHomepage() {
               We provide free online guidance with AI-assisted triage and doctor-reviewed responses.
             </p>
 
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center lg:items-start lg:justify-start">
               <a
                 href={WEB_START_URL}
                 className="inline-flex items-center justify-center rounded-full bg-white px-6 py-3 text-sm font-bold text-[#0C447C] shadow-lg shadow-black/15 transition hover:-translate-y-0.5"
