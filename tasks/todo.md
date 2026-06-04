@@ -1656,3 +1656,4 @@
   - Fix: Firestore 예약 ID 충돌을 피하기 위해 개인 알림 수신자 키를 `operator_alerts`로 바꾸고, 운영 `messenger_rooms/operator_alerts` 문서를 대표 개인 방 `행복한의사`로 등록했다.
   - Verification: `backend npm run verify:ci` passed.
   - Verification: 운영 Firestore에서 `messenger_rooms/operator_alerts.roomName === 행복한의사`를 확인했다.
+  - Verification: 설정 확인용 테스트 알림이 `patient_channel_pushes`에서 `delivered` 상태로 전환되었고, 실제 대상 방도 `행복한의사`로 기록된 것을 확인했다.
