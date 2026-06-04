@@ -73,6 +73,30 @@ function validateDoctorRoomCandidate(roomName, options = {}) {
   };
 }
 
+function resolveStoredDoctorRoom(data = {}) {
+  if (!data || typeof data !== 'object') return null;
+
+  const explicitKind = typeof data.kind === 'string' ? data.kind.trim() : '';
+  const hasGroupFlag = typeof data.isGroupChat !== 'undefined' && data.isGroupChat !== null;
+
+  if (explicitKind && explicitKind !== DOCTOR_ROOM_KIND) {
+    return null;
+  }
+
+  const validation = validateDoctorRoomCandidate(data.roomName, {
+    isGroupChat: hasGroupFlag ? data.isGroupChat : true,
+  });
+
+  if (!validation.ok) {
+    return null;
+  }
+
+  return {
+    roomName: validation.roomName,
+    needsMigration: explicitKind !== DOCTOR_ROOM_KIND || !hasGroupFlag,
+  };
+}
+
 async function countDocuments(query) {
   const snapshot = await query.get();
   return snapshot.size;
@@ -1157,14 +1181,25 @@ async function getDoctorRoomName() {
   if (!snapshot.exists) return null;
 
   const data = snapshot.data() || {};
-  if (data.kind !== DOCTOR_ROOM_KIND) {
+  const resolved = resolveStoredDoctorRoom(data);
+  if (!resolved) {
     return null;
   }
 
-  const validation = validateDoctorRoomCandidate(data.roomName, {
-    isGroupChat: data.isGroupChat,
-  });
-  return validation.ok ? validation.roomName : null;
+  if (resolved.needsMigration) {
+    try {
+      await snapshot.ref.set({
+        kind: DOCTOR_ROOM_KIND,
+        isGroupChat: true,
+        updatedAt: getAdmin().firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+      console.log(`[Doctor Room Migrated] ${resolved.roomName}`);
+    } catch (error) {
+      console.warn('[Doctor Room Migration Failed]', error);
+    }
+  }
+
+  return resolved.roomName;
 }
 
 async function getRoomName(userId) {
@@ -1234,5 +1269,6 @@ module.exports = {
     splitDueDoctorNotifications,
     buildDoctorNotificationGroupKey,
     validateDoctorRoomCandidate,
+    resolveStoredDoctorRoom,
   },
 };

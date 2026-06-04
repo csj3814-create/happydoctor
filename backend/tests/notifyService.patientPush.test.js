@@ -96,6 +96,9 @@ function createFirestoreMock(seed = {}) {
       async get() {
         return createDocSnapshot(collectionName, id);
       },
+      async set(value, options) {
+        applySet({ id, collectionName }, value, options);
+      },
       async update(update) {
         applyUpdate({ id, collectionName }, update);
       },
@@ -126,6 +129,22 @@ function createFirestoreMock(seed = {}) {
       ...current,
       ...resolveValue(update),
     });
+  }
+
+  function applySet(docRef, value, options = {}) {
+    const collection = ensureCollection(docRef.collectionName);
+    const resolved = resolveValue(value);
+    const current = collection.get(docRef.id);
+
+    if (options?.merge && current) {
+      collection.set(docRef.id, {
+        ...current,
+        ...resolved,
+      });
+      return;
+    }
+
+    collection.set(docRef.id, resolved);
   }
 
   function createQuery(collectionName, predicates = [], limitCount = null) {
@@ -540,6 +559,30 @@ test('claimDoctorNotification leases a due notification and delivered ack comple
     assert.equal(deliveredDoc.leaseExpiresAt, null);
     assert.equal(deliveredDoc.lastFailureReason, null);
     assert.ok(deliveredDoc.deliveredAt instanceof Date);
+  } finally {
+    context.restore();
+  }
+});
+
+test('getDoctorRoomName accepts a legacy doctor room document and backfills required metadata', { concurrency: false }, async () => {
+  const context = loadNotifyService({
+    delivery_rooms: {
+      doctor_room: {
+        roomName: 'legacy doctor room',
+      },
+    },
+  });
+
+  try {
+    const roomName = await context.service.getDoctorRoomName();
+
+    assert.equal(roomName, 'legacy doctor room');
+
+    const storedDoc = context.getDoc('delivery_rooms', 'doctor_room');
+    assert.equal(storedDoc.roomName, 'legacy doctor room');
+    assert.equal(storedDoc.kind, 'doctor_group');
+    assert.equal(storedDoc.isGroupChat, true);
+    assert.ok(storedDoc.updatedAt instanceof Date);
   } finally {
     context.restore();
   }
