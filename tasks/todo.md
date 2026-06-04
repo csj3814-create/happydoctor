@@ -1,5 +1,14 @@
 # Happy Doctor Project - Tasks
 
+## 2026-06-05 review
+- [x] Stage 120 개인 미답변 알림 한글 깨짐 원인 확인
+  - Screenshot symptom: the operator alert test message appeared as question marks in Kakao.
+  - Check whether the stored Firestore message was already corrupted by the Windows test script or whether the MessengerBotR delivery path corrupts Korean text.
+  - Verification: inspect recent `patient_channel_pushes` message code points, enqueue one clean Korean test message without direct PowerShell Korean literals, and confirm it reaches `delivered`.
+  - Result: the broken screenshot message was already stored in Firestore as literal `?` code points, so Kakao delivery only displayed what was stored.
+  - Result: the real backend alert builder produced valid Korean code points, and a clean test alert was stored as Korean and reached `delivered` at `2026-06-04T20:04:00.134Z`.
+  - Result: no production code change was needed for encoding; the issue was the manual Windows PowerShell test input method.
+
 ## Phase 1: Planning ✅
 - [x] Project overview and goal definition
 - [x] Chatbot MVP scenario and architecture design
