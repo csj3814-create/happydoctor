@@ -8,7 +8,9 @@ const {
     acknowledgePatientChannelPush,
     registerRoom,
     registerDoctorRoom,
+    registerOperatorAlertRoom,
     getDoctorRoomName,
+    getOperatorAlertRoomName,
 } = require('../services/notifyService');
 const { ConfigurationError, getMessengerApiKey } = require('../config');
 
@@ -58,6 +60,15 @@ function buildDoctorRoomRegistrationErrorReply(validation) {
             return '운영위원회 방에는 상담 내용을 보내지 않습니다.\n의료진 단톡방에서 `~알림방등록`을 보내 다시 등록해 주세요.';
         default:
             return '알림방 이름을 다시 확인해 주세요.\n의료진 단톡방에서 `~알림방등록`을 다시 보내 주세요.';
+    }
+}
+
+function buildOperatorAlertRoomErrorReply(validation) {
+    switch (validation?.code) {
+        case 'ROOM_REQUIRED':
+            return '개인 알림을 받을 방 이름을 다시 확인해 주세요.\n알림을 받을 개인 카카오 방에서 `~개인알림등록`을 다시 보내 주세요.';
+        default:
+            return '개인 알림방 등록 중 문제가 있었습니다.\n알림을 받을 개인 카카오 방에서 `~개인알림등록`을 다시 보내 주세요.';
     }
 }
 
@@ -165,6 +176,38 @@ router.post('/', checkApiKey, async (req, res) => {
                 reply: '차트 조회 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.',
             });
         }
+    }
+
+    if (normalizedCommand === 'register_operator_alert_room' || normalizedMsg === '~개인알림등록') {
+        if (isGroupChat) {
+            return res.status(200).json({
+                reply: '개인 알림은 1:1 카카오 방에서만 등록할 수 있습니다.\n알림을 받을 개인 방에서 `~개인알림등록`을 보내 주세요.',
+            });
+        }
+
+        const registration = await registerOperatorAlertRoom(room);
+        if (!registration?.ok) {
+            return res.status(200).json({
+                reply: buildOperatorAlertRoomErrorReply(registration),
+            });
+        }
+
+        return res.status(200).json({
+            reply: `이 방을 해피닥터 미답변 상담 개인 알림방으로 등록했습니다.\n현재 등록 방: ${registration.roomName}\n이제 의료진 단체방에서 15분 동안 답변이 없으면 이 방으로 한 번 더 알려드립니다.`,
+        });
+    }
+
+    if (normalizedCommand === 'show_operator_alert_room' || normalizedMsg === '~개인알림확인') {
+        const operatorRoomName = await getOperatorAlertRoomName();
+        if (!operatorRoomName) {
+            return res.status(200).json({
+                reply: '아직 등록된 개인 알림방이 없습니다.\n알림을 받을 개인 카카오 방에서 `~개인알림등록`을 보내 주세요.',
+            });
+        }
+
+        return res.status(200).json({
+            reply: `현재 등록된 미답변 상담 개인 알림방은 아래와 같습니다.\n→ ${operatorRoomName}`,
+        });
     }
 
     return res.status(200).json({});

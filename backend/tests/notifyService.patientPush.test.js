@@ -186,7 +186,8 @@ function createFirestoreMock(seed = {}) {
     collection(collectionName) {
       return {
         doc(id) {
-          const docRef = createDocRef(collectionName, id);
+          const resolvedId = id || `doc-${state.nextId++}`;
+          const docRef = createDocRef(collectionName, resolvedId);
           docRef.collectionName = collectionName;
           return docRef;
         },
@@ -221,6 +222,9 @@ function createFirestoreMock(seed = {}) {
     batch() {
       const operations = [];
       return {
+        set(docRef, value, options) {
+          operations.push(() => applySet(docRef, value, options));
+        },
         update(docRef, update) {
           operations.push(() => applyUpdate(docRef, update));
         },
@@ -377,6 +381,50 @@ test('enqueuePatientChannelPush stores due and future doctor-reply reminders and
   }
 });
 
+test('enqueueDoctorNotification also schedules a single operator unanswered alert when an operator room is registered', { concurrency: false }, async () => {
+  const context = loadNotifyService({
+    messenger_rooms: {
+      operator_alerts: { roomName: 'owner-room' },
+    },
+  });
+
+  try {
+    const enqueued = await context.service.enqueueDoctorNotification('critical summary', 'patientA', {
+      type: 'triage_initial',
+      priority: 'urgent',
+      reminderDelaysMinutes: [0, 5, 15],
+    });
+
+    assert.equal(enqueued, true);
+
+    const queuedDoctorNotifications = context.listDocs('doctor_notifications');
+    assert.equal(queuedDoctorNotifications.length, 3);
+
+    const operatorPushes = context.listDocs('patient_channel_pushes');
+    assert.equal(operatorPushes.length, 1);
+    assert.equal(operatorPushes[0].data.userId, 'operator_alerts');
+    assert.equal(operatorPushes[0].data.roomName, 'owner-room');
+    assert.equal(operatorPushes[0].data.type, 'operator_unanswered_doctor_alert');
+    assert.equal(operatorPushes[0].data.relatedUserId, 'patientA');
+    assert.equal(operatorPushes[0].data.reminderDelayMinutes, 15);
+    assert.equal(operatorPushes[0].data.reminderStage, 1);
+    assert.match(operatorPushes[0].data.message, /\[해피닥터\] 미답변 상담 알림/);
+
+    const scheduleIds = new Set(queuedDoctorNotifications.map((entry) => entry.data.scheduleId));
+    assert.equal(scheduleIds.size, 1);
+    const [scheduleId] = [...scheduleIds];
+    assert.equal(operatorPushes[0].data.dedupeKey, `operator:${scheduleId}`);
+    assert.deepEqual(operatorPushes[0].data.metadata, {
+      scheduleId,
+      groupKey: 'patientA:triage_initial',
+      sourceType: 'triage_initial',
+      priority: 'urgent',
+    });
+  } finally {
+    context.restore();
+  }
+});
+
 test('failed patient push ack returns the queue to pending and allows a retry claim', { concurrency: false }, async () => {
   const context = loadNotifyService({
     messenger_rooms: {
@@ -409,6 +457,48 @@ test('failed patient push ack returns the queue to pending and allows a retry cl
     const retriedDoc = context.getDoc('patient_channel_pushes', queueId);
     assert.equal(retriedDoc.status, 'leased');
     assert.equal(retriedDoc.attemptCount, 2);
+  } finally {
+    context.restore();
+  }
+});
+
+test('clearOperatorUnansweredAlerts only cancels matching pending operator alerts for the same patient', { concurrency: false }, async () => {
+  const context = loadNotifyService({
+    patient_channel_pushes: {
+      'operator-a': {
+        userId: 'operator_alerts',
+        roomName: 'owner-room',
+        message: 'patient A',
+        type: 'operator_unanswered_doctor_alert',
+        status: 'pending',
+        relatedUserId: 'patientA',
+      },
+      'operator-b': {
+        userId: 'operator_alerts',
+        roomName: 'owner-room',
+        message: 'patient B',
+        type: 'operator_unanswered_doctor_alert',
+        status: 'pending',
+        relatedUserId: 'patientB',
+      },
+      'operator-a-delivered': {
+        userId: 'operator_alerts',
+        roomName: 'owner-room',
+        message: 'patient A delivered',
+        type: 'operator_unanswered_doctor_alert',
+        status: 'delivered',
+        relatedUserId: 'patientA',
+      },
+    },
+  });
+
+  try {
+    const cleared = await context.service.clearOperatorUnansweredAlerts('patientA');
+    assert.equal(cleared, 1);
+
+    assert.equal(context.getDoc('patient_channel_pushes', 'operator-a').status, 'cancelled');
+    assert.equal(context.getDoc('patient_channel_pushes', 'operator-b').status, 'pending');
+    assert.equal(context.getDoc('patient_channel_pushes', 'operator-a-delivered').status, 'delivered');
   } finally {
     context.restore();
   }

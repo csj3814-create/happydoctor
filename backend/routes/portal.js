@@ -17,13 +17,15 @@ const {
   HDT_REPLY,
   getAdmin,
 } = require('../services/dbService');
+const notifyService = require('../services/notifyService');
 const {
   enqueuePatientChannelPush,
   enqueuePatientSmsNotification,
   clearDoctorNotifications,
   clearPatientChannelPushes,
   clearPatientSmsNotifications,
-} = require('../services/notifyService');
+} = notifyService;
+const clearOperatorUnansweredAlerts = notifyService.clearOperatorUnansweredAlerts || (async () => 0);
 const { isKoreanLanguage, translateText } = require('../services/translationService');
 const { appSiteUrl, getAllowedDoctorEmails, getPortalAdminEmails } = require('../config');
 const followUpService = require('../services/followUpService');
@@ -552,6 +554,7 @@ router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
     }
     await followUpService.cancelFollowUp(consultation.userId);
     await clearDoctorNotifications(consultation.userId);
+    await clearOperatorUnansweredAlerts(consultation.userId);
 
     await awardHDT(req.doctor.email, req.doctor.name, HDT_REPLY, 'reply');
     console.log(`[Portal] ${req.doctor.email} replied to ${consultation.userId} (${replyId})`);

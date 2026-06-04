@@ -15,12 +15,14 @@ const {
   translateText,
 } = require('../services/translationService');
 const { getLocalizedStartUiCopy } = require('../services/uiCopyService');
+const notifyService = require('../services/notifyService');
 const {
   enqueueDoctorNotification,
   clearDoctorNotifications,
   clearPatientChannelPushes,
   clearPatientSmsNotifications,
-} = require('../services/notifyService');
+} = notifyService;
+const clearOperatorUnansweredAlerts = notifyService.clearOperatorUnansweredAlerts || (async () => 0);
 const { appSiteUrl } = require('../config');
 
 const consultationImageUpload = multer({
@@ -611,6 +613,7 @@ router.post('/consultations/status/:lookup/close', async (req, res) => {
     if (closed.userId) {
       await followUpService.cancelFollowUp(closed.userId);
       await clearDoctorNotifications(closed.userId);
+      await clearOperatorUnansweredAlerts(closed.userId);
       await clearPatientChannelPushes(closed.userId, 'doctor_reply');
       await clearPatientSmsNotifications(closed.userId, 'doctor_reply');
     }

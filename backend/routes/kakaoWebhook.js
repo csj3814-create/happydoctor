@@ -1,12 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const { analyzeAndRouteTriage, analyzeFollowUp } = require('../services/llmService');
+const notifyService = require('../services/notifyService');
 const {
     enqueueDoctorNotification,
     clearDoctorNotifications,
     clearPatientChannelPushes,
     clearPatientSmsNotifications,
-} = require('../services/notifyService');
+} = notifyService;
+const clearOperatorUnansweredAlerts = notifyService.clearOperatorUnansweredAlerts || (async () => 0);
 const followUpService = require('../services/followUpService');
 const dbService = require('../services/dbService');
 const { appSiteUrl, ConfigurationError, getMessengerApiKey } = require('../config');
@@ -597,6 +599,7 @@ router.post('/close-consultation', async (req, res) => {
         // 1) F/U 타이머 및 대기 데이터 삭제
         await followUpService.cancelFollowUp(userId);
         await clearDoctorNotifications(userId);
+        await clearOperatorUnansweredAlerts(userId);
         await clearPatientChannelPushes(userId, 'doctor_reply');
         await clearPatientSmsNotifications(userId, 'doctor_reply');
 

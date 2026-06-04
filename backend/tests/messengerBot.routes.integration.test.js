@@ -327,6 +327,77 @@ test('messengerBot patient push poll and ack share the same contract for main an
   });
 });
 
+test('messengerBot personal operator alert room commands register and show the target room', { concurrency: false }, async () => {
+  await withMessengerApiKey(async () => {
+    const calls = [];
+    const routeModule = loadMessengerBotRoute({
+      claimDoctorNotification: async () => null,
+      acknowledgeDoctorNotification: async () => {},
+      confirmDoctorNotifications: async () => [],
+      claimPatientChannelPush: async () => null,
+      acknowledgePatientChannelPush: async () => {},
+      registerRoom: async () => {},
+      registerDoctorRoom: async () => ({ ok: true, roomName: 'doctor room' }),
+      registerOperatorAlertRoom: async (roomName) => {
+        calls.push({ type: 'registerOperatorAlertRoom', roomName });
+        return { ok: true, roomName };
+      },
+      getDoctorRoomName: async () => 'doctor room',
+      getOperatorAlertRoomName: async () => {
+        calls.push({ type: 'getOperatorAlertRoomName' });
+        return 'owner room';
+      },
+    });
+
+    const server = await startServer(routeModule.router);
+
+    try {
+      const register = await postJson(
+        `${server.baseUrl}/`,
+        {
+          room: 'owner room',
+          msg: '~개인알림등록',
+          sender: 'owner',
+          isGroupChat: false,
+          command: 'register_operator_alert_room',
+        },
+        {
+          headers: { 'x-api-key': 'test-messenger-key' },
+        },
+      );
+
+      assert.equal(register.status, 200);
+      assert.match(register.body.reply, /개인 알림방/);
+      assert.match(register.body.reply, /owner room/);
+
+      const show = await postJson(
+        `${server.baseUrl}/`,
+        {
+          room: 'owner room',
+          msg: '~개인알림확인',
+          sender: 'owner',
+          isGroupChat: false,
+          command: 'show_operator_alert_room',
+        },
+        {
+          headers: { 'x-api-key': 'test-messenger-key' },
+        },
+      );
+
+      assert.equal(show.status, 200);
+      assert.match(show.body.reply, /owner room/);
+
+      assert.deepEqual(calls, [
+        { type: 'registerOperatorAlertRoom', roomName: 'owner room' },
+        { type: 'getOperatorAlertRoomName' },
+      ]);
+    } finally {
+      await server.close();
+      routeModule.restore();
+    }
+  });
+});
+
 test('messengerBot endpoints reject requests without the configured API key', { concurrency: false }, async () => {
   await withMessengerApiKey(async () => {
     const routeModule = loadMessengerBotRoute({

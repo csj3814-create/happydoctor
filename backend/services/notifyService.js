@@ -10,12 +10,15 @@ const MESSENGER_ROOMS = 'messenger_rooms';
 const DELIVERY_ROOMS = 'delivery_rooms';
 const DOCTOR_ROOM_DOC_ID = 'doctor_room';
 const DOCTOR_ROOM_KIND = 'doctor_group';
+const OPERATOR_ALERT_USER_ID = 'operator_alerts';
+const OPERATOR_UNANSWERED_ALERT_PUSH_TYPE = 'operator_unanswered_doctor_alert';
 const DOCTOR_NOTIFICATION_LEASE_MS = 60 * 1000;
 const PATIENT_PUSH_LEASE_MS = 60 * 1000;
 const PATIENT_SMS_LEASE_MS = getPatientSmsRuntimeConfig().leaseMs || 60 * 1000;
 const DEFAULT_DOCTOR_REMINDER_DELAYS_MINUTES = Object.freeze([0, 5, 15]);
 const DEFAULT_DOCTOR_REPLY_REMINDER_DELAYS_MINUTES = Object.freeze([0, 5, 15]);
 const DEFAULT_DOCTOR_REPLY_SMS_REMINDER_DELAYS_MINUTES = Object.freeze([0, 5, 15]);
+const DEFAULT_OPERATOR_UNANSWERED_ALERT_DELAYS_MINUTES = Object.freeze([15]);
 const DOCTOR_NOTIFICATION_DUPLICATE_WINDOW_MS = 20 * 60 * 1000;
 const DOCTOR_NOTIFICATION_CATCHUP_GAP_MS = 5 * 60 * 1000;
 const DOCTOR_ROOM_BLOCKED_PATTERNS = Object.freeze([
@@ -32,6 +35,23 @@ function getCollection(name) {
 function normalizeRoomName(value) {
   if (typeof value !== 'string') return '';
   return value.trim().replace(/\s+/g, ' ').slice(0, 120);
+}
+
+function normalizeGenericRoomCandidate(roomName) {
+  const normalizedRoomName = normalizeRoomName(roomName);
+  if (!normalizedRoomName) {
+    return {
+      ok: false,
+      code: 'ROOM_REQUIRED',
+      roomName: '',
+    };
+  }
+
+  return {
+    ok: true,
+    code: 'OK',
+    roomName: normalizedRoomName,
+  };
 }
 
 function isExplicitGroupChat(value) {
@@ -182,6 +202,39 @@ function buildDoctorNotificationGroupKey(patientId, type = 'triage') {
 
 function createDoctorNotificationFingerprint(message) {
   return createHash('sha1').update(String(message || '')).digest('hex').slice(0, 16);
+}
+
+function buildOperatorAlertDedupeKey(scheduleId, patientId, groupKey) {
+  if (scheduleId) return `operator:${scheduleId}`;
+  return `operator:${patientId || 'unknown'}:${groupKey || 'general'}`;
+}
+
+function buildOperatorUnansweredAlertMessage(message, options = {}) {
+  const priorityLabel = options.priority === 'urgent' ? '응급 확인 필요' : '의료진 확인 필요';
+  const delayMinutes = Number(options.delayMinutes);
+  const delayText = Number.isFinite(delayMinutes) && delayMinutes > 0
+    ? `${delayMinutes}분째`
+    : '일정 시간째';
+  const preview = String(message || '')
+    .replace(/[*#`_>]/g, '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 6)
+    .join('\n')
+    .slice(0, 420);
+
+  return [
+    '[해피닥터] 미답변 상담 알림',
+    `${delayText} 의료진 답변이 없는 상담이 있습니다.`,
+    `분류: ${priorityLabel}`,
+    '',
+    preview,
+    '',
+    '포털 확인: https://portal.happydoctor.kr/open-browser?next=%2F',
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 function getDoctorNotificationGroupKey(data = {}, fallbackId = '') {
@@ -486,6 +539,13 @@ async function enqueueDoctorNotification(message, patientId, options = {}) {
   });
 
   await batch.commit();
+  await enqueueOperatorUnansweredAlert(message, patientId, {
+    scheduleId,
+    groupKey,
+    type,
+    priority,
+    delayMinutes: reminderDelaysMinutes.at(-1) || DEFAULT_OPERATOR_UNANSWERED_ALERT_DELAYS_MINUTES[0],
+  });
 
   console.log(`[Notification Enqueued] Patient: ${patientId}, schedule: ${reminderDelaysMinutes.join('/')}`);
   return true;
@@ -680,6 +740,37 @@ async function clearDoctorNotifications(patientId) {
   return docs.length;
 }
 
+async function enqueueOperatorUnansweredAlert(message, patientId, options = {}) {
+  const dedupeKey = buildOperatorAlertDedupeKey(options.scheduleId, patientId, options.groupKey);
+  return enqueuePatientChannelPush(
+    OPERATOR_ALERT_USER_ID,
+    buildOperatorUnansweredAlertMessage(message, {
+      priority: options.priority,
+      delayMinutes: options.delayMinutes,
+    }),
+    OPERATOR_UNANSWERED_ALERT_PUSH_TYPE,
+    {
+      reminderDelaysMinutes: DEFAULT_OPERATOR_UNANSWERED_ALERT_DELAYS_MINUTES,
+      dedupeKey,
+      relatedUserId: patientId,
+      metadata: {
+        scheduleId: options.scheduleId || null,
+        groupKey: options.groupKey || null,
+        sourceType: options.type || 'triage',
+        priority: options.priority || 'normal',
+      },
+    },
+  );
+}
+
+async function clearOperatorUnansweredAlerts(patientId) {
+  return clearPatientChannelPushes(
+    OPERATOR_ALERT_USER_ID,
+    OPERATOR_UNANSWERED_ALERT_PUSH_TYPE,
+    { relatedUserId: patientId },
+  );
+}
+
 async function enqueueFUPush(userId, message) {
   return enqueuePatientChannelPush(userId, message, 'follow_up');
 }
@@ -704,6 +795,28 @@ async function enqueuePatientChannelPush(userId, message, type = 'general', opti
       ? (type === 'doctor_reply' ? 'doctor_reply_default' : [0])
       : options.reminderDelaysMinutes,
   );
+  const dedupeKey = typeof options.dedupeKey === 'string' ? options.dedupeKey.trim() : '';
+  const relatedUserId = typeof options.relatedUserId === 'string' ? options.relatedUserId.trim() : '';
+  const metadata = options.metadata && typeof options.metadata === 'object' && !Array.isArray(options.metadata)
+    ? options.metadata
+    : null;
+
+  if (dedupeKey) {
+    const existingSnapshot = await db.collection(PATIENT_CHANNEL_PUSHES)
+      .where('userId', '==', userId)
+      .get();
+
+    const hasDuplicate = existingSnapshot.docs.some((doc) => {
+      const data = doc.data() || {};
+      return data.dedupeKey === dedupeKey && data.status !== 'cancelled';
+    });
+
+    if (hasDuplicate) {
+      console.log(`[Patient Push Skipped] Duplicate push detected for ${userId} (${type})`);
+      return false;
+    }
+  }
+
   const now = Date.now();
 
   for (const [index, reminderDelayMinutes] of reminderDelaysMinutes.entries()) {
@@ -719,6 +832,9 @@ async function enqueuePatientChannelPush(userId, message, type = 'general', opti
       availableAt: new Date(now + reminderDelayMinutes * 60 * 1000),
       reminderDelayMinutes,
       reminderStage: index + 1,
+      dedupeKey: dedupeKey || null,
+      relatedUserId: relatedUserId || null,
+      metadata,
     });
   }
 
@@ -871,7 +987,7 @@ async function dequeuePatientChannelPush() {
   return claimPatientChannelPush();
 }
 
-async function clearPatientChannelPushes(userId, type = null) {
+async function clearPatientChannelPushes(userId, type = null, options = {}) {
   const collection = getCollection(PATIENT_CHANNEL_PUSHES);
   if (!collection || !userId) return 0;
 
@@ -883,6 +999,7 @@ async function clearPatientChannelPushes(userId, type = null) {
     const data = doc.data() || {};
     if (data.status !== 'pending' && data.status !== 'leased') return false;
     if (type && data.type !== type) return false;
+    if (options.relatedUserId && data.relatedUserId !== options.relatedUserId) return false;
     return true;
   });
 
@@ -1139,6 +1256,24 @@ async function registerRoom(userId, roomName) {
   return true;
 }
 
+async function registerOperatorAlertRoom(roomName) {
+  const validation = normalizeGenericRoomCandidate(roomName);
+  if (!validation.ok) {
+    return validation;
+  }
+
+  const ok = await registerRoom(OPERATOR_ALERT_USER_ID, validation.roomName);
+  if (!ok) {
+    return {
+      ok: false,
+      code: 'DB_UNAVAILABLE',
+      roomName: validation.roomName,
+    };
+  }
+
+  return validation;
+}
+
 async function registerDoctorRoom(roomName, options = {}) {
   const db = getDb();
   const validation = validateDoctorRoomCandidate(roomName, {
@@ -1210,6 +1345,10 @@ async function getRoomName(userId) {
   return snapshot.exists ? snapshot.data().roomName || null : null;
 }
 
+async function getOperatorAlertRoomName() {
+  return getRoomName(OPERATOR_ALERT_USER_ID);
+}
+
 async function getQueueStatus() {
   const db = getDb();
   if (!db) {
@@ -1247,6 +1386,7 @@ module.exports = {
   acknowledgeDoctorNotification,
   confirmDoctorNotifications,
   clearDoctorNotifications,
+  clearOperatorUnansweredAlerts,
   enqueueFUPush,
   dequeueFUPush,
   enqueuePatientChannelPush,
@@ -1261,8 +1401,10 @@ module.exports = {
   reclaimExpiredPatientSmsLeases,
   registerRoom,
   registerDoctorRoom,
+  registerOperatorAlertRoom,
   getRoomName,
   getDoctorRoomName,
+  getOperatorAlertRoomName,
   getQueueStatus,
   validateDoctorRoomCandidate,
   __test__: {
@@ -1270,5 +1412,9 @@ module.exports = {
     buildDoctorNotificationGroupKey,
     validateDoctorRoomCandidate,
     resolveStoredDoctorRoom,
+    buildOperatorAlertDedupeKey,
+    buildOperatorUnansweredAlertMessage,
+    OPERATOR_ALERT_USER_ID,
+    OPERATOR_UNANSWERED_ALERT_PUSH_TYPE,
   },
 };

@@ -164,3 +164,12 @@
 - **교훈**: 홈페이지처럼 우리가 직접 언어 카드를 노출한 선택지는 런타임 번역 API나 메모리 캐시에만 기대지 않는다. 고정 UI 문구는 앱 내부의 안정적인 번역 사전을 우선 사용하고, 실시간 번역은 보조 경로로만 두어야 일본어처럼 특정 언어가 영어 fallback으로 떨어지지 않는다.
 - **교훈**: 랜딩 히어로 첫 화면에서는 보조 카드가 본문 컬럼에 길게 붙어 우측 비주얼을 접히는 위치 아래로 밀지 않게 해야 한다. 데스크톱 균형이 깨지면 보조 정보는 히어로 아래 전폭 섹션으로 내리고, 우측은 주 비주얼 + 작은 오버레이 정보 조합으로 무게를 맞추는 편이 안정적이다.
 - **교훈**: 히어로가 태블릿/모바일에서 세로 스택으로 바뀌면, 위쪽 텍스트 블록과 아래쪽 비주얼 카드의 기준축도 같이 맞춰야 한다. 비주얼은 가운데인데 미션 카피만 왼쪽에 남아 있으면 완성도가 떨어져 보이므로 스택 구간에서는 텍스트와 CTA도 같이 가운데 정렬하는 편이 자연스럽다.
+## 2026-05-22 추가 교훈
+- **교훈**: 대외 제휴 메일의 수신 호칭은 `사무국 또는 대외협력 담당자님`처럼 복수 선택지로 열어두지 말고, 실제로 읽는 사람이 바로 자기 메일로 느끼도록 단일 담당 호칭 하나로 정리한다.
+- **교훈**: 대외 메일의 후속 CTA는 옵션을 여러 개 나열하기보다 `필요하시면 기관 내부 공유용 해피닥터 소개서를 보내드리겠습니다.`처럼 부담이 적고 한 번에 이해되는 한 문장으로 정리한다.
+- **교훈**: 대외 메일 본문은 `공익적`, `출발한`, `보완 창구` 같은 선언형 표현을 길게 늘어놓기보다, 왜 이 기관에 연락했는지와 이용자가 실제로 어떻게 쓰는지를 짧고 구체적인 문장으로 먼저 보여줘야 사람이 직접 쓴 메일처럼 읽힌다.
+- **교훈**: 메일 문장에 `같은 흐름에서`, `첫 연결 수단` 같은 추상적 제품 표현이 들어가면 바로 AI가 쓴 문장처럼 느껴진다. 대외 메일에서는 `1차 상담 후 추가 질문`, `응급실로 가야 할지, 외래를 가도 될지`처럼 실제 사람이 쓰는 구체적 상황 문장으로 바꿔야 한다.
+- **교훈**: 1차 발송 후보 문구를 수정할 때는 지금 당장 보내는 4통만 보지 말고, 같은 묶음의 3·5·7·8번 템플릿과 링크 블록까지 함께 점검해야 다음 차수에서 같은 누락이 반복되지 않는다.
+## 2026-06-04 Added Lesson
+- **Lesson**: Delivery-room schemas can drift over time; if alert delivery depends on metadata like `kind` or `isGroupChat`, the read path must stay backward-compatible or auto-migrate legacy room documents before declaring the doctor alert room unregistered.
+- **Lesson**: Firestore document IDs wrapped in double underscores such as `__operator_alerts__` are reserved in production. Use a normal ID like `operator_alerts` for operational room bindings, and when checking Korean room names from Windows scripts, verify the stored value rather than trusting console output alone.

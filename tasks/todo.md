@@ -1602,3 +1602,57 @@
   - Result: `frontend/app/lib/start-copy-localized.ts`에 홈페이지 카드 20개 언어용 시작 화면 번역 사전을 추가하고, `frontend/app/lib/start-copy.ts`가 이 내장 사전을 먼저 읽도록 바꿔 선택 언어 화면이 백엔드 번역 상태와 무관하게 안정적으로 렌더링되게 했다.
   - Result: 로컬 `http://127.0.0.1:3100/start?source=homepage&lang=en&inputLanguage=ja`와 라이브 `https://app.happydoctor.kr/start?source=homepage&lang=en&inputLanguage=ja`에서 `ウェブで相談を始める`, `ご自身の言葉で書いてください`, `ファイルを選択` 문구를 직접 확인했다.
   - Result: 추가 라이브 점검으로 `fr`, `ar` 선택 언어 화면도 제목, 진행 안내, 파일 선택 문구가 모두 현지 언어로 노출되는 것을 브라우저로 확인했다.
+
+- [x] Stage 115 사회적 의료접근 취약기관 1차 발송 준비 및 발신 경로 점검 (2026-05-22)
+  - 오늘 실제로 보낼 1차 기관 묶음을 기존 승인 대기 큐 기준으로 다시 잠그고, 현재 서비스 구조에 맞는 최신 링크와 설명을 반영한다.
+  - 메일 본문에 한국어 홈페이지, 영어 홈페이지, 다국어 상담 시작 링크 구조를 현재 운영 주소 기준으로 정리한다.
+  - 실제 발송 전 현재 메일 발신 주소가 어떻게 보이는지 확인하고, 필요하면 사용자와 발신 정체성 결정을 짧게 재확인한다.
+  - Verification: `docs/happydoctor_partner_approval_queue_2026-04-17.md`, `docs/happydoctor_partner_priority8_sendpack_2026-04-17.md` 재검토, Gmail 발신 경로 확인.
+  - Progress: `docs/happydoctor_partner_approval_queue_2026-04-17.md`에 현재 실제 발신 Gmail 계정이 `csj3814@gmail.com`이라는 점과 1차 발송은 첨부 없이 링크 중심으로 가는 운영 메모를 추가했다.
+  - Progress: `docs/happydoctor_partner_priority8_sendpack_2026-04-17.md`의 서울외국인주민센터, 서울글로벌센터, 영등포구 가족센터, 요셉의원 발송본에 `https://happydoctor.kr/ko`, `https://happydoctor.kr/en`, `https://app.happydoctor.kr/start?source=homepage&lang=en` 링크와 2026-05-22 기준 운영 수치(`누적 상담 397건`, `의료진 직접 회신 328건`)를 반영했다.
+  - Progress: 사용자 피드백에 맞춰 4개 발송본의 수신 호칭을 `또는` 없이 단일 담당 호칭으로 통일하고, 후속 CTA를 `필요하시면 기관 내부 공유용 해피닥터 소개서를 보내드리겠습니다.` 문장으로 정리했다.
+  - Progress: 4개 발송본 모두에 영어·다국어 페이지가 준비되어 있어 언어 문제로 병원 방문이나 초기 의료 문의가 어려운 분들께 먼저 도움을 드릴 수 있다는 설명을 반영했다.
+  - Progress: 사용자 피드백에 맞춰 4개 발송본의 본문을 `단체 소개 선언문`보다 `왜 이 기관에 메일드리는지`, `어떻게 쓰는지`가 먼저 보이도록 짧고 구체적인 문장으로 다시 정리했다.
+  - Progress: Gmail 드래프트 4통을 실제로 생성했고, 현재 드래프트 발신 표시는 모두 `\"최석재\" <csj3814@gmail.com>`로 확인되었다.
+  - Progress: Gmail 드래프트 4통도 같은 문구로 다시 덮어써, 서울외국인주민센터·서울글로벌센터·영등포구 가족센터·요셉의원 초안 미리보기에서 단일 담당 호칭이 반영된 것을 확인했다.
+  - Progress: Gmail 드래프트 4통의 첫 문장과 본문 톤도 다시 다듬어, `행복한 의사 해피닥터를 운영하는 최석재입니다.`처럼 실제 담당자가 직접 쓴 메일처럼 읽히는 방향으로 맞췄다.
+  - Progress: 사용자 문장 교정에 맞춰 `1차 상담 후에 추가 질문도 이어갈 수 있습니다.`, `응급실로 바로 방문해야 할지...` 같은 더 직접적인 표현으로 바꾸고, `우선은 첨부 없이 링크 중심으로 먼저 공유드립니다.` 문장은 삭제했다.
+  - Progress: 동부외국인주민센터, 성북구 가족센터, 라파엘클리닉, 시립서대문농아인복지관 본문도 같은 기준으로 정리하고, 빠져 있던 3·5·7·8번 링크 블록을 추가했다.
+  - Result: 사용자 승인에 따라 2026-05-22 13:16 KST 기준 `csj3814@gmail.com` 발신으로 서울외국인주민센터, 서울글로벌센터, 영등포구 가족센터, 요셉의원 4통을 모두 실제 발송했다.
+  - Result: 승인 대기 큐 문서를 `발송 완료` 상태로 갱신하고, 후속 확인 날짜를 서울외국인주민센터·서울글로벌센터·영등포구 가족센터는 `2026-05-26`, 요셉의원은 `2026-05-25`로 적어두었다.
+
+- [x] Stage 116 한국어 홈페이지 상단 다국어 진입 CTA 교체 (2026-05-22)
+  - 한국어 홈페이지 상단의 `카카오 채널 보기` 버튼을 제거하고, 같은 위치에 영어·다국어 홈페이지로 이동하는 CTA를 넣는다.
+  - 기존 카카오 상담 시작 흐름과 하단 CTA는 유지하고, 상단 유틸리티 영역만 바꿔 다국어 진입성을 높인다.
+  - Verification: `frontend/homepage npm run verify:ci`, 한국어 홈페이지 렌더에서 상단 CTA 텍스트와 링크 확인.
+  - Result: `frontend/homepage/components/HomepageClient.tsx` 상단 네비게이션의 `카카오 채널 보기` 링크를 `영어·다국어 홈페이지` CTA로 교체하고, `next/link`로 `/en` 진입을 연결했다.
+  - Result: 로컬 `http://127.0.0.1:3101/ko` 렌더에서 새 상단 CTA가 보이고, 기존 `카카오 채널 보기` 문구는 사라졌으며, 클릭 시 `http://127.0.0.1:3101/en`으로 이동하는 것을 브라우저로 확인했다.
+  - Result: Vercel 프로덕션 배포 `dpl_8xwt3Zto69jEUR4UZdKxmvjBGsee`가 완료되었고, 라이브 `https://happydoctor.kr/ko`에서도 새 상단 CTA가 보이며 클릭 시 `https://happydoctor.kr/en`으로 이동하는 것을 재확인했다.
+
+- [x] Stage 117 의료진 지원 메일 수신 경로 확인 (2026-05-23)
+  - 홈페이지/포털에서 의료진 지원 또는 참여 진입점이 어떤 경로를 타는지 찾는다.
+  - 메일 발송인지, 포털 접근 요청인지, 또는 다른 승인 흐름인지 백엔드와 설정을 기준으로 확인한다.
+  - 현재 실제로 어디로 수신되거나 저장되는지 확인 근거와 함께 정리한다.
+  - Verification: 관련 프런트 진입점, 백엔드 라우트, 수신 주소/저장 경로 코드 확인.
+  - Result: 한국어 홈페이지의 `의료진 참여 문의` CTA는 메일 전송이 아니라 `https://open.kakao.com/me/happydoctors` 오픈카카오 링크로 연결되어 있고, 코드상 별도 `mailto:` 또는 메일 발송 라우트는 없다.
+  - Result: 포털 로그인 기반 의료진 지원 흐름은 `/api/portal/auth/status`에서 승인되지 않은 의사 계정을 `upsertDoctorAccessRequest()`로 Firestore `doctor_access_requests` 컬렉션에 `pending` 상태로 저장하는 구조이며, 메일 수신함으로 보내지지 않는다.
+  - Result: 승인 대기 의료진 목록은 포털 관리자 화면의 `ApprovalQueueCard`에서 보이며, 관리자는 `PORTAL_ADMIN_EMAILS` 또는 단일 `ALLOWED_DOCTOR_EMAILS` 기준으로 결정된다. 프로젝트 문서상 현재 대표 관리자 기준 이메일은 `csj3814@gmail.com`으로 기록되어 있다.
+
+- [x] Stage 118 의료진 알람 누락 복구 (2026-06-04)
+  - 의료진 알림 큐, 알림방 등록 문서, MessengerBotR 폴링 구조를 함께 점검해 실제 누락 원인을 찾는다.
+  - 레거시 `doctor_room` 문서가 현재 검증 로직에서 미등록으로 처리되는지 확인하고, 필요하면 호환 복구 로직을 추가한다.
+  - 회귀 테스트와 실데이터 점검으로 이후 알람이 다시 흐를 수 있는 상태인지 검증한다.
+  - Verification: `backend npm test`, `backend npm run check:syntax`, Firestore 알림방/큐 상태 재점검.
+## 2026-06-04 review
+- Stage 118 result: doctor alert room compatibility restored.
+  - Root cause: the live `delivery_rooms/doctor_room` document only had `roomName`, while the newer backend required `kind === doctor_group` and `isGroupChat === true`, so `/api/messengerbot/poll` treated the doctor room as unregistered.
+  - Fix: `backend/services/notifyService.js` now accepts legacy doctor-room documents, validates them, and backfills the missing metadata automatically.
+  - Verification: `backend npm run verify:ci` passed, the live Firestore doctor-room document was migrated in place, and Render `/api/version` advanced to `bb511f83d3a7330b46d62d397c86d9280e620683`.
+## 2026-06-04 review (continued)
+- [x] Stage 119 대표 개인 미답변 상담 알림 추가
+  - Goal: 의료진 단체방 알림과 별도로, 일정 시간 동안 답변이 없는 상담이 생기면 대표 개인 카카오 방에도 한 번 더 알려주는 경로를 추가했다.
+  - Fix: `backend/services/notifyService.js`에 `operator_unanswered_doctor_alert` 큐와 중복 방지 키를 추가하고, 의사 답변 완료나 상담 종료 시 개인 알림 큐도 함께 정리하도록 `public`, `portal`, `kakaoWebhook` 라우트를 보강했다.
+  - Fix: `backend/routes/messengerBot.js`에 `~개인알림등록`, `~개인알림확인` 명령을 추가해 개인 알림방을 조회하고 다시 등록할 수 있게 했다.
+  - Fix: Firestore 예약 ID 충돌을 피하기 위해 개인 알림 수신자 키를 `operator_alerts`로 바꾸고, 운영 `messenger_rooms/operator_alerts` 문서를 대표 개인 방 `행복한의사`로 등록했다.
+  - Verification: `backend npm run verify:ci` passed.
+  - Verification: 운영 Firestore에서 `messenger_rooms/operator_alerts.roomName === 행복한의사`를 확인했다.
