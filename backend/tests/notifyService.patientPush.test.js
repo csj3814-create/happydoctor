@@ -678,6 +678,21 @@ test('getDoctorRoomName accepts a legacy doctor room document and backfills requ
   }
 });
 
+test('validateDoctorRoomCandidate rejects the public emergency consultation room', { concurrency: false }, () => {
+  const context = loadNotifyService();
+
+  try {
+    const validation = context.service.validateDoctorRoomCandidate('행복한 의사의 응급상담방 95', {
+      isGroupChat: true,
+    });
+
+    assert.equal(validation.ok, false);
+    assert.equal(validation.code, 'BLOCKED_ROOM');
+  } finally {
+    context.restore();
+  }
+});
+
 test('enqueuePatientSmsNotification stores due and future doctor-reply SMS reminders and only the due reminder is claimable immediately', { concurrency: false }, async () => {
   await withEnv({
     SOLAPI_API_KEY: 'api-key',

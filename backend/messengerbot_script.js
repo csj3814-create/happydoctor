@@ -96,6 +96,8 @@ function buildDoctorHelp() {
         "~차트확인   대기 중인 신규/미전달 차트 수동 조회\n" +
         "~알림방등록 현재 방을 자동 알림방으로 등록\n" +
         "~알림방확인 현재 등록된 자동 알림방 확인\n" +
+        "~개인알림등록 이 1:1 방을 미답변 후속 알림방으로 등록\n" +
+        "~개인알림확인 현재 등록된 개인 후속 알림방 확인\n" +
         "※ 신규 차트는 10초마다 자동으로도 전송됩니다.\n\n" +
         "[공통]\n" +
         "~도움말    이 도움말 표시\n" +
@@ -195,6 +197,32 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
             }
         } catch (e) {
             replier.reply("⚠️ 알림방 확인 중 오류: " + e.message);
+        }
+        return;
+    }
+
+    if (trimmedMsg === "~개인알림등록") {
+        try {
+            var operatorRegisterConn = callMessengerEndpoint(room, trimmedMsg, sender, isGroupChat, "register_operator_alert_room");
+            var operatorRegisterData = JSON.parse(operatorRegisterConn.body());
+            if (operatorRegisterData.reply) {
+                replier.reply(operatorRegisterData.reply);
+            }
+        } catch (e) {
+            replier.reply("⚠️ 개인 알림방 등록 중 오류: " + e.message);
+        }
+        return;
+    }
+
+    if (trimmedMsg === "~개인알림확인") {
+        try {
+            var operatorRoomInfoConn = callMessengerEndpoint(room, trimmedMsg, sender, isGroupChat, "show_operator_alert_room");
+            var operatorRoomInfoData = JSON.parse(operatorRoomInfoConn.body());
+            if (operatorRoomInfoData.reply) {
+                replier.reply(operatorRoomInfoData.reply);
+            }
+        } catch (e) {
+            replier.reply("⚠️ 개인 알림방 확인 중 오류: " + e.message);
         }
         return;
     }

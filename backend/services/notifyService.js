@@ -25,6 +25,7 @@ const DOCTOR_ROOM_BLOCKED_PATTERNS = Object.freeze([
   /운영위/,
   /운영위원/,
   /운영위원회/,
+  /응급상담방/,
 ]);
 
 function getCollection(name) {

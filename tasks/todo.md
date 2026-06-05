@@ -1,5 +1,16 @@
 # Happy Doctor Project - Tasks
 
+## 2026-06-05 review (continued)
+- [x] Stage 121 의료진 알림방과 대표 개인 후속 알림방 분리
+  - Problem: the operator unanswered-alert test was delivered to the 95-member public emergency consultation room, which should not receive operational alerts.
+  - Fix: remove the mistaken `messenger_rooms/operator_alerts -> 행복한의사` binding so delayed personal alerts cannot go to that public room.
+  - Fix: add MessengerBotR support for `~개인알림등록` and `~개인알림확인` so the representative's real 1:1 room can be registered separately from the medical volunteer group.
+  - Fix: block rooms containing `응급상담방` from being registered as the doctor alert room.
+  - Verification: `backend npm run verify:ci`, Firestore registration check.
+  - Result: 운영 Firestore에서 `messenger_rooms/operator_alerts` 문서를 삭제해 95명방으로 대표 후속 알림이 가는 경로를 차단했다.
+  - Result: 현재 `delivery_rooms/doctor_room` 값은 의료봉사방 제목이 아니라 `최석재 진료교수...` 형태로 잡혀 있어 해당 문서도 삭제했다. 실제 의료봉사방에서 `~알림방등록`으로 재등록해야 한다.
+  - Result: 대표 개인 알림은 MessengerBotR 스크립트 최신본 반영 후 대표 1:1 방에서 `~개인알림등록`을 보내 등록해야 다시 켜진다.
+
 ## 2026-06-05 review
 - [x] Stage 120 개인 미답변 알림 한글 깨짐 원인 확인
   - Screenshot symptom: the operator alert test message appeared as question marks in Kakao.
