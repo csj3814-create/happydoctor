@@ -7,6 +7,7 @@
   - Verification: `backend npm run verify:ci`, Render revision check after deploy.
   - Result: `validateDoctorRoomCandidate()` now accepts trusted medical volunteer room names even when the Kakao group flag is false, while blocked public emergency consultation rooms still return `BLOCKED_ROOM`.
   - Result: added a regression test for the `2기 행복한 의사 의료봉사자` room-name path.
+  - Result: Render `/api/version` advanced to `9222e09294c539c95c850d7ffd5c9d908eda0c67`.
 
 ## 2026-06-05 review (continued)
 - [x] Stage 121 의료진 알림방과 대표 개인 후속 알림방 분리
