@@ -27,6 +27,10 @@ const DOCTOR_ROOM_BLOCKED_PATTERNS = Object.freeze([
   /운영위원회/,
   /응급상담방/,
 ]);
+const DOCTOR_ROOM_TRUSTED_GROUP_NAME_PATTERNS = Object.freeze([
+  /의료봉사/,
+  /의료봉사자/,
+]);
 
 function getCollection(name) {
   const db = getDb();
@@ -61,7 +65,9 @@ function isExplicitGroupChat(value) {
 
 function validateDoctorRoomCandidate(roomName, options = {}) {
   const normalizedRoomName = normalizeRoomName(roomName);
-  const isGroupChat = isExplicitGroupChat(options.isGroupChat);
+  const isBlockedRoom = DOCTOR_ROOM_BLOCKED_PATTERNS.some((pattern) => pattern.test(normalizedRoomName));
+  const isTrustedGroupName = DOCTOR_ROOM_TRUSTED_GROUP_NAME_PATTERNS.some((pattern) => pattern.test(normalizedRoomName));
+  const isGroupChat = isExplicitGroupChat(options.isGroupChat) || isTrustedGroupName;
 
   if (!normalizedRoomName) {
     return {
@@ -71,18 +77,18 @@ function validateDoctorRoomCandidate(roomName, options = {}) {
     };
   }
 
-  if (!isGroupChat) {
+  if (isBlockedRoom) {
     return {
       ok: false,
-      code: 'GROUP_CHAT_REQUIRED',
+      code: 'BLOCKED_ROOM',
       roomName: normalizedRoomName,
     };
   }
 
-  if (DOCTOR_ROOM_BLOCKED_PATTERNS.some((pattern) => pattern.test(normalizedRoomName))) {
+  if (!isGroupChat) {
     return {
       ok: false,
-      code: 'BLOCKED_ROOM',
+      code: 'GROUP_CHAT_REQUIRED',
       roomName: normalizedRoomName,
     };
   }

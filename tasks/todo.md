@@ -1,5 +1,13 @@
 # Happy Doctor Project - Tasks
 
+## 2026-06-13 review
+- [x] Stage 122 의료봉사방 알림방 등록 실패 보정
+  - Problem: in the `2기 행복한 의사 의료봉사자` Kakao group, `~알림방등록` was rejected as a personal chat because MessengerBotR passed `isGroupChat=false`.
+  - Fix: keep blocking public `응급상담방` rooms, but allow doctor-room registration when the room name clearly contains `의료봉사` or `의료봉사자`.
+  - Verification: `backend npm run verify:ci`, Render revision check after deploy.
+  - Result: `validateDoctorRoomCandidate()` now accepts trusted medical volunteer room names even when the Kakao group flag is false, while blocked public emergency consultation rooms still return `BLOCKED_ROOM`.
+  - Result: added a regression test for the `2기 행복한 의사 의료봉사자` room-name path.
+
 ## 2026-06-05 review (continued)
 - [x] Stage 121 의료진 알림방과 대표 개인 후속 알림방 분리
   - Problem: the operator unanswered-alert test was delivered to the 95-member public emergency consultation room, which should not receive operational alerts.

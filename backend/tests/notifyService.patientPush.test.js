@@ -693,6 +693,22 @@ test('validateDoctorRoomCandidate rejects the public emergency consultation room
   }
 });
 
+test('validateDoctorRoomCandidate accepts the medical volunteer room even when MessengerBotR sends a false group flag', { concurrency: false }, () => {
+  const context = loadNotifyService();
+
+  try {
+    const validation = context.service.validateDoctorRoomCandidate('2기 행복한 의사 의료봉사자', {
+      isGroupChat: false,
+    });
+
+    assert.equal(validation.ok, true);
+    assert.equal(validation.code, 'OK');
+    assert.equal(validation.roomName, '2기 행복한 의사 의료봉사자');
+  } finally {
+    context.restore();
+  }
+});
+
 test('enqueuePatientSmsNotification stores due and future doctor-reply SMS reminders and only the due reminder is claimable immediately', { concurrency: false }, async () => {
   await withEnv({
     SOLAPI_API_KEY: 'api-key',
