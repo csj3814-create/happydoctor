@@ -53,13 +53,17 @@ function normalizeDoctorRoomName(room) {
 }
 
 function buildDoctorRoomRegistrationErrorReply(validation) {
+    const receivedRoomName = validation?.roomName
+        ? `\n서버가 받은 방 이름: ${validation.roomName}`
+        : '';
+
     switch (validation?.code) {
         case 'GROUP_CHAT_REQUIRED':
-            return '개인톡은 의료진 자동 알림방으로 등록할 수 없습니다.\n의료진 단톡방에서 `~알림방등록`을 보내 주세요.';
+            return `개인톡은 의료진 자동 알림방으로 등록할 수 없습니다.${receivedRoomName}\n의료진 단톡방에서 \`~알림방등록\`을 보내 주세요.\n방 이름 확인은 \`~방이름\`을 보내 주세요.`;
         case 'BLOCKED_ROOM':
-            return '운영위원회 방에는 상담 내용을 보내지 않습니다.\n의료진 단톡방에서 `~알림방등록`을 보내 다시 등록해 주세요.';
+            return `운영위원회 방에는 상담 내용을 보내지 않습니다.${receivedRoomName}\n의료진 단톡방에서 \`~알림방등록\`을 보내 다시 등록해 주세요.`;
         default:
-            return '알림방 이름을 다시 확인해 주세요.\n의료진 단톡방에서 `~알림방등록`을 다시 보내 주세요.';
+            return `알림방 이름을 다시 확인해 주세요.${receivedRoomName}\n의료진 단톡방에서 \`~알림방등록\`을 다시 보내 주세요.`;
     }
 }
 

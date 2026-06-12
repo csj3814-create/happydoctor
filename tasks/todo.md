@@ -1,5 +1,12 @@
 # Happy Doctor Project - Tasks
 
+## 2026-06-13 review (continued)
+- [ ] Stage 123 의료봉사방 알림방 등록 재실패 보강
+  - Problem: the 2nd medical volunteer Kakao group still receives `GROUP_CHAT_REQUIRED`, which means the live request is probably arriving with a room title that differs from the full visible title or is being treated as non-group by MessengerBotR.
+  - Fix: allow the narrow `2기 행복한 의사 의료...` room-title family as a trusted doctor group fallback while continuing to block public emergency consultation rooms.
+  - Fix: make registration failure replies include the room name received by the server so the next diagnosis does not rely on the Kakao UI title.
+  - Verification: `backend npm run verify:ci`, then deploy and confirm live `/api/version`.
+
 ## 2026-06-13 review
 - [x] Stage 122 의료봉사방 알림방 등록 실패 보정
   - Problem: in the `2기 행복한 의사 의료봉사자` Kakao group, `~알림방등록` was rejected as a personal chat because MessengerBotR passed `isGroupChat=false`.
