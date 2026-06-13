@@ -1,5 +1,11 @@
 # Happy Doctor Project - Tasks
 
+## 2026-06-13 review (continued 2)
+- [ ] Stage 124 MessengerBotR internal room alias for 2nd volunteer group
+  - Problem: the user confirmed the actual 2nd medical volunteer Kakao group is reported by MessengerBotR as `가족-최석재`, so the backend still rejects `~알림방등록` as a non-group room.
+  - Fix: allow only this exact internal room alias as a trusted doctor-room candidate, while keeping public emergency consultation rooms blocked.
+  - Verification: `backend npm run verify:ci`, then deploy and confirm live `/api/version`.
+
 ## 2026-06-13 review (continued)
 - [x] Stage 123 의료봉사방 알림방 등록 재실패 보강
   - Problem: the 2nd medical volunteer Kakao group still receives `GROUP_CHAT_REQUIRED`, which means the live request is probably arriving with a room title that differs from the full visible title or is being treated as non-group by MessengerBotR.

@@ -725,6 +725,22 @@ test('validateDoctorRoomCandidate accepts the truncated 2nd medical volunteer ro
   }
 });
 
+test('validateDoctorRoomCandidate accepts the confirmed MessengerBotR alias for the 2nd volunteer room', { concurrency: false }, () => {
+  const context = loadNotifyService();
+
+  try {
+    const validation = context.service.validateDoctorRoomCandidate('가족-최석재', {
+      isGroupChat: false,
+    });
+
+    assert.equal(validation.ok, true);
+    assert.equal(validation.code, 'OK');
+    assert.equal(validation.roomName, '가족-최석재');
+  } finally {
+    context.restore();
+  }
+});
+
 test('enqueuePatientSmsNotification stores due and future doctor-reply SMS reminders and only the due reminder is claimable immediately', { concurrency: false }, async () => {
   await withEnv({
     SOLAPI_API_KEY: 'api-key',
