@@ -725,7 +725,7 @@ test('validateDoctorRoomCandidate accepts the truncated 2nd medical volunteer ro
   }
 });
 
-test('validateDoctorRoomCandidate accepts the confirmed MessengerBotR alias for the 2nd volunteer room', { concurrency: false }, () => {
+test('validateDoctorRoomCandidate rejects the ambiguous MessengerBotR family alias as a doctor group', { concurrency: false }, () => {
   const context = loadNotifyService();
 
   try {
@@ -733,8 +733,8 @@ test('validateDoctorRoomCandidate accepts the confirmed MessengerBotR alias for 
       isGroupChat: false,
     });
 
-    assert.equal(validation.ok, true);
-    assert.equal(validation.code, 'OK');
+    assert.equal(validation.ok, false);
+    assert.equal(validation.code, 'GROUP_CHAT_REQUIRED');
     assert.equal(validation.roomName, '가족-최석재');
   } finally {
     context.restore();

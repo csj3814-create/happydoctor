@@ -76,6 +76,26 @@ function buildOperatorAlertRoomErrorReply(validation) {
     }
 }
 
+async function resolveDoctorAlertDeliveryRoom() {
+    const operatorRoomName = await getOperatorAlertRoomName();
+    if (operatorRoomName) {
+        return {
+            roomName: operatorRoomName,
+            deliveryMode: 'operator_personal',
+        };
+    }
+
+    const doctorRoomName = await getDoctorRoomName();
+    if (doctorRoomName) {
+        return {
+            roomName: doctorRoomName,
+            deliveryMode: 'doctor_group',
+        };
+    }
+
+    return null;
+}
+
 function checkApiKey(req, res, next) {
     const apiKey = req.headers['x-api-key'];
     let validKey = '';
@@ -218,9 +238,9 @@ router.post('/', checkApiKey, async (req, res) => {
 });
 
 router.get('/poll', checkApiKey, async (req, res) => {
-    const roomName = await getDoctorRoomName();
-    if (!roomName) {
-        return res.status(200).json({ hasNew: false, reason: 'doctor_room_not_registered' });
+    const deliveryRoom = await resolveDoctorAlertDeliveryRoom();
+    if (!deliveryRoom) {
+        return res.status(200).json({ hasNew: false, reason: 'doctor_alert_room_not_registered' });
     }
 
     const chart = await claimDoctorNotification();
@@ -232,7 +252,8 @@ router.get('/poll', checkApiKey, async (req, res) => {
         hasNew: true,
         notificationId: chart.notificationId,
         leaseId: chart.leaseId,
-        roomName,
+        roomName: deliveryRoom.roomName,
+        deliveryMode: deliveryRoom.deliveryMode,
         reply: buildDoctorAlertPreview(chart.message, chart.priority) + buildPortalGuide(),
     });
 });

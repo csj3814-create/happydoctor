@@ -31,7 +31,6 @@ const DOCTOR_ROOM_TRUSTED_GROUP_NAME_PATTERNS = Object.freeze([
   /의료봉사/,
   /의료봉사자/,
   /^2기\s*행복한\s*의사\s*의료/,
-  /^가족-최석재$/,
 ]);
 
 function getCollection(name) {

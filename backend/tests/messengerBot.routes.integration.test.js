@@ -126,8 +126,11 @@ test('messengerBot doctor poll returns the leased notification payload and ack f
       registerRoom: async () => {},
       registerDoctorRoom: async () => ({ ok: true, roomName: 'doctor room' }),
       getDoctorRoomName: async () => {
-        calls.push({ type: 'getDoctorRoomName' });
-        return 'doctor room';
+        throw new Error('doctor room should not be used when operator room is registered');
+      },
+      getOperatorAlertRoomName: async () => {
+        calls.push({ type: 'getOperatorAlertRoomName' });
+        return 'owner room';
       },
     });
 
@@ -142,7 +145,8 @@ test('messengerBot doctor poll returns the leased notification payload and ack f
       assert.equal(poll.body.hasNew, true);
       assert.equal(poll.body.notificationId, 'doctor-note-1');
       assert.equal(poll.body.leaseId, 'lease-1');
-      assert.equal(poll.body.roomName, 'doctor room');
+      assert.equal(poll.body.roomName, 'owner room');
+      assert.equal(poll.body.deliveryMode, 'operator_personal');
       assert.match(poll.body.reply, /line one/);
       assert.match(poll.body.reply, /portal\.happydoctor\.kr\/open-browser/);
 
@@ -162,7 +166,7 @@ test('messengerBot doctor poll returns the leased notification payload and ack f
       assert.deepEqual(ack.body, { ok: true });
 
       assert.deepEqual(calls, [
-        { type: 'getDoctorRoomName' },
+        { type: 'getOperatorAlertRoomName' },
         { type: 'claimDoctorNotification' },
         {
           type: 'acknowledgeDoctorNotification',
@@ -172,6 +176,62 @@ test('messengerBot doctor poll returns the leased notification payload and ack f
             error: 'x'.repeat(240),
           },
         },
+      ]);
+    } finally {
+      await server.close();
+      routeModule.restore();
+    }
+  });
+});
+
+test('messengerBot doctor poll falls back to the doctor group when no personal alert room is registered', { concurrency: false }, async () => {
+  await withMessengerApiKey(async () => {
+    const calls = [];
+    const routeModule = loadMessengerBotRoute({
+      claimDoctorNotification: async () => {
+        calls.push({ type: 'claimDoctorNotification' });
+        return {
+          notificationId: 'doctor-note-2',
+          leaseId: 'lease-2',
+          message: 'fallback chart',
+          priority: 'normal',
+        };
+      },
+      acknowledgeDoctorNotification: async () => {},
+      confirmDoctorNotifications: async () => [],
+      claimPatientChannelPush: async () => null,
+      acknowledgePatientChannelPush: async () => {},
+      registerRoom: async () => {},
+      registerDoctorRoom: async () => ({ ok: true, roomName: 'doctor room' }),
+      getOperatorAlertRoomName: async () => {
+        calls.push({ type: 'getOperatorAlertRoomName' });
+        return null;
+      },
+      getDoctorRoomName: async () => {
+        calls.push({ type: 'getDoctorRoomName' });
+        return 'doctor room';
+      },
+    });
+
+    const server = await startServer(routeModule.router);
+
+    try {
+      const poll = await getJson(`${server.baseUrl}/poll`, {
+        headers: { 'x-api-key': 'test-messenger-key' },
+      });
+
+      assert.equal(poll.status, 200);
+      assert.equal(poll.body.hasNew, true);
+      assert.equal(poll.body.notificationId, 'doctor-note-2');
+      assert.equal(poll.body.leaseId, 'lease-2');
+      assert.equal(poll.body.roomName, 'doctor room');
+      assert.equal(poll.body.deliveryMode, 'doctor_group');
+      assert.match(poll.body.reply, /fallback chart/);
+
+      assert.deepEqual(calls, [
+        { type: 'getOperatorAlertRoomName' },
+        { type: 'getDoctorRoomName' },
+        { type: 'claimDoctorNotification' },
       ]);
     } finally {
       await server.close();
@@ -192,6 +252,7 @@ test('messengerBot doctor poll reports missing registration and rejects missing 
       acknowledgePatientChannelPush: async () => {},
       registerRoom: async () => {},
       registerDoctorRoom: async () => ({ ok: true, roomName: 'doctor room' }),
+      getOperatorAlertRoomName: async () => null,
       getDoctorRoomName: async () => null,
     });
 
@@ -204,7 +265,7 @@ test('messengerBot doctor poll reports missing registration and rejects missing 
       assert.equal(poll.status, 200);
       assert.deepEqual(poll.body, {
         hasNew: false,
-        reason: 'doctor_room_not_registered',
+        reason: 'doctor_alert_room_not_registered',
       });
 
       const ack = await postJson(
