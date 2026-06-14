@@ -1,11 +1,13 @@
 # Happy Doctor Project - Tasks
 
 ## 2026-06-14 review
-- [ ] Stage 125 대표 개인 알림방 우선 의료진 알림 모드
+- [x] Stage 125 대표 개인 알림방 우선 의료진 알림 모드
   - Problem: MessengerBotR cannot safely distinguish the intended 2nd medical volunteer group because the room is reported as `가족-최석재`, so group delivery is unsafe for now.
   - Fix: route new doctor notification poll responses to the registered operator personal alert room first; only fall back to the doctor group room if no personal alert room is registered.
   - Fix: remove the ambiguous `가족-최석재` alias from the trusted doctor group allowlist so it cannot be used as a group fallback destination.
   - Verification: `backend npm run verify:ci`, then deploy and confirm live `/api/version`.
+  - Result: `backend npm run verify:ci` passed with 50 tests.
+  - Result: Render `/api/version` advanced to `d3379aba43c2a9affdb16c89e1214b48470f44f4`.
 
 ## 2026-06-13 review (continued 2)
 - [x] Stage 124 MessengerBotR internal room alias for 2nd volunteer group
