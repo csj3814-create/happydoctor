@@ -7,6 +7,8 @@
   - Verification: `frontend/homepage npm run verify:ci`, 로컬 대표 소개 렌더 확인.
   - Result: 이름 아래 직함과 `현직` 목록 첫 항목에 최신 소속을 반영했다.
   - Result: `frontend/homepage npm run verify:ci`가 통과했고, `http://127.0.0.1:3101/ko` 대표 소개에서 직함·공저 표기·기존 링크 배치를 확인했다.
+  - Result: commit `fcff1e1`을 `main`에 반영했고 GitHub Frontend CI run `29227504367`이 통과했다.
+  - Result: `https://happydoctor.kr/ko`에서 최신 소속·다국어 홈페이지 링크·공저 표기를 최종 확인했다.
 
 ## 2026-06-14 review
 - [x] Stage 125 대표 개인 알림방 우선 의료진 알림 모드
