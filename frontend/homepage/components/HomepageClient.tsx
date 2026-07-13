@@ -1,6 +1,7 @@
 'use client'
 
 import Image from 'next/image'
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
 const FALLBACK_STATS = { total: 373, doctorReplied: 321 }
@@ -211,14 +212,12 @@ function Hero({ stats }: { stats: Stats | null }) {
               <p className="text-xs text-white/60">Happy Doctor</p>
             </div>
           </div>
-          <a
-            href={KAKAO_CHANNEL_URL}
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href="/en"
             className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-white/90 transition hover:bg-white/10"
           >
-            카카오 채널 보기
-          </a>
+            영어·다국어 홈페이지
+          </Link>
         </div>
 
         <div className="grid items-center gap-8 lg:grid-cols-[1.08fr_0.92fr] lg:gap-10">
@@ -817,7 +816,7 @@ function CEOSection() {
   const profiles = [
     {
       label: '현직',
-      items: ['행복한 의사 Happy Doctor 대표', '습관학교 해빛스쿨 운영', '유튜브 건방진 닥터스 채널 운영', '베지닥터 상임이사'],
+      items: ['가톨릭대학교 여의도성모병원 응급의학과 진료교수', '행복한 의사 Happy Doctor 대표', '습관학교 해빛스쿨 운영', '유튜브 건방진 닥터스 채널 운영', '베지닥터 상임이사'],
     },
     {
       label: '전직',
@@ -859,6 +858,7 @@ function CEOSection() {
               </div>
               <div>
                 <h3 className="text-2xl font-bold text-slate-900">최석재</h3>
+                <p className="mt-1 text-sm text-slate-500">가톨릭대학교 여의도성모병원 응급의학과 진료교수</p>
                 <p className="mt-1 text-sm text-slate-500">응급의학과 전문의 · 행복한 의사 대표</p>
               </div>
             </div>

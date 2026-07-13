@@ -1,5 +1,13 @@
 # Happy Doctor Project - Tasks
 
+## 2026-07-13
+- [x] Stage 126 대표 소개 최신 소속 반영
+  - 공개 홈페이지 대표 소개에 `가톨릭대학교 여의도성모병원 응급의학과 진료교수`를 추가한다.
+  - 기존 대표 역할·저서·방송·SNS와 상단 다국어 링크 변경은 그대로 보존한다.
+  - Verification: `frontend/homepage npm run verify:ci`, 로컬 대표 소개 렌더 확인.
+  - Result: 이름 아래 직함과 `현직` 목록 첫 항목에 최신 소속을 반영했다.
+  - Result: `frontend/homepage npm run verify:ci`가 통과했고, `http://127.0.0.1:3101/ko` 대표 소개에서 직함·공저 표기·기존 링크 배치를 확인했다.
+
 ## 2026-06-14 review
 - [x] Stage 125 대표 개인 알림방 우선 의료진 알림 모드
   - Problem: MessengerBotR cannot safely distinguish the intended 2nd medical volunteer group because the room is reported as `가족-최석재`, so group delivery is unsafe for now.
