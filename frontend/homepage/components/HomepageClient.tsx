@@ -816,7 +816,7 @@ function CEOSection() {
   const profiles = [
     {
       label: '현직',
-      items: ['가톨릭대학교 여의도성모병원 응급의학과 진료교수', '행복한 의사 Happy Doctor 대표', '습관학교 해빛스쿨 운영', '유튜브 건방진 닥터스 채널 운영', '베지닥터 상임이사'],
+      items: ['가톨릭대학교 여의도성모병원 응급의학과 진료교수', '행복한 의사 Happy Doctor 대표', '습관학교 해빛스쿨 운영', '유튜브 최석재의 골든타임 운영(구 건방진 닥터스)', '베지닥터 상임이사'],
     },
     {
       label: '전직',
@@ -833,12 +833,12 @@ function CEOSection() {
   ]
 
   const links = [
-    { label: '건방진 닥터스', href: 'https://www.youtube.com/@doctors0', color: '#FF0000' },
+    { label: '최석재의 골든타임', href: 'https://www.youtube.com/@doctors0', color: '#FF0000' },
     { label: '블로그', href: 'https://blog.naver.com/csj3814', color: '#185FA5' },
     { label: '브런치', href: 'https://brunch.co.kr/@csj3814', color: '#7B6200' },
     { label: '인스타그램', href: 'https://www.instagram.com/csj3814/', color: '#E1306C' },
     { label: '쓰레드', href: 'https://www.threads.com/@csj3814', color: '#111827' },
-    { label: '해빛스쿨', href: 'https://habitschool.web.app/', color: '#1D9E75' },
+    { label: '습관학교 해빛스쿨', href: 'https://habitschool.web.app/', color: '#1D9E75' },
   ]
 
   return (

@@ -1722,3 +1722,15 @@
   - Verification: `backend npm run verify:ci` passed.
   - Verification: 운영 Firestore에서 `messenger_rooms/operator_alerts.roomName === 행복한의사`를 확인했다.
   - Verification: 설정 확인용 테스트 알림이 `patient_channel_pushes`에서 `delivered` 상태로 전환되었고, 실제 대상 방도 `행복한의사`로 기록된 것을 확인했다.
+
+- [x] Stage 120 대표 소개 외부 활동 표기 최소 정정 (2026-07-19)
+  - 행복한 의사 홈페이지는 무료 의료상담 서비스의 정체성과 현재 정보 구조를 그대로 유지한다.
+  - 대표 소개 영역의 옛 유튜브 명칭만 `최석재의 골든타임(구 건방진 닥터스)`로 정정한다.
+  - `해빛스쿨` 링크 이름은 공식 표기인 `습관학교 해빛스쿨`로 맞춘다.
+  - 새 개인 브랜드 섹션, 강연 홍보, 해빛스쿨 설명문은 추가하지 않는다.
+  - Verification: `frontend/homepage npm run verify:ci`, 변경 문자열 검색, 로컬 한국어 홈페이지 렌더 확인.
+  - Result: 대표 현직 목록의 유튜브 활동을 `최석재의 골든타임 운영(구 건방진 닥터스)`로 정정했다.
+  - Result: 외부 링크 라벨을 `최석재의 골든타임`, `습관학교 해빛스쿨`로 통일하고 기존 URL은 유지했다.
+  - Result: `npm run verify:ci`에서 ESLint와 Next.js 프로덕션 빌드가 모두 통과했다.
+  - Result: 로컬 `/ko`를 데스크톱 1440×900과 모바일 390×844에서 확인했고, 대상 문구가 보이며 가로 오버플로가 없음을 검증했다.
+  - Result: 커밋·푸시·배포는 수행하지 않았다.
