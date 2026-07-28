@@ -141,10 +141,6 @@ function getRuntimeRevision() {
   };
 }
 
-function getGeminiApiKey() {
-  return getRequiredEnv('GEMINI_API_KEY');
-}
-
 function getGoogleTranslateApiKey() {
   return getEnv('GOOGLE_TRANSLATE_API_KEY');
 }
@@ -205,7 +201,6 @@ function isKeepAliveDisabled() {
 }
 
 function validateStartupConfig() {
-  getGeminiApiKey();
   getMessengerApiKey();
   getFollowUpRuntimeConfig();
   getPatientSmsRuntimeConfig();
@@ -228,7 +223,6 @@ module.exports = {
   getPortalAdminEmails,
   getPortalOrigins,
   getRuntimeRevision,
-  getGeminiApiKey,
   getGoogleTranslateApiKey,
   getMessengerApiKey,
   getFirebaseServiceAccount,

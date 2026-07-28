@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
-import { Analytics } from '@vercel/analytics/react'
 import { Noto_Sans_KR, Space_Grotesk } from 'next/font/google'
+
+import AppPrivacyFooter from '@/components/AppPrivacyFooter'
 import './globals.css'
 
 const notoSansKr = Noto_Sans_KR({
@@ -29,7 +30,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: '해피닥터 앱 | Happy Doctor',
     description:
-      '의료가 멀게 느껴질 때 먼저 닿는 온라인 의료상담. AI 인턴 보듬이와 자원봉사 의료진이 함께하는 해피닥터 앱입니다.',
+      '의료가 멀게 느껴질 때 먼저 닿는 온라인 의료상담. 접수된 모든 상담을 의료진이 직접 검토하는 해피닥터 앱입니다.',
     type: 'website',
     url: '/',
     images: [
@@ -45,7 +46,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: '해피닥터 앱 | Happy Doctor',
     description:
-      '의료가 멀게 느껴질 때 먼저 닿는 온라인 의료상담. AI 인턴 보듬이와 자원봉사 의료진이 함께하는 해피닥터 앱입니다.',
+      '의료가 멀게 느껴질 때 먼저 닿는 온라인 의료상담. 접수된 모든 상담을 의료진이 직접 검토하는 해피닥터 앱입니다.',
     images: ['/app-screenshot.png'],
   },
   appleWebApp: {
@@ -71,7 +72,7 @@ export default function RootLayout({
     <html lang="ko" className={`${notoSansKr.className} ${spaceGrotesk.variable} h-full`}>
       <body className="min-h-full bg-[var(--surface)] text-[var(--ink)] antialiased">
         {children}
-        <Analytics />
+        <AppPrivacyFooter />
       </body>
     </html>
   )

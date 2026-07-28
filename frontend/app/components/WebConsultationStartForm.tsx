@@ -2,7 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react'
 
-import type { PublicConsultationCreateResponse } from '@/lib/status'
+import {
+  type PublicConsultationCreateResponse,
+  extractStatusLookupFromUrl,
+  localizeAndProtectStatusUrl,
+} from '@/lib/status'
 import type { StartFormCopy } from '@/lib/start-copy'
 import {
   ActiveConsultationSession,
@@ -13,7 +17,7 @@ import {
   saveActiveConsultationSession,
   saveWebConsultationDraft,
 } from '@/lib/consultation-session'
-import { UiLanguage, isEnglishUiLanguage, saveUiLanguage, withUiLanguage } from '@/lib/ui-language'
+import { UiLanguage, isEnglishUiLanguage, saveUiLanguage } from '@/lib/ui-language'
 import LocalizedFilePicker from '@/components/LocalizedFilePicker'
 
 type WebConsultationStartFormProps = {
@@ -34,6 +38,9 @@ const INITIAL_FORM_STATE: ConsultationFormState = {
   nrs: '',
   associatedSymptom: '',
   pastMedicalHistory: '',
+  privacyConsent: false,
+  sensitiveInfoConsent: false,
+  adultConfirmed: false,
   replyNotificationConsent: false,
   replyNotificationPhone: '',
 }
@@ -46,7 +53,7 @@ const copyByLanguage = {
     restoredDraft: '방금 입력하던 내용을 다시 불러왔습니다. 이어서 작성한 뒤 상담을 시작할 수 있습니다.',
     languageHintEyebrow: '언어 안내',
     languageHintTitle: '{language} 로 적어도 괜찮습니다.',
-    languageHintBody: '{language} 로 입력한 내용은 자동으로 감지되어 의료진에게는 한국어 번역으로 전달되고, 가능한 경우 같은 언어로 답변이 돌아갑니다.',
+    languageHintBody: '{language} 로 입력한 내용은 의료진 검토를 돕기 위해 번역될 수 있으며, 모든 상담과 답변은 의료진이 직접 검토합니다.',
     phoneConsentRequired: '답변 알림을 받으려면 휴대폰 번호를 입력해 주세요.',
     phoneConsentMismatch: '답변 알림 연락처는 동의한 경우에만 저장할 수 있습니다.',
     submitError: '상담을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.',
@@ -82,9 +89,9 @@ const copyByLanguage = {
     phoneLabel: '휴대폰 번호',
     phonePlaceholder: '예: 010-1234-5678',
     policyNote: '응급 상황이라고 느껴지면 신고나 119 또는 가까운 응급실 이용이 우선입니다. 해피닥터는 응급실을 대신하는 서비스가 아니라 의료가 멀게 느껴지는 분들이 온라인으로 먼저 도움을 청할 수 있게 돕는 상담 서비스입니다.',
-    submitLoading: '보듬이가 내용을 정리하고 있습니다...',
+    submitLoading: '상담 내용을 안전하게 접수하고 있습니다...',
     submitIdle: '웹으로 상담 시작',
-    englishSupportNote: '한국어와 영어 UI는 완전 지원됩니다. 다른 언어는 가능한 범위에서 자동 번역을 시도합니다.',
+    englishSupportNote: '한국어와 영어 UI를 지원합니다. 번역이 필요한 경우에도 모든 상담은 의료진이 직접 검토합니다.',
   },
   en: {
     recentEyebrow: 'Recent consultation',
@@ -93,7 +100,7 @@ const copyByLanguage = {
     restoredDraft: 'We restored the details you were typing so you can continue and submit the consultation.',
     languageHintEyebrow: 'Language support',
     languageHintTitle: 'You can write in {language}.',
-    languageHintBody: 'We will try to detect {language} input automatically, translate it into Korean for our doctors, and send a translated reply back in the same language when possible.',
+    languageHintBody: 'Your {language} message may be translated to support review. Every consultation and reply is directly reviewed by a doctor.',
     phoneConsentRequired: 'Please enter a phone number if you want reply notifications.',
     phoneConsentMismatch: 'We only save a reply notification contact when you opt in.',
     submitError: 'We could not start the consultation right now. Please try again shortly.',
@@ -129,11 +136,53 @@ const copyByLanguage = {
     phoneLabel: 'Phone number',
     phonePlaceholder: 'Example: +82 10-1234-5678',
     policyNote: 'If this feels urgent, please use emergency services first. Happy Doctor does not replace emergency care. It is an online support service for people who need to ask for help before healthcare becomes harder to reach.',
-    submitLoading: 'Bodeum is organizing your consultation...',
+    submitLoading: 'Submitting your consultation securely...',
     submitIdle: 'Start consultation on the web',
-    englishSupportNote: 'Korean and English UI are fully supported. Other languages are accepted on a best-effort basis and may be translated automatically for our doctors.',
+    englishSupportNote: 'Korean and English UI are supported. When translation is needed, every consultation is still directly reviewed by a doctor.',
   },
 } as const
+
+const consentCopyByLanguage = {
+  ko: {
+    title: '상담 접수 동의',
+    requiredError: '필수 개인정보 수집·이용, 민감정보 처리 및 만 18세 이상 확인에 모두 동의해 주세요.',
+    privacyTitle: '[필수] 개인정보 수집·이용 동의',
+    privacyBody: '나이 또는 연령대, 성별, 상담 언어와 접속 정보를 상담 접수·진행·상태 확인 및 서비스 보안을 위해 처리합니다.',
+    sensitiveTitle: '[필수] 민감정보(건강정보) 수집·이용 동의',
+    sensitiveBody: '증상, 발생 시점, 증상 점수, 병력·복용약과 선택한 사진을 상담 내용 확인과 답변 제공을 위해 처리합니다.',
+    adultTitle: '[필수] 만 18세 이상입니다',
+    adultBody: '현재 이 상담 창구는 만 18세 이상만 이용할 수 있습니다.',
+    policyPrefix: '자세한 내용은',
+    policyLink: '개인정보처리방침',
+    policySuffix: '에서 확인할 수 있습니다.',
+  },
+  en: {
+    title: 'Consent for consultation intake',
+    requiredError: 'Please agree to the required privacy, sensitive health data, and age confirmations.',
+    privacyTitle: '[Required] Collection and use of personal information',
+    privacyBody: 'We process your age or age range, gender, language, and connection data to receive and manage your consultation, show its status, and protect the service.',
+    sensitiveTitle: '[Required] Collection and use of sensitive health information',
+    sensitiveBody: 'We process symptoms, onset, symptom score, medical history, medicines, and any photos you choose to submit so the consultation can be reviewed and answered.',
+    adultTitle: '[Required] I am at least 18 years old',
+    adultBody: 'This consultation service is currently available only to adults aged 18 or older.',
+    policyPrefix: 'Read the',
+    policyLink: 'Privacy Policy',
+    policySuffix: 'for more information.',
+  },
+} as const
+
+const reviewFlowCopyByLanguage = {
+  ko: {
+    languageHintBody: '{language} 로 입력한 내용은 의료진 검토를 돕기 위해 번역될 수 있으며, 모든 상담과 답변은 의료진이 직접 검토합니다.',
+    submitLoading: '상담 내용을 안전하게 접수하고 있습니다...',
+  },
+  en: {
+    languageHintBody: 'Your {language} message may be translated to support review. Every consultation and reply is directly reviewed by a doctor.',
+    submitLoading: 'Submitting your consultation securely...',
+  },
+} as const
+
+const PRIVACY_POLICY_VERSION = '2026-07-28'
 
 function isEmptyFormState(formState: ConsultationFormState) {
   return (
@@ -145,6 +194,9 @@ function isEmptyFormState(formState: ConsultationFormState) {
     && !formState.nrs.trim()
     && !formState.associatedSymptom.trim()
     && !formState.pastMedicalHistory.trim()
+    && !formState.privacyConsent
+    && !formState.sensitiveInfoConsent
+    && !formState.adultConfirmed
     && !formState.replyNotificationConsent
     && !formState.replyNotificationPhone.trim()
   )
@@ -174,7 +226,7 @@ function normalizeDraftGender(value: string) {
 }
 
 function localizeStatusUrl(statusUrl: string, uiLanguage: UiLanguage) {
-  return withUiLanguage(statusUrl, uiLanguage)
+  return localizeAndProtectStatusUrl(statusUrl, uiLanguage)
 }
 
 function getSelectionLabel(
@@ -200,6 +252,8 @@ export default function WebConsultationStartForm({
   copyOverride = null,
 }: WebConsultationStartFormProps) {
   const copy = copyOverride || copyByLanguage[uiLanguage]
+  const consentCopy = consentCopyByLanguage[uiLanguage]
+  const reviewFlowCopy = reviewFlowCopyByLanguage[uiLanguage]
   const [formState, setFormState] = useState(INITIAL_FORM_STATE)
   const [draftReady, setDraftReady] = useState(false)
   const [restoredDraft, setRestoredDraft] = useState(false)
@@ -213,6 +267,8 @@ export default function WebConsultationStartForm({
 
     const draft = getWebConsultationDraft()
     if (draft) {
+      // Restore a browser-only draft after hydration; no server snapshot contains this data.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormState({
         ...INITIAL_FORM_STATE,
         ...draft,
@@ -246,6 +302,16 @@ export default function WebConsultationStartForm({
     setError(null)
 
     const trimmedReplyNotificationPhone = formState.replyNotificationPhone.trim()
+    if (
+      !formState.privacyConsent
+      || !formState.sensitiveInfoConsent
+      || !formState.adultConfirmed
+    ) {
+      setError(consentCopy.requiredError)
+      setSubmitting(false)
+      return
+    }
+
     if (formState.replyNotificationConsent && !trimmedReplyNotificationPhone) {
       setError(copy.phoneConsentRequired)
       setSubmitting(false)
@@ -268,6 +334,10 @@ export default function WebConsultationStartForm({
       formData.append('nrs', formState.nrs)
       formData.append('associatedSymptom', formState.associatedSymptom)
       formData.append('pastMedicalHistory', formState.pastMedicalHistory)
+      formData.append('privacyConsent', String(formState.privacyConsent))
+      formData.append('sensitiveInfoConsent', String(formState.sensitiveInfoConsent))
+      formData.append('adultConfirmed', String(formState.adultConfirmed))
+      formData.append('privacyPolicyVersion', PRIVACY_POLICY_VERSION)
       formData.append('replyNotificationConsent', String(formState.replyNotificationConsent))
       formData.append('replyNotificationPhone', formState.replyNotificationPhone)
       formData.append('entrySurface', entrySurface)
@@ -291,9 +361,10 @@ export default function WebConsultationStartForm({
 
       const consultation = responsePayload as PublicConsultationCreateResponse
       const localizedStatusUrl = localizeStatusUrl(consultation.statusUrl, uiLanguage)
+      const longLookup = extractStatusLookupFromUrl(consultation.statusUrl)
       saveActiveConsultationSession({
         consultationId: consultation.consultationId,
-        lookup: consultation.trackingCode || '',
+        lookup: longLookup || consultation.trackingCode || '',
         trackingCode: consultation.trackingCode || null,
         statusUrl: localizedStatusUrl,
         uiLanguage,
@@ -351,7 +422,7 @@ export default function WebConsultationStartForm({
               {formatTemplate(copy.languageHintTitle, { language: inputLanguageLabel })}
             </p>
             <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
-              {formatTemplate(copy.languageHintBody, { language: inputLanguageLabel })}
+              {formatTemplate(reviewFlowCopy.languageHintBody, { language: inputLanguageLabel })}
             </p>
           </div>
         ) : null}
@@ -542,6 +613,65 @@ export default function WebConsultationStartForm({
             </div>
           </section>
 
+          <section className="rounded-[1.4rem] border border-[#bfd6f2] bg-[#f6faff] px-4 py-4">
+            <h3 className="text-sm font-semibold text-[var(--ink)]">{consentCopy.title}</h3>
+            <div className="mt-4 space-y-4">
+              {([
+                {
+                  id: 'privacyConsent',
+                  checked: formState.privacyConsent,
+                  title: consentCopy.privacyTitle,
+                  body: consentCopy.privacyBody,
+                  key: 'privacyConsent',
+                },
+                {
+                  id: 'sensitiveInfoConsent',
+                  checked: formState.sensitiveInfoConsent,
+                  title: consentCopy.sensitiveTitle,
+                  body: consentCopy.sensitiveBody,
+                  key: 'sensitiveInfoConsent',
+                },
+                {
+                  id: 'adultConfirmed',
+                  checked: formState.adultConfirmed,
+                  title: consentCopy.adultTitle,
+                  body: consentCopy.adultBody,
+                  key: 'adultConfirmed',
+                },
+              ] as const).map((item) => (
+                <div key={item.id} className="flex items-start gap-3">
+                  <input
+                    id={item.id}
+                    type="checkbox"
+                    required
+                    checked={item.checked}
+                    onChange={(event) => {
+                      setError(null)
+                      setFormState((current) => ({
+                        ...current,
+                        [item.key]: event.target.checked,
+                      }))
+                    }}
+                    className="mt-1 h-4 w-4 rounded border-[var(--line)] text-[var(--navy)] focus:ring-[var(--blue)]"
+                  />
+                  <div>
+                    <label htmlFor={item.id} className="text-sm font-semibold text-[var(--ink)]">
+                      {item.title}
+                    </label>
+                    <p className="mt-1 text-xs leading-6 text-[var(--muted)]">{item.body}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="mt-4 text-xs leading-6 text-[var(--muted)]">
+              {consentCopy.policyPrefix}{' '}
+              <a href="/privacy" target="_blank" rel="noreferrer" className="font-semibold text-[var(--blue)] underline underline-offset-2">
+                {consentCopy.policyLink}
+              </a>{' '}
+              {consentCopy.policySuffix}
+            </p>
+          </section>
+
           {selectedSummary.length > 0 ? (
             <ul className="rounded-[1.4rem] bg-[var(--surface)] px-4 py-4 text-sm leading-7 text-[var(--ink)]">
               {selectedSummary.map((label) => (
@@ -566,7 +696,7 @@ export default function WebConsultationStartForm({
           disabled={submitting}
           className="mt-6 w-full rounded-[1.2rem] bg-[var(--navy)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#123c67] disabled:cursor-not-allowed disabled:bg-slate-400"
         >
-          {submitting ? copy.submitLoading : copy.submitIdle}
+          {submitting ? reviewFlowCopy.submitLoading : copy.submitIdle}
         </button>
 
         {isEnglishUiLanguage(uiLanguage) ? (

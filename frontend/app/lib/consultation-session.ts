@@ -12,6 +12,9 @@ export type WebConsultationDraft = {
   nrs: string
   associatedSymptom: string
   pastMedicalHistory: string
+  privacyConsent: boolean
+  sensitiveInfoConsent: boolean
+  adultConfirmed: boolean
   replyNotificationConsent: boolean
   replyNotificationPhone: string
 }
@@ -72,8 +75,12 @@ export function extractLookupFromStatusUrl(statusUrl?: string | null): string | 
 
   try {
     const parsed = new URL(statusUrl, typeof window !== 'undefined' ? window.location.origin : 'https://app.happydoctor.kr')
+    const hashParams = new URLSearchParams(parsed.hash.replace(/^#/, ''))
     return (
-      parsed.searchParams.get('lookup')
+      hashParams.get('token')
+      || hashParams.get('lookup')
+      || hashParams.get('code')
+      || parsed.searchParams.get('lookup')
       || parsed.searchParams.get('code')
       || parsed.searchParams.get('token')
     )

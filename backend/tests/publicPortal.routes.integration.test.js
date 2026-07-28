@@ -292,22 +292,33 @@ test('public create route stores an optional consented notification phone for we
     formData.append('associatedSymptom', 'fatigue');
     formData.append('pastMedicalHistory', 'none');
     formData.append('entrySurface', 'app');
+    formData.append('privacyConsent', 'true');
+    formData.append('sensitiveInfoConsent', 'true');
+    formData.append('adultConfirmed', 'true');
     formData.append('replyNotificationConsent', 'true');
     formData.append('replyNotificationPhone', '010-1234-5678');
 
     const response = await postForm(`${server.baseUrl}/consultations`, formData);
 
-    assert.equal(response.status, 201);
+    assert.equal(response.status, 201, JSON.stringify(response.body));
     assert.equal(response.body.consultationId, 'consult-create-1');
-    assert.equal(response.body.statusUrl, 'https://app.happydoctor.kr/status?code=PCBXWN');
+    assert.equal(response.body.statusUrl, 'https://app.happydoctor.kr/status#token=token-1');
 
     const logCall = calls.find((entry) => entry.type === 'logConsultation');
     assert.ok(logCall);
+    assert.equal(logCall.analysisResult.action, 'ESCALATE');
+    assert.equal(response.body.status, 'waiting_doctor');
+    assert.equal(response.body.requiresDoctorReview, true);
     assert.deepEqual(logCall.options.patientNotificationContact, {
       consented: true,
       phone: '010-1234-5678',
       normalizedPhone: '01012345678',
       source: 'web_start',
+    });
+    assert.deepEqual(logCall.options.consent, {
+      privacy: true,
+      sensitiveInfo: true,
+      adultConfirmed: true,
     });
   } finally {
     await server.close();
@@ -357,6 +368,9 @@ test('public create route rejects notification consent without a phone number', 
     formData.append('gender', 'male');
     formData.append('chiefComplaint', 'cough');
     formData.append('symptomDetail', 'details about cough');
+    formData.append('privacyConsent', 'true');
+    formData.append('sensitiveInfoConsent', 'true');
+    formData.append('adultConfirmed', 'true');
     formData.append('replyNotificationConsent', 'true');
 
     const response = await postForm(`${server.baseUrl}/consultations`, formData);
@@ -364,6 +378,96 @@ test('public create route rejects notification consent without a phone number', 
     assert.equal(response.status, 400);
     assert.ok(response.body.error);
     assert.deepEqual(calls, []);
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});
+
+test('public data deletion requires a long token and protects receipt status with a header secret', { concurrency: false }, async () => {
+  const calls = [];
+  const lookup = 'a'.repeat(48);
+  const receiptToken = 'b'.repeat(64);
+  const routeModule = loadRouteWithMocks(PUBLIC_ROUTE_PATH, {
+    [DB_SERVICE_PATH]: {
+      requestPublicDataDeletionByLookup: async (value) => {
+        calls.push({ type: 'requestDeletion', value });
+        return { requestId: 'delete_request_1', receiptToken, status: 'completed' };
+      },
+      getPublicDataDeletionRequestStatus: async (requestId, token) => {
+        calls.push({ type: 'getDeletion', requestId, token });
+        return { requestId, status: 'completed', deletedCounts: { consultations: 1 } };
+      },
+    },
+    [FOLLOW_UP_SERVICE_PATH]: {
+      cancelFollowUp: async () => {},
+      scheduleFollowUpWithOptions: async () => {},
+    },
+    [LLM_SERVICE_PATH]: {
+      analyzeAndRouteTriage: async () => {
+        throw new Error('not used');
+      },
+    },
+    [TRANSLATION_SERVICE_PATH]: createTranslationServiceMock(),
+    [UI_COPY_SERVICE_PATH]: {
+      getLocalizedStartUiCopy: async () => ({}),
+    },
+    [NOTIFY_SERVICE_PATH]: {
+      enqueueDoctorNotification: async () => true,
+      clearDoctorNotifications: async () => {},
+      clearPatientChannelPushes: async () => {},
+      clearPatientSmsNotifications: async () => {},
+    },
+    [CONFIG_PATH]: {
+      appSiteUrl: 'https://app.happydoctor.kr',
+    },
+  });
+
+  const server = await startServer(routeModule.router, '/api/public');
+
+  try {
+    const shortCodeResponse = await postJson(`${server.baseUrl}/data-deletion-requests`, {
+      lookup: 'PCBXWN',
+      confirmed: true,
+    });
+    assert.equal(shortCodeResponse.status, 400);
+
+    const unconfirmedResponse = await postJson(`${server.baseUrl}/data-deletion-requests`, {
+      lookup,
+      confirmed: false,
+    });
+    assert.equal(unconfirmedResponse.status, 400);
+
+    const createResponse = await postJson(`${server.baseUrl}/data-deletion-requests`, {
+      lookup,
+      confirmed: true,
+    });
+    assert.equal(createResponse.status, 201);
+    assert.deepEqual(createResponse.body, {
+      requestId: 'delete_request_1',
+      receiptToken,
+      status: 'completed',
+    });
+
+    const missingReceiptResponse = await getJson(
+      `${server.baseUrl}/data-deletion-requests/delete_request_1`,
+    );
+    assert.equal(missingReceiptResponse.status, 400);
+
+    const statusResponse = await getJson(
+      `${server.baseUrl}/data-deletion-requests/delete_request_1`,
+      { headers: { 'X-Deletion-Receipt-Token': receiptToken } },
+    );
+    assert.equal(statusResponse.status, 200);
+    assert.deepEqual(statusResponse.body, {
+      requestId: 'delete_request_1',
+      status: 'completed',
+      deletedCounts: { consultations: 1 },
+    });
+    assert.deepEqual(calls, [
+      { type: 'requestDeletion', value: lookup },
+      { type: 'getDeletion', requestId: 'delete_request_1', token: receiptToken },
+    ]);
   } finally {
     await server.close();
     routeModule.restore();
@@ -422,8 +526,9 @@ test('public follow-up route appends the question, queues a doctor notification,
 
   try {
     const response = await postJson(
-      `${server.baseUrl}/consultations/status/PCBXWN/follow-up`,
+      `${server.baseUrl}/consultations/status/follow-up`,
       { question: '열이 계속 나요?' },
+      { headers: { 'X-Consultation-Lookup': 'PCBXWN' } },
     );
 
     assert.equal(response.status, 200);
@@ -510,7 +615,9 @@ test('public status route acknowledges doctor replies and clears queued reply re
   const server = await startServer(routeModule.router, '/api/public');
 
   try {
-    const response = await getJson(`${server.baseUrl}/consultations/status/PCBXWN`);
+    const response = await getJson(`${server.baseUrl}/consultations/status`, {
+      headers: { 'X-Consultation-Lookup': 'PCBXWN' },
+    });
 
     assert.equal(response.status, 200);
     assert.equal(response.body.status, 'doctor_replied');
@@ -577,8 +684,9 @@ test('public close route clears durable follow-up and reply delivery state befor
 
   try {
     const response = await postJson(
-      `${server.baseUrl}/consultations/status/PCBXWN/close`,
+      `${server.baseUrl}/consultations/status/close`,
       { reason: '상담 종료' },
+      { headers: { 'X-Consultation-Lookup': 'PCBXWN' } },
     );
 
     assert.equal(response.status, 200);
@@ -648,6 +756,54 @@ test('public status routes reject malformed lookup values before hitting the dat
     assert.match(followUpResponse.body.error, /조회 코드 형식/);
 
     assert.deepEqual(calls, []);
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});
+
+test('public status route rate-limits repeated failed lookup attempts', { concurrency: false }, async () => {
+  const calls = [];
+  const routeModule = loadRouteWithMocks(PUBLIC_ROUTE_PATH, {
+    [DB_SERVICE_PATH]: {
+      getAcknowledgedPublicConsultationStatusByLookup: async (lookup) => {
+        calls.push(lookup);
+        return null;
+      },
+    },
+    [FOLLOW_UP_SERVICE_PATH]: {
+      cancelFollowUp: async () => {},
+      scheduleFollowUpWithOptions: async () => {},
+    },
+    [LLM_SERVICE_PATH]: {
+      analyzeAndRouteTriage: async () => {
+        throw new Error('not_used');
+      },
+    },
+    [TRANSLATION_SERVICE_PATH]: createTranslationServiceMock(),
+    [NOTIFY_SERVICE_PATH]: {
+      enqueueDoctorNotification: async () => true,
+      clearDoctorNotifications: async () => {},
+      clearPatientChannelPushes: async () => {},
+      clearPatientSmsNotifications: async () => {},
+    },
+    [CONFIG_PATH]: {
+      appSiteUrl: 'https://app.happydoctor.kr',
+    },
+  });
+
+  const server = await startServer(routeModule.router, '/api/public');
+
+  try {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const response = await getJson(`${server.baseUrl}/consultations/status/AAAAA${attempt}`);
+      assert.equal(response.status, 404);
+    }
+
+    const blockedResponse = await getJson(`${server.baseUrl}/consultations/status/BBBBB0`);
+    assert.equal(blockedResponse.status, 429);
+    assert.match(blockedResponse.body.error, /조회 시도/);
+    assert.equal(calls.length, 10);
   } finally {
     await server.close();
     routeModule.restore();
@@ -915,7 +1071,7 @@ test('portal reply route authenticates the doctor and enqueues the patient reply
     assert.deepEqual(pushCall.options, { reminderDelaysMinutes: [0, 5, 15] });
     assert.match(pushCall.message, /김의사/);
     assert.match(pushCall.message, /흉통이 지속되면 오늘 진료 보세요\./);
-    assert.match(pushCall.message, /https:\/\/app\.happydoctor\.kr\/status\?code=PCBXWN/);
+    assert.match(pushCall.message, /https:\/\/app\.happydoctor\.kr\/status#token=token-1/);
     assert.match(pushCall.message, /PCBXWN/);
 
     assert.deepEqual(calls, [
@@ -1085,7 +1241,7 @@ test('portal reply route falls back to SMS queue for consented web contacts when
     assert.ok(smsCall.message.includes('[해피닥터]'));
     assert.ok(smsCall.message.includes('답변'));
     assert.ok(smsCall.message.split('\n').length >= 4);
-    assert.match(smsCall.message, /https:\/\/app\.happydoctor\.kr\/status\?code=PCBXWN/);
+    assert.match(smsCall.message, /https:\/\/app\.happydoctor\.kr\/status#token=token-1/);
     assert.match(smsCall.message, /PCBXWN/);
 
     assert.deepEqual(calls, [

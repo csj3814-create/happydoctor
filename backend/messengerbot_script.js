@@ -157,8 +157,8 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
                     "증상 상담은 개인정보 보호를 위해\n" +
                     "아래 1:1 채널에서 진행합니다.\n\n" +
                     "👉 " + CHANNEL_LINK + "\n\n" +
-                    "링크를 누르면 AI 인턴 보듬이가 먼저 도와드리고,\n" +
-                    "필요하면 의료진 확인으로 이어집니다."
+                    "링크에서 상담 내용을 접수하면,\n" +
+                    "자원봉사 의료진이 직접 확인합니다."
                 );
                 return;
             }

@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "kr.happydoctor.app",
+      "sha256_cert_fingerprints": [
+        "UPLOAD_KEY_SHA256",
+        "PLAY_APP_SIGNING_KEY_SHA256"
+      ]
+    }
+  }
+]

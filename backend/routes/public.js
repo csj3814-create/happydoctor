@@ -1,4 +1,5 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const { randomUUID } = require('crypto');
 const multer = require('multer');
 
@@ -6,7 +7,7 @@ const router = express.Router();
 
 const dbService = require('../services/dbService');
 const followUpService = require('../services/followUpService');
-const { analyzeAndRouteTriage } = require('../services/llmService');
+const { analyzeAndRouteTriage, buildDoctorReviewNotice } = require('../services/llmService');
 const {
   TRANSLATION_PROVIDER,
   detectLanguage,
@@ -33,6 +34,34 @@ const consultationImageUpload = multer({
   },
 });
 const LOOKUP_PATTERN = /^[A-Za-z0-9_-]{6,160}$/;
+const publicStatusLookupLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  message: {
+    error: '상담 조회 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.',
+  },
+});
+const publicDataDeletionLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: '삭제 요청 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.',
+  },
+});
+const publicDataDeletionStatusLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: '삭제 처리 상태 조회가 너무 많습니다. 잠시 후 다시 시도해 주세요.',
+  },
+});
 
 function createRequestValidationError(message) {
   const error = new Error(message);
@@ -55,6 +84,10 @@ function parseLookupParam(value) {
   }
 
   return normalized;
+}
+
+function parseLookupRequest(req) {
+  return parseLookupParam(req.get('X-Consultation-Lookup') || req.params.lookup);
 }
 
 function sanitizeSingleLine(value, maxLength = 120) {
@@ -176,27 +209,18 @@ function buildReplyNotificationContact(body = {}) {
 
 function buildPublicStatusUrl(trackingCode, trackingToken) {
   const baseUrl = appSiteUrl.replace(/\/$/, '');
-  if (trackingCode) {
-    return `${baseUrl}/status?code=${encodeURIComponent(trackingCode)}`;
+  if (trackingToken) {
+    return `${baseUrl}/status#token=${encodeURIComponent(trackingToken)}`;
   }
 
-  if (trackingToken) {
-    return `${baseUrl}/status?token=${encodeURIComponent(trackingToken)}`;
+  if (trackingCode) {
+    return `${baseUrl}/status?code=${encodeURIComponent(trackingCode)}`;
   }
 
   return `${baseUrl}/status`;
 }
 
 function buildInitialReply(analysisResult) {
-  if (analysisResult.action === 'ESCALATE') {
-    return (
-      `${analysisResult.replyToPatient}\n\n` +
-      '보듬이가 내용을 정리해 자원봉사 의료진에게 전달했습니다.\n' +
-      '답변이 준비되면 상태 확인 화면에서 바로 확인하실 수 있습니다.\n' +
-      '증상이 많이 힘들어지면 지체 없이 119 또는 가까운 응급실을 이용해 주세요.'
-    );
-  }
-
   return analysisResult.replyToPatient;
 }
 
@@ -320,6 +344,15 @@ router.post('/consultations', handleConsultationImageUpload, async (req, res) =>
     }
 
     const uiLanguage = normalizeUiLanguage(req.body.uiLanguage);
+    if (!parseConsentFlag(req.body.privacyConsent)) {
+      return res.status(400).json({ error: '개인정보 수집·이용 동의가 필요합니다.' });
+    }
+    if (!parseConsentFlag(req.body.sensitiveInfoConsent)) {
+      return res.status(400).json({ error: '민감정보(건강정보) 처리 동의가 필요합니다.' });
+    }
+    if (!parseConsentFlag(req.body.adultConfirmed)) {
+      return res.status(400).json({ error: '현재 상담 서비스는 만 18세 이상만 이용할 수 있습니다.' });
+    }
     const patientData = buildPublicPatientData(req.body);
     const patientNotificationContact = buildReplyNotificationContact(req.body);
     const validationError = validatePublicPatientData(patientData);
@@ -341,10 +374,15 @@ router.post('/consultations', handleConsultationImageUpload, async (req, res) =>
       translationContext.translatedPatientDataKo,
     );
 
-    const analysisResult = await analyzeAndRouteTriage(triagePatientData);
-    if (!analysisResult?.action || !analysisResult?.replyToPatient) {
+    const routingResult = await analyzeAndRouteTriage(triagePatientData);
+    if (!routingResult?.replyToPatient) {
       throw new Error('Invalid triage analysis response');
     }
+    const analysisResult = {
+      ...routingResult,
+      action: 'ESCALATE',
+      soapChartForDoctor: routingResult.soapChartForDoctor || buildDoctorReviewNotice('initial'),
+    };
 
     const internalPatientReply = buildInitialReply(analysisResult);
     let patientDeliveredReply = internalPatientReply;
@@ -374,6 +412,11 @@ router.post('/consultations', handleConsultationImageUpload, async (req, res) =>
       translationProvider: translationContext.translationProvider,
       translationStatus: translationContext.translationStatus,
       patientDeliveredChatbotReply: patientDeliveredReply,
+      consent: {
+        privacy: true,
+        sensitiveInfo: true,
+        adultConfirmed: true,
+      },
     });
 
     if (!saved?.consultationId) {
@@ -388,21 +431,14 @@ router.post('/consultations', handleConsultationImageUpload, async (req, res) =>
       });
     }
 
-    if (analysisResult.action === 'ESCALATE') {
-      await enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId, {
-        type: 'triage_initial',
-        priority: 'urgent',
-        reminderDelaysMinutes: [0, 5, 15],
-      });
-      await followUpService.scheduleFollowUpWithOptions(userId, analysisResult.soapChartForDoctor, 15, {
-        reminderDelaysMinutes: [15, 180, 1440],
-      });
-    } else {
-      const fallbackChart = `[최초 자동 해결된 경증 환자]\n증상: ${patientData.cc}\n증상점수: ${patientData.nrs}`;
-      await followUpService.scheduleFollowUpWithOptions(userId, fallbackChart, 15, {
-        reminderDelaysMinutes: [15, 180, 1440],
-      });
-    }
+    await enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId, {
+      type: 'triage_initial',
+      priority: 'urgent',
+      reminderDelaysMinutes: [0, 5, 15],
+    });
+    await followUpService.scheduleFollowUpWithOptions(userId, analysisResult.soapChartForDoctor, 15, {
+      reminderDelaysMinutes: [15, 180, 1440],
+    });
 
     const statusUrl = buildPublicStatusUrl(saved.trackingCode, saved.trackingToken);
     res.set('Cache-Control', 'no-store');
@@ -412,8 +448,8 @@ router.post('/consultations', handleConsultationImageUpload, async (req, res) =>
       consultationId: saved.consultationId,
       trackingCode: saved.trackingCode || null,
       statusUrl,
-      status: analysisResult.action === 'ESCALATE' ? 'waiting_doctor' : 'guidance_delivered',
-      requiresDoctorReview: analysisResult.action === 'ESCALATE',
+      status: 'waiting_doctor',
+      requiresDoctorReview: true,
       uiLanguage,
       sourceLanguage: translationContext.sourceLanguage,
       patientReplyLanguage: translationContext.patientReplyLanguage,
@@ -428,9 +464,63 @@ router.post('/consultations', handleConsultationImageUpload, async (req, res) =>
   }
 });
 
-router.get('/consultations/status/:lookup', async (req, res) => {
+router.post('/data-deletion-requests', publicDataDeletionLimiter, async (req, res) => {
   try {
-    const lookup = parseLookupParam(req.params.lookup);
+    if (!isPlainObject(req.body) || req.body.confirmed !== true) {
+      return res.status(400).json({ error: '삭제 범위와 복구 불가 내용을 확인해 주세요.' });
+    }
+
+    const lookup = typeof req.body.lookup === 'string' ? req.body.lookup.trim() : '';
+    if (!/^[a-f0-9]{48}$/i.test(lookup)) {
+      return res.status(400).json({ error: '개인 상태 링크의 장기 비밀 토큰이 필요합니다.' });
+    }
+
+    const deletionRequest = await dbService.requestPublicDataDeletionByLookup(lookup);
+    if (!deletionRequest) {
+      return res.status(404).json({ error: '삭제할 상담을 찾지 못했습니다.' });
+    }
+
+    res.set('Cache-Control', 'no-store');
+    return res.status(201).json(deletionRequest);
+  } catch (error) {
+    if (error?.message === 'DELETION_LONG_TOKEN_REQUIRED') {
+      return res.status(400).json({ error: '6자리 조회 코드가 아닌 개인 상태 링크가 필요합니다.' });
+    }
+    console.error('[Public Data Deletion Request Error]', error?.message || 'DELETION_FAILED');
+    return res.status(500).json({
+      error: '삭제 처리를 완료하지 못했습니다. president@happydoctor.kr로 문의해 주세요.',
+    });
+  }
+});
+
+router.get('/data-deletion-requests/:requestId', publicDataDeletionStatusLimiter, async (req, res) => {
+  try {
+    const receiptToken = req.get('X-Deletion-Receipt-Token') || '';
+    if (!/^[a-f0-9]{64}$/i.test(receiptToken)) {
+      return res.status(400).json({ error: '삭제 요청 영수증 토큰이 필요합니다.' });
+    }
+
+    const status = await dbService.getPublicDataDeletionRequestStatus(
+      req.params.requestId,
+      receiptToken,
+    );
+    if (!status) {
+      return res.status(404).json({ error: '삭제 요청 상태를 찾지 못했습니다.' });
+    }
+
+    res.set('Cache-Control', 'no-store');
+    return res.json(status);
+  } catch (error) {
+    console.error('[Public Data Deletion Status Error]', error?.message || 'DELETION_STATUS_FAILED');
+    return res.status(500).json({ error: '삭제 처리 상태를 확인하지 못했습니다.' });
+  }
+});
+
+router.use('/consultations/status', publicStatusLookupLimiter);
+
+router.get(['/consultations/status', '/consultations/status/:lookup'], async (req, res) => {
+  try {
+    const lookup = parseLookupRequest(req);
     const consultationSnapshot = await dbService.getAcknowledgedPublicConsultationStatusByLookup(lookup);
     const consultation = consultationSnapshot?.consultation || null;
     if (!consultation) {
@@ -473,7 +563,7 @@ router.get('/consultations/status/:lookup', async (req, res) => {
   }
 });
 
-router.post('/consultations/status/:lookup/images', (req, res) => {
+router.post(['/consultations/status/images', '/consultations/status/:lookup/images'], (req, res) => {
   consultationImageUpload.array('images', 3)(req, res, async (uploadError) => {
     if (uploadError) {
       console.error('[Public Consultation Image Upload Middleware Error]', uploadError);
@@ -492,7 +582,7 @@ router.post('/consultations/status/:lookup/images', (req, res) => {
     }
 
     try {
-      const lookup = parseLookupParam(req.params.lookup);
+      const lookup = parseLookupRequest(req);
 
       const files = Array.isArray(req.files) ? req.files : [];
       if (files.length === 0) {
@@ -535,9 +625,9 @@ router.post('/consultations/status/:lookup/images', (req, res) => {
   });
 });
 
-router.post('/consultations/status/:lookup/follow-up', async (req, res) => {
+router.post(['/consultations/status/follow-up', '/consultations/status/:lookup/follow-up'], async (req, res) => {
   try {
-    const lookup = parseLookupParam(req.params.lookup);
+    const lookup = parseLookupRequest(req);
     const question = sanitizeMultiline(req.body?.question, 1200);
     const uiLanguage = normalizeUiLanguage(req.body?.uiLanguage);
 
@@ -600,9 +690,9 @@ router.post('/consultations/status/:lookup/follow-up', async (req, res) => {
   }
 });
 
-router.post('/consultations/status/:lookup/close', async (req, res) => {
+router.post(['/consultations/status/close', '/consultations/status/:lookup/close'], async (req, res) => {
   try {
-    const lookup = parseLookupParam(req.params.lookup);
+    const lookup = parseLookupRequest(req);
     const reason = sanitizeSingleLine(req.body?.reason, 120) || '환자가 상태 화면에서 상담 종료를 선택함';
 
     const closed = await dbService.closePublicConsultationByLookup(lookup, reason);

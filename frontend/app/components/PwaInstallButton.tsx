@@ -32,6 +32,8 @@ export default function PwaInstallButton() {
   const [showFallbackHint, setShowFallbackHint] = useState(false)
 
   useEffect(() => {
+    // This effect hydrates browser-only install state and then subscribes to install events.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsStandalone(isStandaloneMode())
 
     const handleBeforeInstallPrompt = (event: Event) => {

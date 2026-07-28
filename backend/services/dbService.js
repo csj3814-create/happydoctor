@@ -10,9 +10,11 @@ const { isKoreanLanguage, translateText } = require('./translationService');
 const PUBLIC_STATS_PATH = ['system', 'public_stats'];
 const FOLLOW_UP_SESSIONS = 'follow_up_sessions';
 const DOCTOR_ACCESS_REQUESTS = 'doctor_access_requests';
+const DATA_DELETION_REQUESTS = 'data_deletion_requests';
 const SHORT_TRACKING_CODE_LENGTH = 6;
 const LEGACY_TRACKING_CODE_LENGTH = 8;
 const SHORT_TRACKING_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+const SHORT_TRACKING_CODE_TTL_MS = 24 * 60 * 60 * 1000;
 const CONSULTATION_MEDIA_LIMIT = 3;
 const CONSULTATION_IMAGE_CONTENT_TYPES = new Set([
   'image/jpeg',
@@ -286,6 +288,23 @@ function getTimestampMs(value) {
   }
 
   return 0;
+}
+
+function isShortTrackingCodeLookupExpired(trackingLookup, consultationData = {}, nowMs = Date.now()) {
+  const trackingCode = normalizeTrackingCode(trackingLookup);
+  if (!trackingCode || trackingCode.length !== SHORT_TRACKING_CODE_LENGTH) {
+    return false;
+  }
+
+  const issuedAtMs =
+    getTimestampMs(consultationData.publicTrackingCodeIssuedAt)
+    || getTimestampMs(consultationData.createdAt);
+
+  if (!issuedAtMs) {
+    return true;
+  }
+
+  return nowMs - issuedAtMs >= SHORT_TRACKING_CODE_TTL_MS;
 }
 
 function toIsoString(value) {
@@ -590,6 +609,13 @@ async function logConsultation(userId, patientData, analysisResult, options = {}
       translationProvider: options.translationProvider || null,
       translationStatus: options.translationStatus || 'not_required',
       patientNotificationContact,
+      consent: options.consent
+        ? {
+            ...options.consent,
+            consentedAt: admin.firestore.FieldValue.serverTimestamp(),
+            policyVersion: '2026-07-28',
+          }
+        : null,
     });
 
     await updatePublicStats({ consultationCount: 1 });
@@ -1100,7 +1126,15 @@ async function resolvePublicConsultationDocByLookup(trackingLookup) {
       .get();
 
     if (!consultationSnapshot.empty) {
-      return consultationSnapshot.docs[0];
+      const consultationDoc = consultationSnapshot.docs[0];
+      if (
+        field === 'publicTrackingCode'
+        && isShortTrackingCodeLookupExpired(value, consultationDoc.data() || {})
+      ) {
+        continue;
+      }
+
+      return consultationDoc;
     }
   }
 
@@ -1126,32 +1160,17 @@ function sanitizeFollowUpQuestion(value) {
 }
 
 function buildDoctorFollowUpNotificationMessage(
-  consultationData = {},
-  question = '',
-  translatedQuestionKo = null,
-  sourceLanguage = 'ko',
+  _consultationData = {},
+  _question = '',
+  _translatedQuestionKo = null,
+  _sourceLanguage = 'ko',
 ) {
-  const patientData = consultationData.translatedPatientDataKo || consultationData.patientData || {};
-
   return [
-    '📩 환자 추가 질문이 도착했습니다.',
-    '',
-    `주요 증상: ${patientData.cc || '미상'}`,
-    patientData.symptom ? `기존 설명: ${patientData.symptom}` : null,
-    patientData.associated ? `동반 증상: ${patientData.associated}` : null,
-    consultationData.doctorRepliedAt
-      ? `직전 의료진 답변 시각: ${toIsoString(consultationData.doctorRepliedAt) || '기록 없음'}`
-      : '직전 의료진 답변: 아직 없음',
-    '',
-    translatedQuestionKo ? `[환자 메시지 원문 - ${sourceLanguage}]` : '[환자 메시지]',
-    question,
-    translatedQuestionKo ? `\n[의사용 한국어 번역]\n${translatedQuestionKo}` : null,
-    consultationData.doctorChart
-      ? `\n[기존 차트]\n${consultationData.doctorChart}`
-      : null,
-  ]
-    .filter(Boolean)
-    .join('\n');
+    '[해피닥터] 상담 후속 내용 접수',
+    '긴급도: 자동 분류하지 않음 - 의료진 확인 필요',
+    '건강정보와 상담 내용은 인증된 의료진 포털에서 확인해 주세요.',
+    '포털 확인: https://portal.happydoctor.kr/open-browser?next=%2F',
+  ].join('\n');
 }
 
 async function appendConsultationMediaItems(consultationDoc, nextItems = []) {
@@ -1387,6 +1406,197 @@ async function closePublicConsultationByLookup(trackingLookup, reason) {
     console.error('[DB PublicClose Error]', error);
     throw error;
   }
+}
+
+function hashDeletionSecret(value) {
+  return crypto.createHash('sha256').update(String(value || ''), 'utf8').digest('hex');
+}
+
+function secretsMatch(leftHash, rightHash) {
+  if (!leftHash || !rightHash) return false;
+  const left = Buffer.from(leftHash, 'hex');
+  const right = Buffer.from(rightHash, 'hex');
+  return left.length === right.length && crypto.timingSafeEqual(left, right);
+}
+
+async function deleteQueryDocuments(query) {
+  const snapshot = await query.get();
+  if (snapshot.empty) return 0;
+
+  let deleted = 0;
+  for (let offset = 0; offset < snapshot.docs.length; offset += 400) {
+    const batch = db.batch();
+    const chunk = snapshot.docs.slice(offset, offset + 400);
+    chunk.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+    deleted += chunk.length;
+  }
+
+  return deleted;
+}
+
+async function deleteConsultationStorageFiles(consultationData = {}) {
+  const mediaItems = normalizeConsultationMediaItems(consultationData.mediaItems);
+  const storageItems = mediaItems.filter((item) => item?.storagePath);
+  if (storageItems.length === 0) return 0;
+
+  let deleted = 0;
+  for (const item of storageItems) {
+    const bucket = await getStorageBucket(item.bucketName || '');
+    if (!bucket) {
+      throw new Error('DELETION_STORAGE_NOT_CONFIGURED');
+    }
+    await bucket.file(item.storagePath).delete({ ignoreNotFound: true });
+    deleted += 1;
+  }
+
+  return deleted;
+}
+
+async function processDataDeletionRequest(requestRef, consultationDoc) {
+  const consultationData = consultationDoc.data() || {};
+  const consultationId = consultationDoc.id;
+  const userId = consultationData.userId || null;
+  const deletedCounts = {};
+
+  await requestRef.set({
+    status: 'processing',
+    processingStartedAt: admin.firestore.FieldValue.serverTimestamp(),
+    attemptCount: admin.firestore.FieldValue.increment(1),
+    lastErrorCode: admin.firestore.FieldValue.delete(),
+  }, { merge: true });
+
+  await consultationDoc.ref.update({
+    publicTrackingToken: admin.firestore.FieldValue.delete(),
+    publicTrackingCode: admin.firestore.FieldValue.delete(),
+    deletionRequestId: requestRef.id,
+    deletionRequestedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  deletedCounts.storageFiles = await deleteConsultationStorageFiles(consultationData);
+  deletedCounts.doctorReplies = await deleteQueryDocuments(
+    db.collection('doctor_replies').where('consultationId', '==', consultationId),
+  );
+
+  if (userId) {
+    deletedCounts.doctorNotifications = await deleteQueryDocuments(
+      db.collection('doctor_notifications').where('patientId', '==', userId),
+    );
+    const userPushes = await deleteQueryDocuments(
+      db.collection('patient_channel_pushes').where('userId', '==', userId),
+    );
+    const relatedPushes = await deleteQueryDocuments(
+      db.collection('patient_channel_pushes').where('relatedUserId', '==', userId),
+    );
+    deletedCounts.patientChannelPushes = userPushes + relatedPushes;
+    deletedCounts.patientSmsNotifications = await deleteQueryDocuments(
+      db.collection('patient_sms_notifications').where('userId', '==', userId),
+    );
+    await db.collection(FOLLOW_UP_SESSIONS).doc(userId).delete();
+    await db.collection('messenger_rooms').doc(userId).delete();
+    deletedCounts.followUpSessions = 1;
+    deletedCounts.messengerRooms = 1;
+  }
+
+  await consultationDoc.ref.delete();
+  deletedCounts.consultations = 1;
+
+  try {
+    await updatePublicStats({
+      consultationCount: -1,
+      completedCount:
+        consultationData.status === 'COMPLETED' || consultationData.closedAt ? -1 : 0,
+    });
+  } catch (error) {
+    // Anonymous aggregate counters must never block a verified privacy deletion.
+    console.warn('[DB Data Deletion Stats Update Error]', error?.message || 'STATS_UPDATE_FAILED');
+  }
+
+  await requestRef.set({
+    status: 'completed',
+    completedAt: admin.firestore.FieldValue.serverTimestamp(),
+    consultationId: admin.firestore.FieldValue.delete(),
+    userId: admin.firestore.FieldValue.delete(),
+    deletedCounts,
+    lastErrorCode: admin.firestore.FieldValue.delete(),
+  }, { merge: true });
+
+  return deletedCounts;
+}
+
+async function requestPublicDataDeletionByLookup(trackingToken) {
+  if (!db || !trackingToken) return null;
+
+  const normalizedToken = String(trackingToken).trim();
+  if (!/^[a-f0-9]{48}$/i.test(normalizedToken)) {
+    throw new Error('DELETION_LONG_TOKEN_REQUIRED');
+  }
+
+  const consultationDoc = await resolvePublicConsultationDocByLookup(normalizedToken);
+  if (!consultationDoc) return null;
+
+  const consultationData = consultationDoc.data() || {};
+  if (consultationData.publicTrackingToken !== normalizedToken) {
+    throw new Error('DELETION_LONG_TOKEN_REQUIRED');
+  }
+
+  const requestRef = db.collection(DATA_DELETION_REQUESTS).doc();
+  const receiptToken = crypto.randomBytes(32).toString('hex');
+  const auditExpiresAt = admin.firestore.Timestamp.fromDate(
+    new Date(Date.now() + (365 * 24 * 60 * 60 * 1000)),
+  );
+
+  await requestRef.set({
+    status: 'pending',
+    source: 'self_service',
+    consultationId: consultationDoc.id,
+    userId: consultationData.userId || null,
+    lookupHash: hashDeletionSecret(normalizedToken),
+    receiptTokenHash: hashDeletionSecret(receiptToken),
+    requestedAt: admin.firestore.FieldValue.serverTimestamp(),
+    attemptCount: 0,
+    auditExpiresAt,
+  });
+
+  try {
+    await processDataDeletionRequest(requestRef, consultationDoc);
+  } catch (error) {
+    await requestRef.set({
+      status: 'failed',
+      failedAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastErrorCode: String(error?.message || 'DELETION_FAILED').slice(0, 80),
+    }, { merge: true });
+    throw error;
+  }
+
+  return {
+    requestId: requestRef.id,
+    receiptToken,
+    status: 'completed',
+  };
+}
+
+async function getPublicDataDeletionRequestStatus(requestId, receiptToken) {
+  if (!db || !requestId || !receiptToken) return null;
+  const normalizedRequestId = String(requestId).trim();
+  if (!/^[A-Za-z0-9_-]{8,160}$/.test(normalizedRequestId)) return null;
+
+  const snapshot = await db.collection(DATA_DELETION_REQUESTS).doc(normalizedRequestId).get();
+  if (!snapshot.exists) return null;
+
+  const data = snapshot.data() || {};
+  if (!secretsMatch(data.receiptTokenHash, hashDeletionSecret(receiptToken))) {
+    return null;
+  }
+
+  return {
+    requestId: snapshot.id,
+    status: data.status || 'pending',
+    requestedAt: toIsoString(data.requestedAt),
+    completedAt: toIsoString(data.completedAt),
+    deletedCounts: data.status === 'completed' ? data.deletedCounts || {} : undefined,
+    errorCode: data.status === 'failed' ? data.lastErrorCode || 'DELETION_FAILED' : undefined,
+  };
 }
 
 async function addConsultationImagesById(consultationId, files = [], options = {}) {
@@ -1732,6 +1942,8 @@ module.exports = {
   getAcknowledgedPublicConsultationStatusByLookup,
   getPublicConsultationStatusByToken: getPublicConsultationStatusByLookup,
   closePublicConsultationByLookup,
+  requestPublicDataDeletionByLookup,
+  getPublicDataDeletionRequestStatus,
   appendPublicFollowUpQuestionByLookup,
   addConsultationImagesById,
   addConsultationRemoteImagesById,
@@ -1748,6 +1960,8 @@ module.exports = {
   rebuildPublicStats,
   saveFollowUpSession,
   getFollowUpSession,
+  isShortTrackingCodeLookupExpired,
+  buildDoctorFollowUpNotificationMessage,
   deleteFollowUpSession,
   getScheduledFollowUpSessions,
   reclaimExpiredFollowUpLeases,

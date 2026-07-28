@@ -95,11 +95,12 @@ export default function StatusCloseActions({
 
     try {
       const response = await fetch(
-        `/api/public/consultations/status/${encodeURIComponent(lookup)}/close`,
+        '/api/public/consultations/status/close',
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'X-Consultation-Lookup': lookup,
           },
           body: JSON.stringify({}),
         },
@@ -130,11 +131,12 @@ export default function StatusCloseActions({
 
     try {
       const response = await fetch(
-        `/api/public/consultations/status/${encodeURIComponent(lookup)}/follow-up`,
+        '/api/public/consultations/status/follow-up',
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'X-Consultation-Lookup': lookup,
           },
           body: JSON.stringify({
             question: followUpQuestion.trim(),

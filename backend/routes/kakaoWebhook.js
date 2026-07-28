@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { analyzeAndRouteTriage, analyzeFollowUp } = require('../services/llmService');
+const {
+    analyzeAndRouteTriage,
+    analyzeFollowUp,
+    buildDoctorReviewNotice,
+} = require('../services/llmService');
 const notifyService = require('../services/notifyService');
 const {
     enqueueDoctorNotification,
@@ -20,9 +24,9 @@ function buildStatusLinkText(trackingInfo) {
     if (!trackingCode && !trackingToken) return '';
 
     const normalizedBaseUrl = appSiteUrl.replace(/\/$/, '');
-    const queryKey = trackingCode ? 'code' : 'token';
-    const queryValue = trackingCode || trackingToken;
-    const statusUrl = `${normalizedBaseUrl}/status?${queryKey}=${encodeURIComponent(queryValue)}`;
+    const statusUrl = trackingToken
+        ? `${normalizedBaseUrl}/status#token=${encodeURIComponent(trackingToken)}`
+        : `${normalizedBaseUrl}/status?code=${encodeURIComponent(trackingCode)}`;
     const directCodeLine = trackingCode ? `\n직접 입력 코드: ${trackingCode}` : '';
 
     return `\n\n앱에서 진행 상태 확인하기\n${statusUrl}${directCodeLine}`;
@@ -249,7 +253,7 @@ router.post('/triage-complete', async (req, res) => {
         // (예: "예진시작" 블록이 실수로 스킬을 호출한 경우, chief_complaint 파라미터가 없음)
         const rawCc = merged.chief_complaint;
         if (!rawCc || rawCc.startsWith('sys.')) {
-            console.warn(`[Premature Call] ${userId} — chief_complaint 없음. 슬롯필링 미완료로 판단, Gemini 호출 없이 즉시 반환.`);
+            console.warn(`[Premature Call] ${userId} — chief_complaint 없음. 슬롯필링 미완료로 판단하여 즉시 반환.`);
             return res.status(200).json({
                 version: "2.0",
                 template: {
@@ -301,61 +305,28 @@ router.post('/triage-complete', async (req, res) => {
     }
 });
 
-// 콜백 모드(useCallback)가 꺼진 경우의 안전망: 4.5초 내 응답 못하면 재시도 안내 반환
-const SYNC_TIMEOUT_MS = 4500;
-
 async function processTriageSync(userId, patientData) {
     try {
         const startTime = Date.now();
-
-        const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('SYNC_TIMEOUT')), SYNC_TIMEOUT_MS)
-        );
-
-        let analysisResult;
-        try {
-            analysisResult = await Promise.race([
-                analyzeAndRouteTriage(patientData),
-                timeoutPromise
-            ]);
-        } catch (raceErr) {
-            if (raceErr.message === 'SYNC_TIMEOUT') {
-                console.warn(`[Sync Timeout] ${userId} — Gemini가 ${SYNC_TIMEOUT_MS}ms 내 응답 못함. 재시도 안내 반환. (콜백 모드 ON 권장)`);
-                return {
-                    version: "2.0",
-                    template: {
-                        outputs: [{ simpleText: { text: "답변 준비에 시간이 조금 더 필요합니다.\n아래 버튼으로 다시 시도해 주세요.\n계속 지연되면 잠시 후 다시 찾아주세요." } }],
-                        quickReplies: [
-                            START_CONSULTATION_QUICK_REPLY
-                        ]
-                    }
-                };
-            }
-            throw raceErr;
-        }
+        const routingResult = await analyzeAndRouteTriage(patientData);
+        const analysisResult = {
+            ...routingResult,
+            action: 'ESCALATE',
+            soapChartForDoctor: routingResult.soapChartForDoctor || buildDoctorReviewNotice('initial'),
+        };
 
         const durationMs = Date.now() - startTime;
-        console.log(`[Timing] analyzeAndRouteTriage took ${durationMs}ms`);
+        console.log(`[Timing] review routing took ${durationMs}ms`);
 
-        let finalResponseText = '';
-        if (analysisResult.action === 'AUTONOMOUS_REPLY') {
-            finalResponseText = analysisResult.replyToPatient;
-            const fallbackChart = `[최초 자동 해결된 경증 환자]\n증상: ${patientData.cc}\n증상점수: ${patientData.nrs}`;
-            await followUpService.scheduleFollowUpWithOptions(userId, fallbackChart, 15, {
-                reminderDelaysMinutes: [15, 180, 1440],
-            });
-        } else {
-            await enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId, {
-                type: 'triage_initial',
-                priority: 'urgent',
-                reminderDelaysMinutes: [0, 5, 15],
-            });
-            await followUpService.scheduleFollowUpWithOptions(userId, analysisResult.soapChartForDoctor, 15, {
-                reminderDelaysMinutes: [15, 180, 1440],
-            });
-            finalResponseText = analysisResult.replyToPatient +
-                "\n\n보듬이가 내용을 정리해 자원봉사 의료진에게 전달했습니다.\n답변이 준비되면 이 채널로 다시 안내드릴게요.\n증상이 많이 힘들어지면 지체 없이 119 또는 가까운 응급실을 이용해 주세요.";
-        }
+        await enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId, {
+            type: 'triage_initial',
+            priority: 'urgent',
+            reminderDelaysMinutes: [0, 5, 15],
+        });
+        await followUpService.scheduleFollowUpWithOptions(userId, analysisResult.soapChartForDoctor, 15, {
+            reminderDelaysMinutes: [15, 180, 1440],
+        });
+        let finalResponseText = analysisResult.replyToPatient;
         finalResponseText += await logConsultationAndGetStatusLink(userId, patientData, analysisResult);
         return {
             version: "2.0",
@@ -379,31 +350,24 @@ async function processTriageSync(userId, patientData) {
 async function processTriageAsync(callbackUrl, userId, patientData) {
     try {
         const startTime = Date.now();
-        const analysisResult = await analyzeAndRouteTriage(patientData);
+        const routingResult = await analyzeAndRouteTriage(patientData);
+        const analysisResult = {
+            ...routingResult,
+            action: 'ESCALATE',
+            soapChartForDoctor: routingResult.soapChartForDoctor || buildDoctorReviewNotice('initial'),
+        };
         const durationMs = Date.now() - startTime;
-        console.log(`[Timing] analyzeAndRouteTriage (async) took ${durationMs}ms`);
-        console.log('[Gemini Analysis Result]', analysisResult.action);
+        console.log(`[Timing] review routing (async) took ${durationMs}ms`);
 
-        let finalResponseText = '';
-
-        if (analysisResult.action === 'AUTONOMOUS_REPLY') {
-            finalResponseText = analysisResult.replyToPatient;
-            const fallbackChart = `[최초 자동 해결된 경증 환자]\n증상: ${patientData.cc}\n증상점수: ${patientData.nrs}`;
-            await followUpService.scheduleFollowUpWithOptions(userId, fallbackChart, 15, {
-                reminderDelaysMinutes: [15, 180, 1440],
-            });
-        } else {
-            await enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId, {
-                type: 'triage_initial',
-                priority: 'urgent',
-                reminderDelaysMinutes: [0, 5, 15],
-            });
-            await followUpService.scheduleFollowUpWithOptions(userId, analysisResult.soapChartForDoctor, 15, {
-                reminderDelaysMinutes: [15, 180, 1440],
-            });
-            finalResponseText = analysisResult.replyToPatient +
-                "\n\n보듬이가 내용을 정리해 자원봉사 의료진에게 전달했습니다.\n답변이 준비되면 이 채널로 다시 안내드릴게요.\n증상이 많이 힘들어지면 지체 없이 119 또는 가까운 응급실을 이용해 주세요.";
-        }
+        await enqueueDoctorNotification(analysisResult.soapChartForDoctor, userId, {
+            type: 'triage_initial',
+            priority: 'urgent',
+            reminderDelaysMinutes: [0, 5, 15],
+        });
+        await followUpService.scheduleFollowUpWithOptions(userId, analysisResult.soapChartForDoctor, 15, {
+            reminderDelaysMinutes: [15, 180, 1440],
+        });
+        let finalResponseText = analysisResult.replyToPatient;
 
         finalResponseText += await logConsultationAndGetStatusLink(userId, patientData, analysisResult);
 
@@ -471,7 +435,7 @@ router.post('/fu-reply', async (req, res) => {
         // 1. 기존 차트 가져오기
         const originalChart = await followUpService.getOriginalChart(userId);
 
-        // 세션 만료 또는 기록 없는 경우 — Gemini 호출 없이 안내 메시지 반환
+        // 세션 만료 또는 기록 없는 경우 안내 메시지 반환
         if (!originalChart || originalChart === '이전 차트 기록 없음') {
             console.warn(`[F/U Reply] ${userId} — 이전 차트 없음 또는 세션 만료. F/U 분석 생략.`);
             return res.status(200).json(
@@ -482,21 +446,23 @@ router.post('/fu-reply', async (req, res) => {
             );
         }
 
-        // 2. 증상 변화 AI 분석 (호전/유지 vs 악화)
-        const fuAnalysis = await analyzeFollowUp(originalChart, nrsChange, additionalSymptom);
-        console.log('[Gemini F/U Analysis Result]', fuAnalysis.action);
+        // 2. 자동 임상 분류 없이 모든 후속 내용을 의료진 검토로 전달
+        const followUpResult = await analyzeFollowUp(originalChart, nrsChange, additionalSymptom);
+        const fuAnalysis = {
+            ...followUpResult,
+            action: 'ESCALATE_FU',
+            fuChartForDoctor: followUpResult.fuChartForDoctor || buildDoctorReviewNotice('follow_up'),
+        };
+        console.log('[Follow-Up Routing Result]', fuAnalysis.action);
 
         let finalResponseText = fuAnalysis.replyToPatient;
 
-        // 3. 악화 시 전문의 큐 재할당
-        if (fuAnalysis.action === 'ESCALATE_FU') {
-            await enqueueDoctorNotification(`🚨 **[F/U 경고: 증상 악화 감지]**\n${fuAnalysis.fuChartForDoctor}`, userId, {
-                type: 'follow_up_doctor',
-                priority: 'urgent',
-                reminderDelaysMinutes: [0, 5, 15],
-            });
-            finalResponseText += "\n\n증상 변화를 의료진이 한 번 더 확인할 수 있도록 바로 전달했습니다.\n답변을 준비하는 동안 잠시만 기다려 주세요.\n많이 힘드시면 119 또는 가까운 응급실을 이용해 주세요.";
-        }
+        // 3. 모든 후속 내용을 전문의 큐에 재할당
+        await enqueueDoctorNotification(fuAnalysis.fuChartForDoctor, userId, {
+            type: 'follow_up_doctor',
+            priority: 'urgent',
+            reminderDelaysMinutes: [0, 5, 15],
+        });
 
         // [추가] 4. F/U 내역에 대한 상태 점검 기록을 추후 홈페이지 조회를 위해 DB에 병합
         dbService.logFollowUp(userId, fuAnalysis).catch(err => console.error("DB F/U Log Error:", err));

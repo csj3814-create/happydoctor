@@ -95,8 +95,9 @@ export default function ConsultationImageUploader({
       const formData = new FormData()
       files.forEach((file) => formData.append('images', file))
 
-      const response = await fetch(`/api/public/consultations/status/${encodeURIComponent(lookup)}/images`, {
+      const response = await fetch('/api/public/consultations/status/images', {
         method: 'POST',
+        headers: { 'X-Consultation-Lookup': lookup },
         body: formData,
       })
 

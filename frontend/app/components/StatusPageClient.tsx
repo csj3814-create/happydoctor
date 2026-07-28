@@ -3,7 +3,7 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 
 import ConsultationImageUploader from '@/components/ConsultationImageUploader'
 import StatusCloseActions from '@/components/StatusCloseActions'
@@ -13,7 +13,9 @@ import {
 } from '@/lib/consultation-session'
 import {
   type PublicConsultationStatus,
+  buildStatusPageHref,
   fetchConsultationStatus,
+  isStatusCode,
   normalizeStatusLookup,
 } from '@/lib/status'
 import {
@@ -48,8 +50,8 @@ const copyByLanguage = {
     loadError: '지금은 상태를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.',
     loading: '상담 상태를 불러오고 있습니다...',
     liveUpdate: '새 의료진 답변이 도착했습니다. 아래 최신 답변을 확인해 주세요.',
-    firstReplyEyebrow: 'Bodeum First Reply',
-    firstReplyTitle: '보듬이의 1차 상담 결과',
+    firstReplyEyebrow: 'Submission received',
+    firstReplyTitle: '상담 접수 안내',
     doctorReplyEyebrow: '의료진 답변',
     noDoctorReply: '아직 의료진 답변이 없습니다.',
     infoTitle: '안내',
@@ -83,7 +85,7 @@ const copyByLanguage = {
     statusWaitingDoctor: {
       badge: '확인 대기',
       title: '의료진이 확인 중입니다',
-      body: '보듬이가 정리한 내용을 바탕으로 의료진이 순서대로 확인하고 있습니다.',
+      body: '접수된 상담 내용을 의료진이 순서대로 직접 확인하고 있습니다.',
     },
     statusDoctorReplied: {
       badge: '답변 도착',
@@ -114,8 +116,8 @@ const copyByLanguage = {
     loadError: 'We could not load the consultation status right now. Please try again shortly.',
     loading: 'Loading your consultation status...',
     liveUpdate: 'A new doctor reply has arrived. Please check the latest reply below.',
-    firstReplyEyebrow: 'Bodeum First Reply',
-    firstReplyTitle: 'Bodeum’s first consultation reply',
+    firstReplyEyebrow: 'Submission received',
+    firstReplyTitle: 'Consultation submission notice',
     doctorReplyEyebrow: 'Doctor reply',
     noDoctorReply: 'There is no doctor reply yet.',
     infoTitle: 'Notes',
@@ -149,7 +151,7 @@ const copyByLanguage = {
     statusWaitingDoctor: {
       badge: 'Waiting for review',
       title: 'A doctor is reviewing your case',
-      body: 'Our doctors are reviewing Bodeum’s summary in order.',
+      body: 'Our doctors are directly reviewing submitted consultations in order.',
     },
     statusDoctorReplied: {
       badge: 'Reply ready',
@@ -214,11 +216,10 @@ function getLatestUpdate(
 }
 
 export default function StatusPageClient({ initialUiLanguage }: StatusPageClientProps) {
-  const router = useRouter()
   const searchParams = useSearchParams()
 
   const requestedLang = searchParams.get('lang')
-  const rawLookup = useMemo(() => {
+  const queryLookup = useMemo(() => {
     return (
       searchParams.get('lookup')
       || searchParams.get('code')
@@ -226,6 +227,9 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
       || ''
     )
   }, [searchParams])
+  const [fragmentLookup, setFragmentLookup] = useState('')
+  const [fragmentReady, setFragmentReady] = useState(false)
+  const rawLookup = fragmentLookup || queryLookup
 
   const [uiLanguage, setUiLanguage] = useState<UiLanguage>(initialUiLanguage)
   const copy = copyByLanguage[uiLanguage]
@@ -245,6 +249,41 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
   const latestConsultationRef = useRef<PublicConsultationStatus | null>(null)
   const lastLoadingNoticeAtRef = useRef(0)
   const loadingNoticeTimeoutRef = useRef<number | null>(null)
+
+  function readFragmentLookup() {
+    if (typeof window === 'undefined') return ''
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    return params.get('token') || params.get('lookup') || params.get('code') || ''
+  }
+
+  function replaceVisibleStatusUrl(lookup: string, language: UiLanguage) {
+    if (typeof window === 'undefined') return
+    const href = buildStatusPageHref(lookup, language, window.location.origin)
+    window.history.replaceState(null, '', href)
+  }
+
+  function handleLookupSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const normalizedLookup = normalizeStatusLookup(lookupValue)
+
+    if (!normalizedLookup) {
+      setResolvedLookup(null)
+      setConsultation(null)
+      setFetchError(copy.invalidLookup)
+      return
+    }
+
+    setFetchError(null)
+    setRestoredRecentSession(false)
+    setSessionChatbotReply(null)
+    setResolvedLookup(normalizedLookup)
+
+    if (typeof window !== 'undefined') {
+      const href = buildStatusPageHref(normalizedLookup, uiLanguage, window.location.origin)
+      window.history.pushState(null, '', href)
+      setFragmentLookup(isStatusCode(normalizedLookup) ? '' : normalizedLookup)
+    }
+  }
 
   function queueBackgroundLoadingNotice() {
     if (typeof window === 'undefined') return
@@ -272,11 +311,26 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
     const nextLanguage = requestedLang
       ? normalizeUiLanguage(requestedLang)
       : storedLanguage || initialUiLanguage
+    // Synchronize the client UI with browser-persisted language preferences.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setUiLanguage(nextLanguage)
     saveUiLanguage(nextLanguage)
   }, [initialUiLanguage, requestedLang])
 
   useEffect(() => {
+    function syncFragmentLookup() {
+      setFragmentLookup(readFragmentLookup())
+      setFragmentReady(true)
+    }
+
+    syncFragmentLookup()
+    window.addEventListener('hashchange', syncFragmentLookup)
+    return () => window.removeEventListener('hashchange', syncFragmentLookup)
+  }, [])
+
+  useEffect(() => {
+    // Keep the editable field in sync when the URL fragment/query changes externally.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLookupValue(rawLookup)
   }, [rawLookup])
 
@@ -293,6 +347,8 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
   }, [])
 
   useEffect(() => {
+    if (!fragmentReady) return
+
     const normalizedLookup = normalizeStatusLookup(rawLookup)
     const recentSession = getActiveConsultationSession()
     const recentLookup = recentSession?.lookup || null
@@ -303,6 +359,8 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
         ? recentSession.chatbotReply || null
         : null
 
+    // Reconcile the view once browser-only fragment and session storage are available.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLiveUpdateMessage(null)
     setSessionChatbotReply(matchedSessionReply)
 
@@ -315,6 +373,10 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
     }
 
     if (normalizedLookup) {
+      if (!fragmentLookup && queryLookup && !isStatusCode(normalizedLookup)) {
+        replaceVisibleStatusUrl(normalizedLookup, activeLanguage)
+        setFragmentLookup(normalizedLookup)
+      }
       setResolvedLookup(normalizedLookup)
       setRestoredRecentSession(false)
       setCheckingStoredSession(false)
@@ -326,7 +388,10 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
       setUiLanguage(activeLanguage)
       setSessionChatbotReply(recentSession?.chatbotReply || null)
       setCheckingStoredSession(false)
-      router.replace(withUiLanguage(`/status?lookup=${encodeURIComponent(recentLookup)}`, activeLanguage))
+      replaceVisibleStatusUrl(recentLookup, activeLanguage)
+      setFragmentLookup(isStatusCode(recentLookup) ? '' : recentLookup)
+      setLookupValue(recentLookup)
+      setResolvedLookup(recentLookup)
       return
     }
 
@@ -335,7 +400,7 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
     setFetchError(null)
     setSessionChatbotReply(null)
     setCheckingStoredSession(false)
-  }, [copy.invalidLookup, initialUiLanguage, rawLookup, requestedLang, router])
+  }, [copy.invalidLookup, fragmentLookup, fragmentReady, initialUiLanguage, queryLookup, rawLookup, requestedLang])
 
   useEffect(() => {
     if (!resolvedLookup) return
@@ -375,8 +440,8 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
           trackingCode: status.trackingCode,
           statusUrl:
             typeof window !== 'undefined'
-              ? `${window.location.origin}${withUiLanguage(`/status?lookup=${encodeURIComponent(activeLookup)}`, nextUiLanguage)}`
-              : withUiLanguage(`/status?lookup=${encodeURIComponent(activeLookup)}`, nextUiLanguage),
+              ? buildStatusPageHref(activeLookup, nextUiLanguage, window.location.origin)
+              : buildStatusPageHref(activeLookup, nextUiLanguage),
           uiLanguage: nextUiLanguage,
           chatbotReply: status.chatbotReply,
         })
@@ -552,8 +617,7 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
         </header>
 
         <section className="mt-8 rounded-[2rem] border border-[var(--line)] bg-white/88 p-5 shadow-[0_24px_60px_rgba(8,34,55,0.08)] sm:p-7">
-          <form action="/status" className="grid gap-3 lg:grid-cols-[1fr_auto]">
-            <input type="hidden" name="lang" value={uiLanguage} />
+          <form onSubmit={handleLookupSubmit} className="grid gap-3 lg:grid-cols-[1fr_auto]">
             <label className="block">
               <span className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
                 {copy.lookupLabel}

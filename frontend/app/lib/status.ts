@@ -51,10 +51,14 @@ export interface PublicConsultationStatus {
   entryChannel: 'kakao' | 'web' | string
 }
 
-function tryExtractTokenFromUrl(value: string): string | null {
+export function extractStatusLookupFromUrl(value: string): string | null {
   try {
-    const parsed = new URL(value)
+    const parsed = new URL(value, 'https://app.happydoctor.kr')
+    const hashParams = new URLSearchParams(parsed.hash.replace(/^#/, ''))
     return (
+      hashParams.get('token') ||
+      hashParams.get('lookup') ||
+      hashParams.get('code') ||
       parsed.searchParams.get('lookup') ||
       parsed.searchParams.get('code') ||
       parsed.searchParams.get('token')
@@ -77,20 +81,23 @@ export interface PublicConsultationCreateResponse {
   replyToPatient: string
 }
 
+export function isStatusCode(value: string) {
+  const upperValue = value.toUpperCase()
+  return new RegExp(
+    `^(?:[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{${PUBLIC_STATUS_CODE_LENGTH}}|[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{${LEGACY_STATUS_CODE_LENGTH}})$`,
+  ).test(upperValue)
+}
+
 export function normalizeStatusLookup(rawToken?: string | string[] | null): string | null {
   const source = Array.isArray(rawToken) ? rawToken[0] : rawToken
   const trimmed = source?.trim()
   if (!trimmed) return null
 
-  const fromUrl = tryExtractTokenFromUrl(trimmed)
+  const fromUrl = extractStatusLookupFromUrl(trimmed)
   const candidate = (fromUrl || trimmed).trim()
   const upperCandidate = candidate.toUpperCase()
 
-  if (
-    new RegExp(
-      `^(?:[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{${PUBLIC_STATUS_CODE_LENGTH}}|[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{${LEGACY_STATUS_CODE_LENGTH}})$`,
-    ).test(upperCandidate)
-  ) {
+  if (isStatusCode(upperCandidate)) {
     return upperCandidate
   }
 
@@ -103,10 +110,48 @@ export function normalizeStatusLookup(rawToken?: string | string[] | null): stri
 
 export const normalizeStatusToken = normalizeStatusLookup
 
+export function buildStatusPageHref(
+  lookup: string,
+  uiLanguage: 'ko' | 'en',
+  origin = 'https://app.happydoctor.kr',
+) {
+  const normalizedLookup = normalizeStatusLookup(lookup)
+  if (!normalizedLookup) return `/status?lang=${uiLanguage}`
+
+  const url = new URL('/status', origin)
+  url.searchParams.set('lang', uiLanguage)
+
+  if (isStatusCode(normalizedLookup)) {
+    url.searchParams.set('lookup', normalizedLookup)
+  } else {
+    url.hash = new URLSearchParams({ token: normalizedLookup }).toString()
+  }
+
+  return url.origin === 'https://app.happydoctor.kr'
+    ? `${url.pathname}${url.search}${url.hash}`
+    : url.toString()
+}
+
+export function localizeAndProtectStatusUrl(
+  statusUrl: string,
+  uiLanguage: 'ko' | 'en',
+) {
+  const lookup = extractStatusLookupFromUrl(statusUrl)
+  if (!lookup) return buildStatusPageHref('', uiLanguage)
+
+  try {
+    const parsed = new URL(statusUrl, 'https://app.happydoctor.kr')
+    return buildStatusPageHref(lookup, uiLanguage, parsed.origin)
+  } catch {
+    return buildStatusPageHref(lookup, uiLanguage)
+  }
+}
+
 export async function fetchConsultationStatus(
   token: string,
 ): Promise<PublicConsultationStatus | null> {
-  const response = await fetch(`/api/public/consultations/status/${encodeURIComponent(token)}`, {
+  const response = await fetch('/api/public/consultations/status', {
+    headers: { 'X-Consultation-Lookup': token },
     cache: 'no-store',
   })
 

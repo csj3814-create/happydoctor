@@ -112,24 +112,24 @@ test('getFirebaseServiceAccount parses a JSON object and rejects malformed paylo
   });
 });
 
-test('validateStartupConfig requires the backend secrets and surfaces missing-key errors clearly', { concurrency: false }, async () => {
+test('validateStartupConfig no longer requires a clinical AI key and still requires backend access secrets', { concurrency: false }, async () => {
   await withEnv({
     GEMINI_API_KEY: undefined,
-    MESSENGER_API_KEY: 'messenger-secret',
+    MESSENGER_API_KEY: undefined,
     FIREBASE_SERVICE_ACCOUNT: undefined,
   }, async () => {
     assert.throws(
       () => validateStartupConfig(),
       (error) => {
         assert.ok(error instanceof ConfigurationError);
-        assert.match(error.message, /GEMINI_API_KEY/);
+        assert.match(error.message, /MESSENGER_API_KEY/);
         return true;
       },
     );
   });
 
   await withEnv({
-    GEMINI_API_KEY: 'gemini-secret',
+    GEMINI_API_KEY: undefined,
     MESSENGER_API_KEY: 'messenger-secret',
     FIREBASE_SERVICE_ACCOUNT: undefined,
     SOLAPI_API_KEY: undefined,

@@ -90,7 +90,7 @@ export const startCopyByLanguage: Record<'ko' | 'en', LocalizedStartCopyBundle> 
       supportItems: [
         '증상이 급하면 119나 가까운 응급실이 우선입니다.',
         '화면은 한국어 중심이지만 영어 입력도 가능합니다.',
-        '영어 외 다른 언어도 입력할 수 있고, 가능한 범위에서 자동 번역을 시도합니다.',
+        '영어 외 다른 언어도 입력할 수 있으며, 번역이 필요한 경우에도 의료진이 직접 상담을 검토합니다.',
       ],
     },
     form: {
@@ -100,7 +100,7 @@ export const startCopyByLanguage: Record<'ko' | 'en', LocalizedStartCopyBundle> 
       restoredDraft: '방금 입력하던 내용을 다시 불러왔습니다. 이어서 작성한 뒤 상담을 시작할 수 있습니다.',
       languageHintEyebrow: '언어 안내',
       languageHintTitle: '{language} 로 적어도 괜찮습니다.',
-      languageHintBody: '{language} 로 입력한 내용은 자동으로 감지되어 의료진에게는 한국어 번역으로 전달되고, 가능한 경우 같은 언어로 답변이 돌아갑니다.',
+      languageHintBody: '{language} 로 입력한 내용은 의료진 검토를 돕기 위해 번역될 수 있으며, 모든 상담과 답변은 의료진이 직접 검토합니다.',
       phoneConsentRequired: '답변 알림을 받으려면 휴대폰 번호를 입력해 주세요.',
       phoneConsentMismatch: '답변 알림 연락처는 동의한 경우에만 저장할 수 있습니다.',
       submitError: '상담을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.',
@@ -136,9 +136,9 @@ export const startCopyByLanguage: Record<'ko' | 'en', LocalizedStartCopyBundle> 
       phoneLabel: '휴대폰 번호',
       phonePlaceholder: '예: 010-1234-5678',
       policyNote: '응급 상황이라고 느껴지면 신고나 119 또는 가까운 응급실 이용이 우선입니다. 해피닥터는 응급실을 대신하는 서비스가 아니라 의료가 멀게 느껴지는 분들이 온라인으로 먼저 도움을 청할 수 있게 돕는 상담 서비스입니다.',
-      submitLoading: '보듬이가 내용을 정리하고 있습니다...',
+      submitLoading: '상담 내용을 안전하게 접수하고 있습니다...',
       submitIdle: '웹으로 상담 시작',
-      englishSupportNote: '한국어와 영어 UI는 완전 지원됩니다. 다른 언어는 가능한 범위에서 자동 번역을 시도합니다.',
+      englishSupportNote: '한국어와 영어 UI를 지원합니다. 번역이 필요한 경우에도 모든 상담은 의료진이 직접 검토합니다.',
     },
   },
   en: {
@@ -163,7 +163,7 @@ export const startCopyByLanguage: Record<'ko' | 'en', LocalizedStartCopyBundle> 
       supportItems: [
         'If your symptoms feel urgent, please use emergency services first.',
         'You can write in the language you selected for this page.',
-        'We will try to translate your message for our doctors automatically.',
+        'Your message may be translated to support review, and every consultation is directly reviewed by a doctor.',
       ],
     },
     form: {
@@ -173,7 +173,7 @@ export const startCopyByLanguage: Record<'ko' | 'en', LocalizedStartCopyBundle> 
       restoredDraft: 'We restored the details you were typing so you can continue and submit the consultation.',
       languageHintEyebrow: 'Language support',
       languageHintTitle: 'You can write in {language}.',
-      languageHintBody: 'We will try to detect {language} input automatically, translate it into Korean for our doctors, and send a translated reply back in the same language when possible.',
+      languageHintBody: 'Your {language} message may be translated to support review. Every consultation and reply is directly reviewed by a doctor.',
       phoneConsentRequired: 'Please enter a phone number if you want reply notifications.',
       phoneConsentMismatch: 'We only save a reply notification contact when you opt in.',
       submitError: 'We could not start the consultation right now. Please try again shortly.',
@@ -209,7 +209,7 @@ export const startCopyByLanguage: Record<'ko' | 'en', LocalizedStartCopyBundle> 
       phoneLabel: 'Phone number',
       phonePlaceholder: 'Example: +82 10-1234-5678',
       policyNote: 'If this feels urgent, please use emergency services first. Happy Doctor does not replace emergency care. It is an online support service for people who need to ask for help before healthcare becomes harder to reach.',
-      submitLoading: 'Bodeum is organizing your consultation...',
+      submitLoading: 'Submitting your consultation securely...',
       submitIdle: 'Start consultation on the web',
       englishSupportNote: 'This page is translated for your selected language. Medical nuance may still require clarification in follow-up replies.',
     },

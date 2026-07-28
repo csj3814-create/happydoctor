@@ -2,6 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 
 import PwaInstallButton from '../components/PwaInstallButton'
+import StatusLookupForm from '../components/StatusLookupForm'
 
 const KAKAO_CHAT_URL = 'https://pf.kakao.com/_PxaTxhX/chat'
 const WEB_START_URL = '/start?source=app'
@@ -26,8 +27,8 @@ const processSteps = [
   },
   {
     step: '02',
-    title: '보듬이가 먼저 정리합니다',
-    body: '설명이 길지 않아도 핵심 흐름을 읽기 좋게 정리합니다.',
+    title: '접수 내용을 안전하게 전달합니다',
+    body: '입력한 내용은 상담 접수 후 의료진이 직접 검토합니다.',
   },
   {
     step: '03',
@@ -161,7 +162,7 @@ export default function AppHomePage() {
                         </div>
                         <Image
                           src="/chatbot-character.png"
-                          alt="AI 인턴 보듬이 캐릭터"
+                          alt="해피닥터 안내 캐릭터"
                           width={54}
                           height={54}
                           className="h-11 w-11 object-contain sm:h-14 sm:w-14"
@@ -179,7 +180,7 @@ export default function AppHomePage() {
                                 증상과 궁금한 점을 먼저 남깁니다.
                               </div>
                               <div className="rounded-[0.95rem] bg-[var(--sky)] px-3 py-2.5 text-[13px] leading-5 text-[var(--ink)] sm:rounded-[1rem] sm:py-3 sm:text-sm sm:leading-6">
-                                보듬이가 정리하고 필요하면 의료진이 답변합니다.
+                                접수 후 의료진이 직접 확인하고 답변합니다.
                               </div>
                               <div className="rounded-[0.95rem] bg-[var(--navy)] px-3 py-2.5 text-[13px] leading-5 text-white sm:rounded-[1rem] sm:py-3 sm:text-sm sm:leading-6">
                                 링크나 6자리 코드로 상태를 다시 확인합니다.
@@ -256,21 +257,7 @@ export default function AppHomePage() {
                     받은 링크를 그대로 열거나 6자리 코드를 직접 입력하면 현재 상태와 최근 답변을 다시 볼 수 있습니다.
                   </p>
 
-                  <form action="/status" className="mt-5 grid gap-3">
-                    <input
-                      type="text"
-                      name="lookup"
-                      placeholder="받은 링크 또는 코드"
-                      className="w-full rounded-[1.1rem] border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--blue)] focus:bg-white"
-                    />
-                    <button
-                      type="submit"
-                      className="rounded-[1.1rem] bg-[var(--navy)] px-5 py-3 text-sm font-semibold text-white visited:text-white transition hover:bg-[#123c67]"
-                      style={{ color: '#ffffff' }}
-                    >
-                      상태 확인
-                    </button>
-                  </form>
+                  <StatusLookupForm />
                 </div>
               </div>
             </div>

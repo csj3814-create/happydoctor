@@ -178,13 +178,19 @@ function buildPatientStatusUrl(trackingInfo, uiLanguage = 'ko') {
   const trackingToken = trackingInfo?.trackingToken || '';
   if (!trackingCode && !trackingToken) return '';
 
-  const queryKey = trackingCode ? 'code' : 'token';
-  const queryValue = trackingCode || trackingToken;
-  const params = new URLSearchParams({ [queryKey]: queryValue });
+  const params = new URLSearchParams();
   if (normalizeUiLanguage(uiLanguage) === 'en') {
     params.set('lang', 'en');
   }
-  return `${appSiteUrl.replace(/\/$/, '')}/status?${params.toString()}`;
+  const baseUrl = `${appSiteUrl.replace(/\/$/, '')}/status`;
+  const query = params.toString() ? `?${params.toString()}` : '';
+  if (trackingToken) {
+    return `${baseUrl}${query}#token=${encodeURIComponent(trackingToken)}`;
+  }
+  return `${baseUrl}?${new URLSearchParams({
+    ...(normalizeUiLanguage(uiLanguage) === 'en' ? { lang: 'en' } : {}),
+    code: trackingCode,
+  }).toString()}`;
 }
 
 function getReplyCopy(uiLanguage = 'ko') {

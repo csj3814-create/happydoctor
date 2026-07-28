@@ -1,0 +1,13 @@
+{
+  "name": "happydoctor-twa-build",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Reproducible Trusted Web Activity wrapper for app.happydoctor.kr",
+  "scripts": {
+    "bubblewrap": "bubblewrap",
+    "verify:target-sdk": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/verify-target-sdk.ps1"
+  },
+  "devDependencies": {
+    "@bubblewrap/cli": "1.24.1"
+  }
+}
