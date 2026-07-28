@@ -87,7 +87,7 @@ const TIMELINE = [
   { year: '2022.01', title: '부평구다문화가족센터 MOU', desc: '다문화가족 대상 무료 온라인 의료상담 서비스를 본격적으로 확대했습니다.' },
   { year: '2022.08', title: '서울특별시농아인협회 MOU', desc: '농아인 의료상담 지원 범위를 넓히는 협력을 시작했습니다.' },
   { year: '2022.10', title: '서대문농아인복지관 협력', desc: '교육과 상담이 함께 가는 형태로 활동을 정례화했습니다.' },
-  { year: '2023.02', title: '사단법인 창립총회', desc: '임의단체를 넘어 비영리법인으로 전환하며 활동 기반을 다졌습니다.' },
+  { year: '2023.02', title: '사단법인 창립총회', desc: '비영리법인 전환을 추진하며 창립총회를 열고 활동 기반을 정비했습니다.' },
   { year: '2023.04', title: '다가치 MOU', desc: '이주민 의료지원 체계 구축을 위한 협약을 체결했습니다.' },
   { year: '2024-2026', title: '카카오톡 채널 + AI 인턴 보듬이 도입', desc: '언제 어디서나 도움을 청할 수 있도록 온라인 의료상담 흐름을 만들었습니다.' },
 ]
@@ -981,9 +981,21 @@ function Footer() {
         </div>
 
         <div className="space-y-1 text-sm text-white/58">
-          <p>비영리법인 고유번호 111-82-67141</p>
+          <p>비영리단체 고유번호 111-82-67141</p>
           <p>대표 최석재 (응급의학과 전문의)</p>
           <p>서울특별시 영등포구 선유로9길 10, SK V1 616</p>
+          <p>
+            대표전화{' '}
+            <a className="transition hover:text-white" href="tel:+821041009696">
+              010-4100-9696
+            </a>
+          </p>
+          <p>
+            대표메일{' '}
+            <a className="transition hover:text-white" href="mailto:president@happydoctor.kr">
+              president@happydoctor.kr
+            </a>
+          </p>
         </div>
 
         <a
