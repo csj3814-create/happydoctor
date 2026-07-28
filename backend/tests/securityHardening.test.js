@@ -10,6 +10,13 @@ const {
   buildDoctorFollowUpNotificationMessage,
   isShortTrackingCodeLookupExpired,
 } = require('../services/dbService');
+const { createApp } = require('../app');
+
+test('the API trusts exactly one Render proxy hop for client rate-limit keys', () => {
+  const app = createApp();
+
+  assert.equal(app.get('trust proxy'), 1);
+});
 
 test('new consultations deterministically route to clinician review without medical advice', async () => {
   const result = await analyzeAndRouteTriage({

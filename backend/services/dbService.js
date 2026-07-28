@@ -1,4 +1,7 @@
-const admin = require('firebase-admin');
+const { cert, initializeApp } = require('firebase-admin/app');
+const { FieldValue, Timestamp, getFirestore } = require('firebase-admin/firestore');
+const { getAuth } = require('firebase-admin/auth');
+const { getStorage } = require('firebase-admin/storage');
 const crypto = require('crypto');
 const {
   ConfigurationError,
@@ -32,9 +35,21 @@ const CONSULTATION_IMAGE_EXTENSIONS = {
 };
 
 let db = null;
+let firebaseApp = null;
 let storageBucketName = '';
 let resolvedStorageBucketName = '';
 let storageBucketCandidates = [];
+
+// Keep the narrow legacy surface consumed by this service and notifyService
+// while using the modular Firebase Admin API required by v14.
+const admin = {
+  firestore: Object.assign(
+    () => getFirestore(firebaseApp),
+    { FieldValue, Timestamp },
+  ),
+  storage: () => getStorage(firebaseApp),
+  auth: () => getAuth(firebaseApp),
+};
 
 try {
   const serviceAccount = getFirebaseServiceAccount();
@@ -53,11 +68,11 @@ try {
       ),
     );
     storageBucketName = storageBucketCandidates[0] || '';
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
+    firebaseApp = initializeApp({
+      credential: cert(serviceAccount),
       ...(storageBucketName ? { storageBucket: storageBucketName } : {}),
     });
-    db = admin.firestore();
+    db = getFirestore(firebaseApp);
     console.log('[Firebase] Firestore initialized successfully.');
   } else {
     console.warn('[Firebase] FIREBASE_SERVICE_ACCOUNT is missing. DB logging is disabled.');
@@ -1970,7 +1985,7 @@ module.exports = {
   HDT_REPLY,
   HDT_SEEN,
   getDb: () => db,
-  getAdmin: () => admin,
+  getAdmin: () => (firebaseApp ? admin : null),
   getStorageBucketName: () => resolvedStorageBucketName || storageBucketName,
   getStorageBucketCandidates: () => [...storageBucketCandidates],
 };

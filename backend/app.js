@@ -34,6 +34,9 @@ function createRuntimeResponse() {
 
 function createApp() {
   const app = express();
+  // Render terminates TLS at one trusted proxy. This keeps rate-limit keys
+  // bound to the originating client instead of the shared proxy address.
+  app.set('trust proxy', 1);
   const portalOrigins = getPortalOrigins();
 
   const portalCors = cors({
