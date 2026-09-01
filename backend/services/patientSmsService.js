@@ -1,5 +1,6 @@
 const { SolapiMessageService } = require('solapi');
 
+const emailService = require('./emailService');
 const {
   acknowledgePatientSmsNotification,
   claimPatientSmsNotification,
@@ -52,8 +53,16 @@ class PatientSmsService {
       return;
     }
 
-    await reclaimExpiredPatientSmsLeases();
-    await this.processDueNotifications();
+    // The initial drain must never stop the loop from starting: a single
+    // failing message here previously left SMS delivery dead until the next
+    // deploy, and the same message failed again on every restart.
+    try {
+      await reclaimExpiredPatientSmsLeases();
+      await this.processDueNotifications();
+    } catch (error) {
+      console.error('[Patient SMS] Initial drain failed, continuing:', error?.message || error);
+    }
+
     this.startProcessorLoop();
   }
 
@@ -106,6 +115,8 @@ class PatientSmsService {
     });
   }
 
+  // Never rethrows: one undeliverable message must not abort the batch and
+  // strand every message queued behind it.
   async executeClaimedNotification(notification) {
     try {
       await this.sendSms({
@@ -113,15 +124,45 @@ class PatientSmsService {
         message: notification.message,
       });
 
-      await acknowledgePatientSmsNotification(notification.notificationId, {
-        delivered: true,
+      await acknowledgePatientSmsNotification(notification.notificationId, { delivered: true });
+      return true;
+    } catch (error) {
+      const reason = error?.message || 'sms_delivery_failed';
+      let outcome = null;
+
+      try {
+        outcome = await acknowledgePatientSmsNotification(notification.notificationId, {
+          delivered: false,
+          error: reason,
+        });
+      } catch (ackError) {
+        console.error('[Patient SMS Ack Error]', ackError?.message || ackError);
+      }
+
+      if (outcome?.exhausted) {
+        console.error(
+          `[Patient SMS] Giving up on ${notification.notificationId} after ${outcome.attemptCount} attempts: ${reason}`,
+        );
+        await this.reportExhaustedNotification(notification, outcome, reason);
+      } else {
+        console.warn(`[Patient SMS] Delivery failed, will retry: ${reason}`);
+      }
+
+      return false;
+    }
+  }
+
+  // Phone numbers and reply bodies stay out of the report: it says only that a
+  // patient could not be reached and points at the portal.
+  async reportExhaustedNotification(notification, outcome, reason) {
+    try {
+      await emailService.sendPatientSmsFailureEmail({
+        userId: notification.userId || outcome?.userId || null,
+        attemptCount: outcome?.attemptCount || null,
+        reason,
       });
     } catch (error) {
-      await acknowledgePatientSmsNotification(notification.notificationId, {
-        delivered: false,
-        error: error?.message || 'sms_delivery_failed',
-      });
-      throw error;
+      console.error('[Patient SMS Failure Report Error]', error?.message || error);
     }
   }
 }

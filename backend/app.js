@@ -231,6 +231,7 @@ function createApp() {
           doctorNotificationsPending: queueStatus.pendingCount,
           patientPushPending: queueStatus.patientPushPending,
           patientSmsPending: queueStatus.patientSmsPending,
+          patientSmsFailed: queueStatus.patientSmsFailed,
         },
         backlog: {
           unansweredConsultations: pending.total,

@@ -20,6 +20,11 @@ const DEFAULT_DOCTOR_REMINDER_DELAYS_MINUTES = Object.freeze([0, 5, 15]);
 const DEFAULT_DOCTOR_REPLY_REMINDER_DELAYS_MINUTES = Object.freeze([0, 5, 15]);
 const DEFAULT_DOCTOR_REPLY_SMS_REMINDER_DELAYS_MINUTES = Object.freeze([0, 5, 15]);
 const DEFAULT_OPERATOR_UNANSWERED_ALERT_DELAYS_MINUTES = Object.freeze([15]);
+// A permanently undeliverable SMS used to return straight to `pending` keeping
+// its original availableAt, so it stayed first in the due queue and blocked
+// every message behind it indefinitely. Failures now back off and then die.
+const PATIENT_SMS_MAX_ATTEMPTS = 5;
+const PATIENT_SMS_RETRY_BACKOFF_MINUTES = Object.freeze([1, 2, 4, 8, 16]);
 const DOCTOR_NOTIFICATION_DUPLICATE_WINDOW_MS = 20 * 60 * 1000;
 const DOCTOR_NOTIFICATION_CATCHUP_GAP_MS = 5 * 60 * 1000;
 const DOCTOR_ROOM_BLOCKED_PATTERNS = Object.freeze([
@@ -1196,31 +1201,52 @@ async function claimPatientSmsNotification() {
 
 async function acknowledgePatientSmsNotification(notificationId, payload = {}) {
   const collection = getCollection(PATIENT_SMS_NOTIFICATIONS);
-  if (!collection || !notificationId) return false;
+  if (!collection || !notificationId) return null;
 
   const docRef = collection.doc(notificationId);
   const snapshot = await docRef.get();
-  if (!snapshot.exists) return false;
+  if (!snapshot.exists) return null;
 
-  const delivered = payload.delivered !== false;
-  const update = delivered
-    ? {
-        status: 'delivered',
-        deliveredAt: getAdmin().firestore.FieldValue.serverTimestamp(),
-        leaseId: null,
-        leaseExpiresAt: null,
-        lastFailureReason: null,
-      }
-    : {
-        status: 'pending',
-        leaseId: null,
-        leaseExpiresAt: null,
-        lastFailedAt: getAdmin().firestore.FieldValue.serverTimestamp(),
-        lastFailureReason: payload.error || 'delivery_failed',
-      };
+  if (payload.delivered !== false) {
+    await docRef.update({
+      status: 'delivered',
+      deliveredAt: getAdmin().firestore.FieldValue.serverTimestamp(),
+      leaseId: null,
+      leaseExpiresAt: null,
+      lastFailureReason: null,
+    });
 
-  await docRef.update(update);
-  return true;
+    return { status: 'delivered', exhausted: false };
+  }
+
+  // claimPatientSmsNotification() already incremented attemptCount for this try.
+  const attemptCount = Number(snapshot.data()?.attemptCount) || 0;
+  const exhausted = attemptCount >= PATIENT_SMS_MAX_ATTEMPTS;
+  const backoffIndex = Math.min(
+    Math.max(attemptCount - 1, 0),
+    PATIENT_SMS_RETRY_BACKOFF_MINUTES.length - 1,
+  );
+  const retryDelayMinutes = PATIENT_SMS_RETRY_BACKOFF_MINUTES[backoffIndex];
+
+  await docRef.update({
+    status: exhausted ? 'failed' : 'pending',
+    leaseId: null,
+    leaseExpiresAt: null,
+    lastFailedAt: getAdmin().firestore.FieldValue.serverTimestamp(),
+    lastFailureReason: payload.error || 'delivery_failed',
+    ...(exhausted
+      ? { failedAt: getAdmin().firestore.FieldValue.serverTimestamp() }
+      // Pushing availableAt forward is what lets the queue move past a message
+      // that keeps failing.
+      : { availableAt: new Date(Date.now() + retryDelayMinutes * 60 * 1000) }),
+  });
+
+  return {
+    status: exhausted ? 'failed' : 'pending',
+    exhausted,
+    attemptCount,
+    userId: snapshot.data()?.userId || null,
+  };
 }
 
 async function clearPatientSmsNotifications(userId, type = null) {
@@ -1381,10 +1407,17 @@ async function getQueueStatus() {
   const patientSmsCollection = db.collection(PATIENT_SMS_NOTIFICATIONS);
   const roomsCollection = db.collection(MESSENGER_ROOMS);
 
-  const [pendingCount, patientPushPending, patientSmsPending, registeredRooms] = await Promise.all([
+  const [
+    pendingCount,
+    patientPushPending,
+    patientSmsPending,
+    patientSmsFailed,
+    registeredRooms,
+  ] = await Promise.all([
     countDocuments(doctorCollection.where('status', '==', 'pending')),
     countDocuments(patientPushCollection.where('status', '==', 'pending')),
     countDocuments(patientSmsCollection.where('status', '==', 'pending')),
+    countDocuments(patientSmsCollection.where('status', '==', 'failed')),
     countDocuments(roomsCollection),
   ]);
 
@@ -1393,6 +1426,9 @@ async function getQueueStatus() {
     fuPushPending: patientPushPending,
     patientPushPending,
     patientSmsPending,
+    // Abandoned messages mean a patient was never reached; they must stay
+    // visible instead of disappearing from the pending count.
+    patientSmsFailed,
     registeredRooms,
   };
 }

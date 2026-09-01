@@ -10,7 +10,7 @@
 | `messenger_rooms/operator_alerts` | `가족-최석재` (개인방) |
 | `doctor_notifications` | delivered 80 / cancelled 62 / notified 1 |
 | `patient_channel_pushes` | delivered 20 / cancelled 5 |
-| `patient_sms_notifications` | **pending 24 (attempts=0)** / cancelled 6 |
+| `patient_sms_notifications` | pending 24 / cancelled 6 — **delivered 0 (한 번도 발송된 적 없음)** |
 | 포털 미답변 | 67건 |
 
 ### 1-1. 의료진 알림이 단톡방에 가지 않았다
@@ -22,9 +22,25 @@
 신규 상담 리마인더는 0/5/15분, 후속 푸시는 15분/3시간/24시간이 전부입니다.
 그 창을 놓치면 미답변 상담은 다시 알림을 만들지 않습니다.
 
-### 1-3. 환자 답변 SMS가 한 번도 발송되지 않았다
-`SOLAPI_API_KEY` / `SOLAPI_API_SECRET` / `SOLAPI_SENDER`가 Render에 없어
-`patientSmsService`의 발송 루프가 비활성 상태입니다. 24건이 claim조차 되지 않은 채 쌓였습니다.
+### 1-3. 환자 답변 SMS가 한 번도 발송되지 않았다 (2026-09-02 원인 정정)
+
+이 문서의 초판은 원인을 "SOLAPI 환경변수 미설정"으로 적었으나 **오진이었습니다.**
+SOLAPI는 처음부터 설정돼 있었습니다. 진단 스크립트가 존재하지 않는 필드 `deliveryAttempts`를
+읽어 모든 문서가 `attempts=0`으로 보였고, 이를 "한 번도 시도되지 않음"으로 잘못 해석했습니다.
+실제 필드명은 `attemptCount`이며, 가장 오래된 건은 **854회 실패 중**이었습니다.
+
+진짜 원인은 **한 건이 큐 전체를 막는 head-of-line 차단**이었습니다.
+
+1. `acknowledgePatientSmsNotification()`이 실패 시 재시도 상한도 백오프도 없이
+   `status`만 `pending`으로 되돌렸고 `availableAt`은 그대로였습니다.
+2. `getDuePendingPatientSmsDocs()`가 `availableAt` 오름차순으로 정렬하므로
+   그 실패 건이 **영구히 큐 맨 앞**을 차지했습니다.
+3. `executeClaimedNotification()`이 예외를 다시 던져 배치 전체가 중단됐고,
+   뒤의 모든 메시지는 시도조차 되지 않았습니다.
+4. `initialize()`에서 그 예외가 빠져나가 `startProcessorLoop()`이 호출되지 않았습니다.
+   재시작해도 같은 건에서 실패해 루프가 다시 죽었습니다.
+
+결과적으로 2026-06-04 이후 환자 답변 SMS는 **delivered 0건**입니다.
 
 ### 1-4. 전체 발송이 안드로이드 폰 한 대에 걸려 있다
 서버는 Firestore 큐에 적재만 하고, 실제 발송은 MessengerBot 폰이 `/api/messengerbot/poll`을
@@ -72,10 +88,11 @@ Play 출시 보안 강화 커밋 `d78e4e9`에서 AI 임상 응답 경로를 의�
 하나만 넣어도 **서버는 정상 기동하고 메일 채널만 비활성화**됩니다(2026-09-01 수정).
 이유는 `/api/version`에 문자열로 표시되므로, 저장 후 아래 4절로 바로 확인하세요.
 
-### 3-3. 함께 확인할 것
-- `SOLAPI_API_KEY` / `SOLAPI_API_SECRET` / `SOLAPI_SENDER`: 세 개를 모두 넣어야 환자 SMS가 살아납니다.
-  현재 pending 24건은 설정 직후 순차 발송됩니다. 오래된 건까지 한꺼번에 나가는 것이 곤란하면
-  발송 전에 오래된 pending 문서를 정리해야 합니다.
+### 3-3. SOLAPI는 손댈 필요 없습니다
+SOLAPI 3종 변수는 이미 설정돼 있습니다. SMS 장애는 환경변수가 아니라 코드 문제였고
+2026-09-02에 수정했습니다 (재시도 5회 상한, 지수 백오프, 죽은편지함, 배치 중단 방지).
+밀린 건은 정리했습니다 — 7일 초과 21건과 중복 리마인더 단계 8건을 취소하고,
+2026-09-01에 답변한 환자 4명에게 각 1통씩만 남겼습니다.
 
 ## 4. 설정이 제대로 들어갔는지 확인하기
 
@@ -93,6 +110,9 @@ https://happydoctor.onrender.com/api/version
 | `"configured": false, "issue": null` | 변수를 아예 안 넣었거나 재배포 전 | 변수 확인 후 재배포 |
 | `"issue": "SMTP_USER and SMTP_PASS..."` | 한쪽만 저장됨 | 빠진 쪽 추가 |
 | `"configured": true, "recipientCount": 0` | 보낼 곳이 없음 | `ALERT_EMAIL_RECIPIENTS` 추가 |
+
+`/api/notification-health`의 `queues.patientSmsFailed`가 0보다 크면 재시도를 포기한 환자가 있다는 뜻입니다.
+연락처가 잘못됐을 가능성이 크니 포털에서 확인하고 필요하면 직접 연락해야 합니다.
 
 큐 적체와 미답변 경과 시간까지 보려면 (API 키 필요, 개인 식별 정보는 포함되지 않음):
 

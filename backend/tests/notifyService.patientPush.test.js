@@ -1050,3 +1050,101 @@ test('a failing mail alert never blocks or unwinds the queued Kakao notification
     context.restore();
   }
 });
+
+test('a failed SMS ack backs off instead of returning to the head of the queue', { concurrency: false }, async () => {
+  const context = loadNotifyService({
+    patient_sms_notifications: {
+      'sms-retry': {
+        userId: 'patientA',
+        phoneNumber: '01012345678',
+        message: 'doctor reply',
+        type: 'doctor_reply',
+        status: 'leased',
+        leaseId: 'lease-1',
+        attemptCount: 1,
+        availableAt: new Date('2026-06-04T06:54:44.045Z'),
+        createdAt: new Date('2026-06-04T06:54:44.087Z'),
+      },
+    },
+  });
+
+  try {
+    const before = Date.now();
+    const outcome = await context.service.acknowledgePatientSmsNotification('sms-retry', {
+      delivered: false,
+      error: 'solapi_rejected',
+    });
+
+    assert.equal(outcome.status, 'pending');
+    assert.equal(outcome.exhausted, false);
+
+    const doc = context.getDoc('patient_sms_notifications', 'sms-retry');
+    assert.equal(doc.status, 'pending');
+    assert.equal(doc.lastFailureReason, 'solapi_rejected');
+    // Keeping the original availableAt is what pinned this message to the front
+    // of the due queue forever.
+    assert.ok(doc.availableAt.getTime() >= before, 'availableAt must move forward');
+  } finally {
+    context.restore();
+  }
+});
+
+test('an SMS is dead-lettered once it exhausts its attempts', { concurrency: false }, async () => {
+  const context = loadNotifyService({
+    patient_sms_notifications: {
+      'sms-dead': {
+        userId: 'patientA',
+        phoneNumber: '01012345678',
+        message: 'doctor reply',
+        type: 'doctor_reply',
+        status: 'leased',
+        leaseId: 'lease-1',
+        attemptCount: 5,
+      },
+    },
+  });
+
+  try {
+    const outcome = await context.service.acknowledgePatientSmsNotification('sms-dead', {
+      delivered: false,
+      error: 'solapi_rejected',
+    });
+
+    assert.equal(outcome.exhausted, true);
+    assert.equal(outcome.status, 'failed');
+    assert.equal(outcome.userId, 'patientA');
+
+    const doc = context.getDoc('patient_sms_notifications', 'sms-dead');
+    assert.equal(doc.status, 'failed');
+    assert.equal(doc.leaseId, null);
+    // A dead-lettered message must never be claimed again.
+    assert.equal(await context.service.claimPatientSmsNotification(), null);
+  } finally {
+    context.restore();
+  }
+});
+
+test('a delivered SMS ack still completes the message', { concurrency: false }, async () => {
+  const context = loadNotifyService({
+    patient_sms_notifications: {
+      'sms-ok': {
+        userId: 'patientA',
+        phoneNumber: '01012345678',
+        message: 'doctor reply',
+        type: 'doctor_reply',
+        status: 'leased',
+        leaseId: 'lease-1',
+        attemptCount: 1,
+      },
+    },
+  });
+
+  try {
+    const outcome = await context.service.acknowledgePatientSmsNotification('sms-ok', { delivered: true });
+
+    assert.equal(outcome.status, 'delivered');
+    assert.equal(context.getDoc('patient_sms_notifications', 'sms-ok').status, 'delivered');
+  } finally {
+    context.restore();
+  }
+});

@@ -153,6 +153,40 @@ class EmailService {
     return true;
   }
 
+  // Sent when a patient reply SMS is abandoned after repeated failures, so a
+  // human knows one patient is unreachable. Carries no phone number and no
+  // reply text - only the fact and the portal link.
+  async sendPatientSmsFailureEmail({ userId, attemptCount, reason } = {}) {
+    if (!this.isConfigured()) {
+      return false;
+    }
+
+    const recipients = getAlertEmailRecipients();
+    if (recipients.length === 0) {
+      return false;
+    }
+
+    const text = [
+      '환자에게 답변 도착 문자를 보내지 못해 재시도를 중단했습니다.',
+      attemptCount ? `시도 횟수: ${attemptCount}회` : '',
+      reason ? `마지막 실패 사유: ${String(reason).slice(0, 200)}` : '',
+      userId ? `상담 식별자: ${userId}` : '',
+      '',
+      '해당 환자는 답변이 도착한 사실을 모르고 있을 수 있습니다.',
+      '연락처가 올바른지 포털에서 확인하고 필요하면 직접 연락해 주세요.',
+      ...PORTAL_GUIDE_LINES,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    await this.sendMail({
+      to: recipients,
+      subject: '[해피닥터] 환자 답변 문자 발송 실패 - 확인 필요',
+      text,
+    });
+    return true;
+  }
+
   // Patient-facing fallback for when neither the Kakao channel nor SMS is
   // available. Carries the doctor's reply the patient is already waiting for.
   async sendPatientReplyEmail({ to, subject, text }) {

@@ -166,7 +166,7 @@ test('processDueNotifications sends claimed SMS jobs through SOLAPI and acknowle
   }
 });
 
-test('processDueNotifications requeues the SMS job when SOLAPI send fails', { concurrency: false }, async () => {
+test('a failing SMS is requeued without aborting the batch behind it', { concurrency: false }, async () => {
   const calls = [];
   let claimed = false;
 
@@ -213,7 +213,11 @@ test('processDueNotifications requeues the SMS job when SOLAPI send fails', { co
   });
 
   try {
-    await assert.rejects(() => context.service.processDueNotifications(), /solapi_send_failed/);
+    // Rethrowing here used to abort the whole batch, so one undeliverable
+    // message stranded every message queued behind it.
+    const processed = await context.service.processDueNotifications();
+
+    assert.equal(processed, 1);
     assert.deepEqual(calls, [
       {
         type: 'acknowledgePatientSmsNotification',
