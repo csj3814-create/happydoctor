@@ -279,3 +279,34 @@ test('/api/notification-health reports an empty backlog as a null age', { concur
     }
   });
 });
+
+test('backlog age is computed from Firestore Timestamps, not just ISO strings', { concurrency: false }, async () => {
+  await withEnv({ MESSENGER_API_KEY: MESSENGER_KEY }, async () => {
+    const threeHoursAgoMs = Date.now() - 3 * 60 * 60 * 1000;
+    const server = await startApp(loadAppWithMocks({
+      dbOverrides: {
+        getActiveConsultations: async () => ({
+          total: 3,
+          consultations: [
+            // getActiveConsultations returns raw documents, so these are the
+            // shapes the Firestore SDK actually hands back.
+            { id: 'c1', createdAt: { toMillis: () => Date.now() - 30 * 60 * 1000 } },
+            { id: 'c2', createdAt: { _seconds: Math.floor(threeHoursAgoMs / 1000), _nanoseconds: 0 } },
+            { id: 'c3', createdAt: new Date(Date.now() - 10 * 60 * 1000) },
+          ],
+        }),
+      },
+    }));
+
+    try {
+      const { body } = await getJson(`${server.baseUrl}/api/notification-health`, {
+        headers: { 'x-api-key': MESSENGER_KEY },
+      });
+
+      assert.equal(body.backlog.unansweredConsultations, 3);
+      assert.equal(body.backlog.oldestUnansweredAgeMinutes, 180);
+    } finally {
+      await server.close();
+    }
+  });
+});

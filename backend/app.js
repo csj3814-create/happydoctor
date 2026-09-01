@@ -98,9 +98,21 @@ function requireMessengerApiKey(req, res, next) {
   return next();
 }
 
+// getActiveConsultations() returns raw Firestore documents, so createdAt is a
+// Timestamp rather than a string. Date.parse() on one yields NaN, which made
+// this report null for a 67-consultation backlog.
+function toMillis(value) {
+  if (!value) return NaN;
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (typeof value.toDate === 'function') return value.toDate().getTime();
+  if (typeof value._seconds === 'number') return value._seconds * 1000;
+  if (value instanceof Date) return value.getTime();
+  return Date.parse(value);
+}
+
 function getOldestPendingAgeMinutes(consultations, now) {
   const timestamps = consultations
-    .map((consultation) => Date.parse(consultation.createdAt))
+    .map((consultation) => toMillis(consultation.createdAt))
     .filter((value) => Number.isFinite(value));
 
   if (timestamps.length === 0) return null;
