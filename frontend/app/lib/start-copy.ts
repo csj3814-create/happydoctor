@@ -56,6 +56,12 @@ export type StartFormCopy = {
   notificationDescription: string
   phoneLabel: string
   phonePlaceholder: string
+  // Optional so existing locale bundles stay valid; the component falls back to
+  // the built-in ko/en copy for any bundle that has not been translated yet.
+  emailLabel?: string
+  emailPlaceholder?: string
+  contactChoiceHint?: string
+  emailInvalid?: string
   policyNote: string
   submitLoading: string
   submitIdle: string
@@ -101,7 +107,7 @@ export const startCopyByLanguage: Record<'ko' | 'en', LocalizedStartCopyBundle> 
       languageHintEyebrow: '언어 안내',
       languageHintTitle: '{language} 로 적어도 괜찮습니다.',
       languageHintBody: '{language} 로 입력한 내용은 의료진 검토를 돕기 위해 번역될 수 있으며, 모든 상담과 답변은 의료진이 직접 검토합니다.',
-      phoneConsentRequired: '답변 알림을 받으려면 휴대폰 번호를 입력해 주세요.',
+      phoneConsentRequired: '답변 알림을 받으려면 휴대폰 번호나 이메일 중 하나를 입력해 주세요.',
       phoneConsentMismatch: '답변 알림 연락처는 동의한 경우에만 저장할 수 있습니다.',
       submitError: '상담을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.',
       ageLabel: '나이 또는 연령대',
@@ -135,6 +141,10 @@ export const startCopyByLanguage: Record<'ko' | 'en', LocalizedStartCopyBundle> 
       notificationDescription: '선택 사항입니다. 동의한 경우에만 의료진 답변 알림 연락처로 사용됩니다.',
       phoneLabel: '휴대폰 번호',
       phonePlaceholder: '예: 010-1234-5678',
+      emailLabel: '이메일 (선택)',
+      emailPlaceholder: '예: name@example.com',
+      contactChoiceHint: '휴대폰 번호와 이메일 중 하나만 입력해도 됩니다.',
+      emailInvalid: '이메일 주소를 다시 확인해 주세요.',
       policyNote: '응급 상황이라고 느껴지면 신고나 119 또는 가까운 응급실 이용이 우선입니다. 해피닥터는 응급실을 대신하는 서비스가 아니라 의료가 멀게 느껴지는 분들이 온라인으로 먼저 도움을 청할 수 있게 돕는 상담 서비스입니다.',
       submitLoading: '상담 내용을 안전하게 접수하고 있습니다...',
       submitIdle: '웹으로 상담 시작',
@@ -174,7 +184,7 @@ export const startCopyByLanguage: Record<'ko' | 'en', LocalizedStartCopyBundle> 
       languageHintEyebrow: 'Language support',
       languageHintTitle: 'You can write in {language}.',
       languageHintBody: 'Your {language} message may be translated to support review. Every consultation and reply is directly reviewed by a doctor.',
-      phoneConsentRequired: 'Please enter a phone number if you want reply notifications.',
+      phoneConsentRequired: 'Please enter a phone number or an email address if you want reply notifications.',
       phoneConsentMismatch: 'We only save a reply notification contact when you opt in.',
       submitError: 'We could not start the consultation right now. Please try again shortly.',
       ageLabel: 'Age or age range',
@@ -204,10 +214,14 @@ export const startCopyByLanguage: Record<'ko' | 'en', LocalizedStartCopyBundle> 
       imageChooseLabel: 'Choose files',
       imageEmptyLabel: 'No file selected',
       imageSelectedLabel: '{count} files selected',
-      notificationTitle: 'Leave a phone number for reply alerts',
+      notificationTitle: 'Leave a contact for reply alerts',
       notificationDescription: 'Optional. We only use this contact if you opt in to receive a reply alert.',
       phoneLabel: 'Phone number',
       phonePlaceholder: 'Example: +82 10-1234-5678',
+      emailLabel: 'Email (optional)',
+      emailPlaceholder: 'Example: name@example.com',
+      contactChoiceHint: 'Either a phone number or an email address is enough.',
+      emailInvalid: 'Please check the email address.',
       policyNote: 'If this feels urgent, please use emergency services first. Happy Doctor does not replace emergency care. It is an online support service for people who need to ask for help before healthcare becomes harder to reach.',
       submitLoading: 'Submitting your consultation securely...',
       submitIdle: 'Start consultation on the web',

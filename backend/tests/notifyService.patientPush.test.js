@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 
 const DB_SERVICE_PATH = path.resolve(__dirname, '../services/dbService.js');
+const EMAIL_SERVICE_PATH = path.resolve(__dirname, '../services/emailService.js');
 const NOTIFY_SERVICE_PATH = path.resolve(__dirname, '../services/notifyService.js');
 
 function clone(value) {
@@ -251,9 +252,17 @@ function createFirestoreMock(seed = {}) {
   };
 }
 
-function loadNotifyService(seed = {}) {
+function loadNotifyService(seed = {}, options = {}) {
   const originalDbService = require.cache[DB_SERVICE_PATH];
+  const originalEmailService = require.cache[EMAIL_SERVICE_PATH];
   const originalNotifyService = require.cache[NOTIFY_SERVICE_PATH];
+  // Always stubbed so no test can reach a real SMTP transport.
+  const doctorAlertEmails = [];
+  const sendDoctorAlertEmail = options.sendDoctorAlertEmail
+    || (async (payload) => {
+      doctorAlertEmails.push(payload);
+      return true;
+    });
   const firestore = createFirestoreMock(seed);
   const fakeAdmin = {
     firestore: {
@@ -274,10 +283,21 @@ function loadNotifyService(seed = {}) {
     },
   };
 
+  require.cache[EMAIL_SERVICE_PATH] = {
+    id: EMAIL_SERVICE_PATH,
+    filename: EMAIL_SERVICE_PATH,
+    loaded: true,
+    exports: {
+      isConfigured: () => true,
+      sendDoctorAlertEmail,
+    },
+  };
+
   const service = require(NOTIFY_SERVICE_PATH);
 
   return {
     service,
+    doctorAlertEmails,
     getDoc: firestore.getDoc,
     listDocs: firestore.listDocs,
     restore() {
@@ -290,6 +310,12 @@ function loadNotifyService(seed = {}) {
         require.cache[DB_SERVICE_PATH] = originalDbService;
       } else {
         delete require.cache[DB_SERVICE_PATH];
+      }
+
+      if (originalEmailService) {
+        require.cache[EMAIL_SERVICE_PATH] = originalEmailService;
+      } else {
+        delete require.cache[EMAIL_SERVICE_PATH];
       }
     },
   };
@@ -966,6 +992,60 @@ test('claimDoctorNotification supersedes older due schedules for the same patien
     const newerDoc = context.getDoc('doctor_notifications', 'newer-schedule');
     assert.equal(newerDoc.status, 'leased');
     assert.equal(newerDoc.attemptCount, 1);
+  } finally {
+    context.restore();
+  }
+});
+
+test('enqueueDoctorNotification also raises a mail alert alongside the Kakao queue', { concurrency: false }, async () => {
+  const context = loadNotifyService();
+
+  try {
+    const enqueued = await context.service.enqueueDoctorNotification('SOAP', 'public_mail_1', {
+      type: 'triage_initial',
+      priority: 'urgent',
+      reminderDelaysMinutes: [0, 5, 15],
+    });
+
+    assert.equal(enqueued, true);
+    assert.equal(context.doctorAlertEmails.length, 1);
+    assert.deepEqual(context.doctorAlertEmails[0], {
+      patientId: 'public_mail_1',
+      type: 'triage_initial',
+      priority: 'urgent',
+    });
+
+    const queued = context.listDocs('doctor_notifications');
+    assert.equal(queued.length, 3);
+    assert.ok(queued.every((entry) => entry.data.status === 'pending'));
+    assert.deepEqual(
+      queued.map((entry) => entry.data.reminderStage).sort((left, right) => left - right),
+      [1, 2, 3],
+    );
+  } finally {
+    context.restore();
+  }
+});
+
+test('a failing mail alert never blocks or unwinds the queued Kakao notification', { concurrency: false }, async () => {
+  const context = loadNotifyService({}, {
+    sendDoctorAlertEmail: async () => {
+      throw new Error('smtp_unreachable');
+    },
+  });
+
+  try {
+    const enqueued = await context.service.enqueueDoctorNotification('SOAP', 'public_mail_2', {
+      type: 'triage_initial',
+      priority: 'urgent',
+      reminderDelaysMinutes: [0, 5, 15],
+    });
+
+    assert.equal(enqueued, true);
+
+    const queued = context.listDocs('doctor_notifications');
+    assert.equal(queued.length, 3);
+    assert.ok(queued.every((entry) => entry.data.status === 'pending'));
   } finally {
     context.restore();
   }

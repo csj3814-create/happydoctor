@@ -5,6 +5,7 @@ const axios = require('axios');
 const { createApp } = require('./app');
 const followUpService = require('./services/followUpService');
 const patientSmsService = require('./services/patientSmsService');
+const unansweredDigestService = require('./services/unansweredDigestService');
 const {
   isKeepAliveDisabled,
   port,
@@ -40,6 +41,11 @@ async function startServer() {
       await patientSmsService.initialize();
     } catch (error) {
       console.error('[Patient SMS Init Error]', error);
+    }
+    try {
+      await unansweredDigestService.initialize();
+    } catch (error) {
+      console.error('[Unanswered Digest Init Error]', error);
     }
   });
 

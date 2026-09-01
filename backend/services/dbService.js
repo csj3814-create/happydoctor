@@ -802,6 +802,8 @@ function applyConsultationViewOptions(docs, options = {}) {
         doc.translatedPatientDataKo?.pmhx,
         doc.patientNotificationContact?.phone,
         doc.patientNotificationContact?.normalizedPhone,
+        doc.patientNotificationContact?.email,
+        doc.patientNotificationContact?.normalizedEmail,
       ]
         .filter(Boolean)
         .join(' ')

@@ -17,6 +17,7 @@ export type WebConsultationDraft = {
   adultConfirmed: boolean
   replyNotificationConsent: boolean
   replyNotificationPhone: string
+  replyNotificationEmail: string
 }
 
 export type ActiveConsultationSession = {

@@ -27,6 +27,7 @@ const {
 } = notifyService;
 const clearOperatorUnansweredAlerts = notifyService.clearOperatorUnansweredAlerts || (async () => 0);
 const { isKoreanLanguage, translateText } = require('../services/translationService');
+const emailService = require('../services/emailService');
 const { appSiteUrl, getAllowedDoctorEmails, getPortalAdminEmails } = require('../config');
 const followUpService = require('../services/followUpService');
 
@@ -281,6 +282,15 @@ function getOptedInPatientNotificationPhone(consultation) {
   }
 
   return String(contact.normalizedPhone || contact.phone || '').trim();
+}
+
+function getOptedInPatientNotificationEmail(consultation) {
+  const contact = consultation?.patientNotificationContact;
+  if (!contact?.consented) {
+    return '';
+  }
+
+  return String(contact.normalizedEmail || contact.email || '').trim();
 }
 
 async function resolveDoctorAccessContext(decoded) {
@@ -551,9 +561,30 @@ router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
         },
       )
       : false;
+    const optedInEmail = getOptedInPatientNotificationEmail(consultation);
+    let patientEmailSent = false;
+    if (!patientNotificationQueued && !patientSmsQueued && optedInEmail) {
+      try {
+        patientEmailSent = await emailService.sendPatientReplyEmail({
+          to: optedInEmail,
+          subject: getReplyCopy(uiLanguage).smsTitle,
+          text: buildPatientReplySmsMessage({
+            uiLanguage,
+            doctorName: req.doctor.name,
+            message: patientDeliveredMessage,
+            statusUrl,
+            trackingCode: trackingInfo?.trackingCode || null,
+          }),
+        });
+      } catch (error) {
+        console.error(`[Portal] Patient reply email failed for ${consultation.userId}:`, error?.message || error);
+      }
+    }
     if (!patientNotificationQueued) {
       if (patientSmsQueued) {
         console.log(`[Portal] SMS fallback queued for ${consultation.userId}.`);
+      } else if (patientEmailSent) {
+        console.log(`[Portal] Email fallback sent for ${consultation.userId}.`);
       } else {
         console.warn(`[Portal] No patient reply notification channel available for ${consultation.userId}.`);
       }

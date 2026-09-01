@@ -164,6 +164,8 @@ function validatePublicPatientData(patientData) {
   return null;
 }
 
+const REPLY_NOTIFICATION_EMAIL_PATTERN = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
+
 function parseConsentFlag(value) {
   return value === true || value === 'true' || value === '1' || value === 'on';
 }
@@ -178,31 +180,44 @@ function normalizePhoneNumber(value) {
     .slice(0, 20);
 }
 
+function normalizeEmailAddress(value) {
+  if (typeof value !== 'string') return '';
+  return value.trim().toLowerCase().slice(0, 254);
+}
+
 function buildReplyNotificationContact(body = {}) {
   const consent = parseConsentFlag(body.replyNotificationConsent);
   const rawPhone = sanitizeSingleLine(body.replyNotificationPhone, 40);
   const normalizedPhone = normalizePhoneNumber(rawPhone);
+  const rawEmail = sanitizeSingleLine(body.replyNotificationEmail, 254);
+  const normalizedEmail = normalizeEmailAddress(rawEmail);
 
-  if (!consent && !normalizedPhone) {
+  if (!consent && !normalizedPhone && !normalizedEmail) {
     return null;
   }
 
-  if (!consent && normalizedPhone) {
+  if (!consent) {
     throw createRequestValidationError('답변 알림 연락처는 동의한 경우에만 저장할 수 있습니다.');
   }
 
-  if (consent && !normalizedPhone) {
-    throw createRequestValidationError('답변 알림을 받으려면 휴대폰 번호를 입력해 주세요.');
+  if (!normalizedPhone && !normalizedEmail) {
+    throw createRequestValidationError('답변 알림을 받으려면 휴대폰 번호나 이메일 중 하나를 입력해 주세요.');
   }
 
-  if (!/^\+?\d{10,15}$/.test(normalizedPhone)) {
+  if (normalizedPhone && !/^\+?\d{10,15}$/.test(normalizedPhone)) {
     throw createRequestValidationError('휴대폰 번호를 다시 확인해 주세요.');
+  }
+
+  if (normalizedEmail && !REPLY_NOTIFICATION_EMAIL_PATTERN.test(normalizedEmail)) {
+    throw createRequestValidationError('이메일 주소를 다시 확인해 주세요.');
   }
 
   return {
     consented: true,
-    phone: rawPhone || normalizedPhone,
-    normalizedPhone,
+    phone: rawPhone || normalizedPhone || null,
+    normalizedPhone: normalizedPhone || null,
+    email: rawEmail || null,
+    normalizedEmail: normalizedEmail || null,
     source: 'web_start',
   };
 }

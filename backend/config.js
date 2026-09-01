@@ -173,26 +173,104 @@ function getPatientSmsRuntimeConfig() {
   };
 }
 
-function getSolapiSmsConfig() {
+// Credential pairs are typed by hand into the Render dashboard, where a partial
+// save is easy to make. Half-configured optional channels therefore report an
+// issue and stay disabled instead of taking the whole service down at boot.
+function readSolapiSmsSettings() {
   const apiKey = getEnv('SOLAPI_API_KEY');
   const apiSecret = getEnv('SOLAPI_API_SECRET');
   const sender = getEnv('SOLAPI_SENDER');
 
   const configuredCount = [apiKey, apiSecret, sender].filter(Boolean).length;
   if (configuredCount === 0) {
-    return null;
+    return { config: null, issue: null };
   }
 
   if (!apiKey || !apiSecret || !sender) {
-    throw new ConfigurationError(
-      '[Config] SOLAPI_API_KEY, SOLAPI_API_SECRET, and SOLAPI_SENDER must all be set together.',
-    );
+    return {
+      config: null,
+      issue: 'SOLAPI_API_KEY, SOLAPI_API_SECRET, and SOLAPI_SENDER must all be set together.',
+    };
   }
 
   return {
-    apiKey,
-    apiSecret,
-    sender,
+    config: { apiKey, apiSecret, sender },
+    issue: null,
+  };
+}
+
+function getSolapiSmsConfig() {
+  return readSolapiSmsSettings().config;
+}
+
+function getSolapiSmsConfigIssue() {
+  return readSolapiSmsSettings().issue;
+}
+
+function readSmtpSettings() {
+  const user = getEnv('SMTP_USER');
+  const pass = getEnv('SMTP_PASS');
+
+  if (!user && !pass) {
+    return { config: null, issue: null };
+  }
+
+  if (!user || !pass) {
+    return { config: null, issue: 'SMTP_USER and SMTP_PASS must be set together.' };
+  }
+
+  let port;
+  try {
+    port = getNumberEnv('SMTP_PORT', 465, { min: 1, integer: true });
+  } catch (error) {
+    return { config: null, issue: error.message.replace('[Config] ', '') };
+  }
+
+  return {
+    config: {
+      host: getEnv('SMTP_HOST', 'smtp.gmail.com'),
+      port,
+      // 465 is implicit TLS; every other port negotiates STARTTLS after connect.
+      secure: port === 465,
+      user,
+      pass,
+      from: getEnv('SMTP_FROM') || user,
+    },
+    issue: null,
+  };
+}
+
+function getSmtpConfig() {
+  return readSmtpSettings().config;
+}
+
+function getSmtpConfigIssue() {
+  return readSmtpSettings().issue;
+}
+
+function getAlertEmailRecipients() {
+  const configured = getEnv('ALERT_EMAIL_RECIPIENTS')
+    .split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (configured.length > 0) {
+    return Array.from(new Set(configured));
+  }
+
+  return getPortalAdminEmails();
+}
+
+function getUnansweredDigestConfig() {
+  return {
+    enabled: getBooleanEnv('UNANSWERED_DIGEST_ENABLED', true),
+    // Local hour in Asia/Seoul, so the digest lands during Korean office hours.
+    hourKst: getNumberEnv('UNANSWERED_DIGEST_HOUR_KST', 9, { min: 0, integer: true }),
+    checkIntervalMs: getNumberEnv('UNANSWERED_DIGEST_CHECK_INTERVAL_MS', 15 * 60 * 1000, {
+      min: 60 * 1000,
+      integer: true,
+    }),
+    maxItems: getNumberEnv('UNANSWERED_DIGEST_MAX_ITEMS', 50, { min: 1, integer: true }),
   };
 }
 
@@ -200,12 +278,29 @@ function isKeepAliveDisabled() {
   return getBooleanEnv('DISABLE_KEEP_ALIVE', false);
 }
 
+// Returns the misconfiguration of every optional notification channel. These
+// never abort startup: consultations must keep flowing even when an alert
+// channel is misconfigured. They surface on /api/version instead of a log line
+// nobody reads.
+function getNotificationChannelIssues() {
+  return [
+    ['smtp', getSmtpConfigIssue()],
+    ['solapi', getSolapiSmsConfigIssue()],
+  ]
+    .filter(([, issue]) => Boolean(issue))
+    .map(([channel, issue]) => ({ channel, issue }));
+}
+
 function validateStartupConfig() {
   getMessengerApiKey();
   getFollowUpRuntimeConfig();
   getPatientSmsRuntimeConfig();
-  getSolapiSmsConfig();
   getFirebaseServiceAccount();
+  getUnansweredDigestConfig();
+
+  getNotificationChannelIssues().forEach(({ channel, issue }) => {
+    console.error(`[Config] ${channel} notification channel is DISABLED: ${issue}`);
+  });
 
   return true;
 }
@@ -230,6 +325,12 @@ module.exports = {
   getFollowUpRuntimeConfig,
   getPatientSmsRuntimeConfig,
   getSolapiSmsConfig,
+  getSolapiSmsConfigIssue,
+  getSmtpConfig,
+  getSmtpConfigIssue,
+  getNotificationChannelIssues,
+  getAlertEmailRecipients,
+  getUnansweredDigestConfig,
   isKeepAliveDisabled,
   validateStartupConfig,
   port: getEnv('PORT', '3000'),

@@ -313,6 +313,8 @@ test('public create route stores an optional consented notification phone for we
       consented: true,
       phone: '010-1234-5678',
       normalizedPhone: '01012345678',
+      email: null,
+      normalizedEmail: null,
       source: 'web_start',
     });
     assert.deepEqual(logCall.options.consent, {
@@ -372,6 +374,130 @@ test('public create route rejects notification consent without a phone number', 
     formData.append('sensitiveInfoConsent', 'true');
     formData.append('adultConfirmed', 'true');
     formData.append('replyNotificationConsent', 'true');
+
+    const response = await postForm(`${server.baseUrl}/consultations`, formData);
+
+    assert.equal(response.status, 400);
+    assert.ok(response.body.error);
+    assert.deepEqual(calls, []);
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});
+
+test('public create route accepts an email-only reply notification contact', { concurrency: false }, async () => {
+  const calls = [];
+  const routeModule = loadRouteWithMocks(PUBLIC_ROUTE_PATH, {
+    [DB_SERVICE_PATH]: {
+      logConsultation: async (userId, patientData, analysisResult, options) => {
+        calls.push({ type: 'logConsultation', options });
+        return {
+          consultationId: 'consult-create-email',
+          trackingCode: 'PCBXWM',
+          trackingToken: 'token-email',
+        };
+      },
+      addConsultationImagesById: async () => [],
+    },
+    [FOLLOW_UP_SERVICE_PATH]: {
+      cancelFollowUp: async () => {},
+      scheduleFollowUpWithOptions: async () => {},
+    },
+    [LLM_SERVICE_PATH]: {
+      analyzeAndRouteTriage: async () => ({
+        action: 'ESCALATE',
+        replyToPatient: 'First reply',
+        soapChartForDoctor: 'SOAP',
+      }),
+    },
+    [TRANSLATION_SERVICE_PATH]: createTranslationServiceMock(),
+    [NOTIFY_SERVICE_PATH]: {
+      enqueueDoctorNotification: async () => true,
+      clearDoctorNotifications: async () => {},
+      clearPatientChannelPushes: async () => {},
+      clearPatientSmsNotifications: async () => {},
+    },
+    [CONFIG_PATH]: {
+      appSiteUrl: 'https://app.happydoctor.kr',
+    },
+  });
+
+  const server = await startServer(routeModule.router, '/api/public');
+
+  try {
+    const formData = new FormData();
+    formData.append('age', '44');
+    formData.append('gender', 'male');
+    formData.append('chiefComplaint', 'cough');
+    formData.append('symptomDetail', 'details about cough');
+    formData.append('privacyConsent', 'true');
+    formData.append('sensitiveInfoConsent', 'true');
+    formData.append('adultConfirmed', 'true');
+    formData.append('replyNotificationConsent', 'true');
+    formData.append('replyNotificationEmail', ' Patient@Example.COM ');
+
+    const response = await postForm(`${server.baseUrl}/consultations`, formData);
+
+    assert.equal(response.status, 201, JSON.stringify(response.body));
+
+    const logCall = calls.find((entry) => entry.type === 'logConsultation');
+    assert.ok(logCall);
+    assert.deepEqual(logCall.options.patientNotificationContact, {
+      consented: true,
+      phone: null,
+      normalizedPhone: null,
+      email: 'Patient@Example.COM',
+      normalizedEmail: 'patient@example.com',
+      source: 'web_start',
+    });
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});
+
+test('public create route rejects a malformed reply notification email', { concurrency: false }, async () => {
+  const calls = [];
+  const routeModule = loadRouteWithMocks(PUBLIC_ROUTE_PATH, {
+    [DB_SERVICE_PATH]: {
+      logConsultation: async () => {
+        calls.push({ type: 'logConsultation' });
+        return null;
+      },
+    },
+    [FOLLOW_UP_SERVICE_PATH]: {
+      cancelFollowUp: async () => {},
+      scheduleFollowUpWithOptions: async () => {},
+    },
+    [LLM_SERVICE_PATH]: {
+      analyzeAndRouteTriage: async () => ({ action: 'ESCALATE', replyToPatient: 'unused' }),
+    },
+    [TRANSLATION_SERVICE_PATH]: createTranslationServiceMock(),
+    [NOTIFY_SERVICE_PATH]: {
+      enqueueDoctorNotification: async () => true,
+      clearDoctorNotifications: async () => {},
+      clearPatientChannelPushes: async () => {},
+      clearPatientSmsNotifications: async () => {},
+    },
+    [CONFIG_PATH]: {
+      appSiteUrl: 'https://app.happydoctor.kr',
+    },
+  });
+
+  const server = await startServer(routeModule.router, '/api/public');
+
+  try {
+    const formData = new FormData();
+    formData.append('age', '44');
+    formData.append('gender', 'male');
+    formData.append('chiefComplaint', 'cough');
+    formData.append('symptomDetail', 'details about cough');
+    formData.append('privacyConsent', 'true');
+    formData.append('sensitiveInfoConsent', 'true');
+    formData.append('adultConfirmed', 'true');
+    formData.append('replyNotificationConsent', 'true');
+    formData.append('replyNotificationEmail', 'not-an-email');
 
     const response = await postForm(`${server.baseUrl}/consultations`, formData);
 

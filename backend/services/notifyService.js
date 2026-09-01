@@ -1,5 +1,6 @@
 const { randomUUID, createHash } = require('crypto');
 const { getDb, getAdmin } = require('./dbService');
+const emailService = require('./emailService');
 const { getPatientSmsRuntimeConfig, getSolapiSmsConfig } = require('../config');
 
 const DOCTOR_NOTIFICATIONS = 'doctor_notifications';
@@ -554,6 +555,14 @@ async function enqueueDoctorNotification(message, patientId, options = {}) {
     priority,
     delayMinutes: reminderDelaysMinutes.at(-1) || DEFAULT_OPERATOR_UNANSWERED_ALERT_DELAYS_MINUTES[0],
   });
+
+  // Mail is an independent channel: a failure here must never block or undo the
+  // queued Kakao alert, so it is logged and swallowed.
+  try {
+    await emailService.sendDoctorAlertEmail({ patientId, type, priority });
+  } catch (error) {
+    console.error('[Notification Email Error]', error?.message || error);
+  }
 
   console.log(`[Notification Enqueued] Patient: ${patientId}, schedule: ${reminderDelaysMinutes.join('/')}`);
   return true;
