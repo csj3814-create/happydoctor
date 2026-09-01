@@ -1148,3 +1148,70 @@ test('a delivered SMS ack still completes the message', { concurrency: false }, 
     context.restore();
   }
 });
+
+test('SMS deliverability follows the Korean origination number SOLAPI sends from', { concurrency: false }, async () => {
+  const context = loadNotifyService();
+
+  try {
+    const { isSmsDeliverableNumber } = context.service;
+
+    assert.equal(isSmsDeliverableNumber('01012345678'), true);
+    assert.equal(isSmsDeliverableNumber('010-1234-5678'), true);
+    assert.equal(isSmsDeliverableNumber('+82 10 1234 5678'), true);
+
+    // Real recipients from production that SOLAPI rejected outright.
+    assert.equal(isSmsDeliverableNumber('+923278655785'), false);
+    assert.equal(isSmsDeliverableNumber('+61400000000'), false);
+
+    assert.equal(isSmsDeliverableNumber(''), false);
+    assert.equal(isSmsDeliverableNumber(null), false);
+  } finally {
+    context.restore();
+  }
+});
+
+test('a non-Korean number is never queued, so the caller can fall through to mail', { concurrency: false }, async () => {
+  const context = loadNotifyService();
+
+  try {
+    const queued = await context.service.enqueuePatientSmsNotification(
+      'patientA',
+      '+923278655785',
+      'doctor reply',
+      'doctor_reply',
+    );
+
+    assert.equal(queued, false);
+    assert.deepEqual(context.listDocs('patient_sms_notifications'), []);
+  } finally {
+    context.restore();
+  }
+});
+
+test('a stored failure reason is capped so one SDK error cannot bloat the document', { concurrency: false }, async () => {
+  const context = loadNotifyService({
+    patient_sms_notifications: {
+      'sms-verbose': {
+        userId: 'patientA',
+        phoneNumber: '01012345678',
+        message: 'doctor reply',
+        type: 'doctor_reply',
+        status: 'leased',
+        leaseId: 'lease-1',
+        attemptCount: 1,
+      },
+    },
+  });
+
+  try {
+    await context.service.acknowledgePatientSmsNotification('sms-verbose', {
+      delivered: false,
+      error: 'x'.repeat(60000),
+    });
+
+    const doc = context.getDoc('patient_sms_notifications', 'sms-verbose');
+    assert.equal(doc.lastFailureReason.length, 300);
+  } finally {
+    context.restore();
+  }
+});

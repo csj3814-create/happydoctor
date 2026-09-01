@@ -4,6 +4,7 @@ const emailService = require('./emailService');
 const {
   acknowledgePatientSmsNotification,
   claimPatientSmsNotification,
+  isSmsDeliverableNumber,
   reclaimExpiredPatientSmsLeases,
 } = require('./notifyService');
 const { getPatientSmsRuntimeConfig, getSolapiSmsConfig } = require('../config');
@@ -11,6 +12,26 @@ const { getPatientSmsRuntimeConfig, getSolapiSmsConfig } = require('../config');
 const DEFAULT_PATIENT_SMS_LEASE_MS = 60 * 1000;
 const DEFAULT_PATIENT_SMS_POLL_INTERVAL_MS = 30 * 1000;
 const DEFAULT_PATIENT_SMS_BATCH_SIZE = 10;
+const FAILURE_REASON_MAX_LENGTH = 300;
+
+// SOLAPI reports per-recipient rejections inside failedMessageList; the generic
+// error message only says to go look there. Recipient numbers are dropped: the
+// status code and text are what identify the problem.
+function describeSmsFailure(error) {
+  const failedMessages = Array.isArray(error?.failedMessageList) ? error.failedMessageList : [];
+
+  if (failedMessages.length > 0) {
+    const reasons = Array.from(new Set(failedMessages.map((entry) => {
+      const code = entry?.statusCode || 'unknown';
+      const detail = entry?.statusMessage || '';
+      return detail ? `${code} ${detail}` : code;
+    })));
+
+    return reasons.join(' | ').slice(0, FAILURE_REASON_MAX_LENGTH);
+  }
+
+  return String(error?.message || 'sms_delivery_failed').slice(0, FAILURE_REASON_MAX_LENGTH);
+}
 
 class PatientSmsService {
   constructor() {
@@ -118,6 +139,21 @@ class PatientSmsService {
   // Never rethrows: one undeliverable message must not abort the batch and
   // strand every message queued behind it.
   async executeClaimedNotification(notification) {
+    // Queued before the deliverability check existed, or queued for a number
+    // SOLAPI cannot reach. Retrying five times cannot change the outcome.
+    if (!isSmsDeliverableNumber(notification.phoneNumber)) {
+      const reason = 'unsupported_recipient_country';
+      const outcome = await acknowledgePatientSmsNotification(notification.notificationId, {
+        delivered: false,
+        error: reason,
+        exhaust: true,
+      });
+
+      console.error(`[Patient SMS] ${notification.notificationId} targets a number SOLAPI cannot reach.`);
+      await this.reportExhaustedNotification(notification, outcome, reason);
+      return false;
+    }
+
     try {
       await this.sendSms({
         phoneNumber: notification.phoneNumber,
@@ -127,7 +163,7 @@ class PatientSmsService {
       await acknowledgePatientSmsNotification(notification.notificationId, { delivered: true });
       return true;
     } catch (error) {
-      const reason = error?.message || 'sms_delivery_failed';
+      const reason = describeSmsFailure(error);
       let outcome = null;
 
       try {

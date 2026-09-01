@@ -56,6 +56,8 @@ test('initialize is a safe no-op when SOLAPI config is absent', { concurrency: f
       reclaimExpiredPatientSmsLeases: async () => {
         calls.push({ type: 'reclaimExpiredPatientSmsLeases' });
       },
+      isSmsDeliverableNumber: (phone) => typeof phone === 'string'
+        && (phone.startsWith('+82') || (!phone.startsWith('+') && phone.startsWith('0'))),
       claimPatientSmsNotification: async () => {
         calls.push({ type: 'claimPatientSmsNotification' });
         return null;
@@ -99,6 +101,8 @@ test('processDueNotifications sends claimed SMS jobs through SOLAPI and acknowle
       reclaimExpiredPatientSmsLeases: async () => {
         calls.push({ type: 'reclaimExpiredPatientSmsLeases' });
       },
+      isSmsDeliverableNumber: (phone) => typeof phone === 'string'
+        && (phone.startsWith('+82') || (!phone.startsWith('+') && phone.startsWith('0'))),
       claimPatientSmsNotification: async () => {
         if (claimed) return null;
         claimed = true;
@@ -175,6 +179,8 @@ test('a failing SMS is requeued without aborting the batch behind it', { concurr
       reclaimExpiredPatientSmsLeases: async () => {
         calls.push({ type: 'reclaimExpiredPatientSmsLeases' });
       },
+      isSmsDeliverableNumber: (phone) => typeof phone === 'string'
+        && (phone.startsWith('+82') || (!phone.startsWith('+') && phone.startsWith('0'))),
       claimPatientSmsNotification: async () => {
         if (claimed) return null;
         claimed = true;

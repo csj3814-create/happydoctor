@@ -24,6 +24,9 @@ const DEFAULT_OPERATOR_UNANSWERED_ALERT_DELAYS_MINUTES = Object.freeze([15]);
 // its original availableAt, so it stayed first in the due queue and blocked
 // every message behind it indefinitely. Failures now back off and then die.
 const PATIENT_SMS_MAX_ATTEMPTS = 5;
+// Failure reasons are stored verbatim on the queue document. One SDK validation
+// error ran to tens of kilobytes, so everything written here is bounded.
+const PATIENT_SMS_FAILURE_REASON_MAX_LENGTH = 300;
 const PATIENT_SMS_RETRY_BACKOFF_MINUTES = Object.freeze([1, 2, 4, 8, 16]);
 const DOCTOR_NOTIFICATION_DUPLICATE_WINDOW_MS = 20 * 60 * 1000;
 const DOCTOR_NOTIFICATION_CATCHUP_GAP_MS = 5 * 60 * 1000;
@@ -1043,6 +1046,27 @@ async function clearPatientChannelPushes(userId, type = null, options = {}) {
   return docs.length;
 }
 
+function normalizeSmsPhoneNumber(phoneNumber) {
+  return typeof phoneNumber === 'string'
+    ? phoneNumber.trim().replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '')
+    : '';
+}
+
+// SOLAPI sends from a Korean origination number and cannot reach subscribers
+// abroad; those requests are rejected by the SDK before they ever leave. Many
+// patients here use foreign numbers, so this is a routine case, not an error.
+function isSmsDeliverableNumber(phoneNumber) {
+  const normalized = normalizeSmsPhoneNumber(phoneNumber);
+  if (!normalized) return false;
+  if (normalized.startsWith('+82')) return true;
+  if (normalized.startsWith('+')) return false;
+  return normalized.startsWith('0');
+}
+
+function truncateSmsFailureReason(reason) {
+  return String(reason || 'delivery_failed').slice(0, PATIENT_SMS_FAILURE_REASON_MAX_LENGTH);
+}
+
 async function enqueuePatientSmsNotification(userId, phoneNumber, message, type = 'general', options = {}) {
   const db = getDb();
   if (!db) {
@@ -1055,11 +1079,16 @@ async function enqueuePatientSmsNotification(userId, phoneNumber, message, type 
     return false;
   }
 
-  const normalizedPhoneNumber = typeof phoneNumber === 'string'
-    ? phoneNumber.trim().replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '')
-    : '';
+  const normalizedPhoneNumber = normalizeSmsPhoneNumber(phoneNumber);
   if (!normalizedPhoneNumber) {
     console.warn(`[Patient SMS] No phone number found for ${userId}.`);
+    return false;
+  }
+
+  // Refusing here lets the caller fall through to the next channel instead of
+  // queueing three reminders that can only ever fail.
+  if (!isSmsDeliverableNumber(normalizedPhoneNumber)) {
+    console.warn(`[Patient SMS] ${userId} has a non-Korean number; SMS cannot deliver, skipping enqueue.`);
     return false;
   }
 
@@ -1221,7 +1250,9 @@ async function acknowledgePatientSmsNotification(notificationId, payload = {}) {
 
   // claimPatientSmsNotification() already incremented attemptCount for this try.
   const attemptCount = Number(snapshot.data()?.attemptCount) || 0;
-  const exhausted = attemptCount >= PATIENT_SMS_MAX_ATTEMPTS;
+  // `exhaust` short-circuits the retry budget for failures that repetition
+  // cannot fix, such as a recipient country SOLAPI does not serve.
+  const exhausted = payload.exhaust === true || attemptCount >= PATIENT_SMS_MAX_ATTEMPTS;
   const backoffIndex = Math.min(
     Math.max(attemptCount - 1, 0),
     PATIENT_SMS_RETRY_BACKOFF_MINUTES.length - 1,
@@ -1233,7 +1264,7 @@ async function acknowledgePatientSmsNotification(notificationId, payload = {}) {
     leaseId: null,
     leaseExpiresAt: null,
     lastFailedAt: getAdmin().firestore.FieldValue.serverTimestamp(),
-    lastFailureReason: payload.error || 'delivery_failed',
+    lastFailureReason: truncateSmsFailureReason(payload.error),
     ...(exhausted
       ? { failedAt: getAdmin().firestore.FieldValue.serverTimestamp() }
       // Pushing availableAt forward is what lets the queue move past a message
@@ -1448,6 +1479,7 @@ module.exports = {
   dequeuePatientChannelPush,
   clearPatientChannelPushes,
   enqueuePatientSmsNotification,
+  isSmsDeliverableNumber,
   claimPatientSmsNotification,
   acknowledgePatientSmsNotification,
   clearPatientSmsNotifications,

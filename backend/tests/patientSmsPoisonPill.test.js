@@ -85,6 +85,8 @@ test('a permanently failing message no longer strands the queue behind it', { co
   const context = loadPatientSmsServiceWithMocks({
     [NOTIFY_SERVICE_PATH]: {
       reclaimExpiredPatientSmsLeases: async () => {},
+      isSmsDeliverableNumber: (phone) => typeof phone === 'string'
+        && (phone.startsWith('+82') || (!phone.startsWith('+') && phone.startsWith('0'))),
       claimPatientSmsNotification: async () => queue.shift() || null,
       acknowledgePatientSmsNotification: async (notificationId, payload) => {
         acked.push({ notificationId, delivered: payload.delivered !== false });
@@ -117,6 +119,8 @@ test('an abandoned message raises a mail report carrying no phone number or repl
   const context = loadPatientSmsServiceWithMocks({
     [NOTIFY_SERVICE_PATH]: {
       reclaimExpiredPatientSmsLeases: async () => {},
+      isSmsDeliverableNumber: (phone) => typeof phone === 'string'
+        && (phone.startsWith('+82') || (!phone.startsWith('+') && phone.startsWith('0'))),
       claimPatientSmsNotification: async () => {
         if (claimed) return null;
         claimed = true;
@@ -170,6 +174,8 @@ test('a mail report failure does not stop the batch', { concurrency: false }, as
   const context = loadPatientSmsServiceWithMocks({
     [NOTIFY_SERVICE_PATH]: {
       reclaimExpiredPatientSmsLeases: async () => {},
+      isSmsDeliverableNumber: (phone) => typeof phone === 'string'
+        && (phone.startsWith('+82') || (!phone.startsWith('+') && phone.startsWith('0'))),
       claimPatientSmsNotification: async () => queue.shift() || null,
       acknowledgePatientSmsNotification: async () => ({ exhausted: true, attemptCount: 5 }),
     },
@@ -198,6 +204,8 @@ test('the processor loop starts even when the initial drain throws', { concurren
       reclaimExpiredPatientSmsLeases: async () => {
         throw new Error('firestore_unavailable');
       },
+      isSmsDeliverableNumber: (phone) => typeof phone === 'string'
+        && (phone.startsWith('+82') || (!phone.startsWith('+') && phone.startsWith('0'))),
       claimPatientSmsNotification: async () => null,
       acknowledgePatientSmsNotification: async () => ({ exhausted: false }),
     },
@@ -214,6 +222,132 @@ test('the processor loop starts even when the initial drain throws', { concurren
       clearInterval(context.service.processorHandle);
       context.service.processorHandle = null;
     }
+    context.restore();
+  }
+});
+
+test('a number SOLAPI cannot reach is abandoned immediately, not retried five times', { concurrency: false }, async () => {
+  const acked = [];
+  const reports = [];
+  const sendAttempts = [];
+  const queue = [
+    { notificationId: 'intl', userId: 'patientA', phoneNumber: '+923278655785', message: 'a', type: 'doctor_reply' },
+    { notificationId: 'domestic', userId: 'patientB', phoneNumber: '01011112222', message: 'b', type: 'doctor_reply' },
+  ];
+
+  const context = loadPatientSmsServiceWithMocks({
+    [NOTIFY_SERVICE_PATH]: {
+      reclaimExpiredPatientSmsLeases: async () => {},
+      isSmsDeliverableNumber: (phone) => typeof phone === 'string'
+        && (phone.startsWith('+82') || (!phone.startsWith('+') && phone.startsWith('0'))),
+      claimPatientSmsNotification: async () => queue.shift() || null,
+      acknowledgePatientSmsNotification: async (notificationId, payload) => {
+        acked.push({
+          notificationId,
+          delivered: payload.delivered !== false,
+          exhaust: payload.exhaust,
+          error: payload.error,
+        });
+        return { status: 'failed', exhausted: true, attemptCount: 1 };
+      },
+    },
+    [EMAIL_SERVICE_PATH]: {
+      isConfigured: () => true,
+      sendPatientSmsFailureEmail: async (payload) => {
+        reports.push(payload);
+        return true;
+      },
+    },
+    [CONFIG_PATH]: RUNTIME_CONFIG,
+    [SOLAPI_PATH]: {
+      SolapiMessageService: class SolapiMessageService {
+        async send({ to }) {
+          sendAttempts.push(to);
+          return { ok: true };
+        }
+      },
+    },
+  });
+
+  try {
+    await context.service.processDueNotifications();
+
+    // The international number never reaches SOLAPI at all, while the domestic
+    // one behind it still goes out.
+    assert.deepEqual(sendAttempts, ['01011112222']);
+
+    const failures = acked.filter((entry) => !entry.delivered);
+    assert.equal(failures.length, 1);
+    assert.equal(failures[0].notificationId, 'intl');
+    assert.equal(failures[0].exhaust, true);
+    assert.equal(failures[0].error, 'unsupported_recipient_country');
+
+    assert.deepEqual(
+      acked.filter((entry) => entry.delivered).map((entry) => entry.notificationId),
+      ['domestic'],
+    );
+    assert.equal(reports.length, 1);
+  } finally {
+    context.restore();
+  }
+});
+
+test('a SOLAPI rejection is recorded as its status code, not a wall of SDK type text', { concurrency: false }, async () => {
+  const acked = [];
+  let claimed = false;
+
+  class MessageNotReceivedError extends Error {
+    constructor() {
+      super('1개의 메시지가 접수되지 못했습니다. 자세한 에러 메시지는 해당 에러 내 failedMessageList를 확인해주세요.');
+      this.failedMessageList = [
+        { to: '01011112222', statusCode: '3037', statusMessage: '발신번호 사전등록이 되어있지 않습니다.' },
+        { to: '01033334444', statusCode: '3037', statusMessage: '발신번호 사전등록이 되어있지 않습니다.' },
+      ];
+    }
+  }
+
+  const context = loadPatientSmsServiceWithMocks({
+    [NOTIFY_SERVICE_PATH]: {
+      reclaimExpiredPatientSmsLeases: async () => {},
+      isSmsDeliverableNumber: (phone) => typeof phone === 'string'
+        && (phone.startsWith('+82') || (!phone.startsWith('+') && phone.startsWith('0'))),
+      claimPatientSmsNotification: async () => {
+        if (claimed) return null;
+        claimed = true;
+        return {
+          notificationId: 'rejected',
+          userId: 'patientA',
+          phoneNumber: '01011112222',
+          message: 'reply',
+          type: 'doctor_reply',
+        };
+      },
+      acknowledgePatientSmsNotification: async (notificationId, payload) => {
+        acked.push(payload);
+        return { status: 'pending', exhausted: false, attemptCount: 1 };
+      },
+    },
+    [EMAIL_SERVICE_PATH]: { isConfigured: () => true, sendPatientSmsFailureEmail: async () => true },
+    [CONFIG_PATH]: RUNTIME_CONFIG,
+    [SOLAPI_PATH]: {
+      SolapiMessageService: class SolapiMessageService {
+        async send() {
+          throw new MessageNotReceivedError();
+        }
+      },
+    },
+  });
+
+  try {
+    await context.service.processDueNotifications();
+
+    assert.equal(acked.length, 1);
+    // Duplicate rejections collapse to one reason, and the recipient numbers
+    // are left out of what gets stored.
+    assert.equal(acked[0].error, '3037 발신번호 사전등록이 되어있지 않습니다.');
+    assert.ok(!acked[0].error.includes('01011112222'));
+    assert.ok(acked[0].error.length <= 300);
+  } finally {
     context.restore();
   }
 });
