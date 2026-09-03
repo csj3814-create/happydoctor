@@ -178,6 +178,23 @@ test('the SMTP transport is built once and reused across sends', { concurrency: 
   assert.equal(first.options.auth.user, 'alerts@happydoctor.kr');
 });
 
+test('the transport pins IPv4 and bounds every timeout', { concurrency: false }, async () => {
+  const emailService = loadEmailServiceWithMocks({
+    smtpConfig: WORKING_SMTP,
+    recipients: ['admin@happydoctor.kr'],
+    sentMails: [],
+  });
+
+  const { options } = emailService.getTransport();
+
+  // Render has no IPv6 route; without this Node picks the AAAA record and
+  // every connection fails with ENETUNREACH.
+  assert.equal(options.family, 4);
+  assert.equal(options.connectionTimeout, 8000);
+  assert.equal(options.greetingTimeout, 8000);
+  assert.equal(options.socketTimeout, 8000);
+});
+
 test('doctor alert subjects name the real notification types', { concurrency: false }, async () => {
   const sentMails = [];
   const emailService = loadEmailServiceWithMocks({

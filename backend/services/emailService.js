@@ -56,7 +56,11 @@ class EmailService {
           user: smtpConfig.user,
           pass: smtpConfig.pass,
         },
-        // Hosts that block outbound SMTP drop the packets rather than refusing
+        // Node prefers the AAAA record, and this container has no IPv6 route:
+        // smtp.gmail.com resolved to 2404:6800:... and every connection died
+        // with ENETUNREACH. Pinning IPv4 is what makes mail leave at all.
+        family: 4,
+        // A host without a usable route drops packets rather than refusing
         // them, so without these the socket hangs for nodemailer's two-minute
         // default while a patient waits on their submission.
         connectionTimeout: SMTP_TIMEOUT_MS,
