@@ -3,6 +3,7 @@ const nodemailer = require('nodemailer');
 const { getAlertEmailRecipients, getSmtpConfig } = require('../config');
 
 const PORTAL_URL = 'https://portal.happydoctor.kr/open-browser?next=%2F';
+const SMTP_TIMEOUT_MS = 8000;
 
 // Alert mail travels over third-party infrastructure and lands in ordinary
 // inboxes, so it never carries symptoms, charts, or any other health detail.
@@ -55,6 +56,12 @@ class EmailService {
           user: smtpConfig.user,
           pass: smtpConfig.pass,
         },
+        // Hosts that block outbound SMTP drop the packets rather than refusing
+        // them, so without these the socket hangs for nodemailer's two-minute
+        // default while a patient waits on their submission.
+        connectionTimeout: SMTP_TIMEOUT_MS,
+        greetingTimeout: SMTP_TIMEOUT_MS,
+        socketTimeout: SMTP_TIMEOUT_MS,
       });
       this.cachedConfigKey = configKey;
     }

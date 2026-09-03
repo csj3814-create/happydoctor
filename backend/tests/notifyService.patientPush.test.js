@@ -1266,3 +1266,29 @@ test('no heartbeat document reads back as null rather than throwing', { concurre
     context.restore();
   }
 });
+
+test('a hanging mail send does not hold up the queued alert', { concurrency: false }, async () => {
+  let released = null;
+  const context = loadNotifyService({}, {
+    // A host that blocks outbound SMTP drops packets rather than refusing them,
+    // so the send never settles. enqueueDoctorNotification must not await it.
+    sendDoctorAlertEmail: () => new Promise((resolve) => { released = resolve; }),
+  });
+
+  try {
+    const enqueued = await Promise.race([
+      context.service.enqueueDoctorNotification('SOAP', 'public_hang', {
+        type: 'triage_initial',
+        priority: 'urgent',
+        reminderDelaysMinutes: [0, 5, 15],
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('enqueue blocked on mail')), 1000)),
+    ]);
+
+    assert.equal(enqueued, true);
+    assert.equal(context.listDocs('doctor_notifications').length, 3);
+  } finally {
+    if (released) released(true);
+    context.restore();
+  }
+});
