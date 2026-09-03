@@ -153,6 +153,47 @@ class EmailService {
     return true;
   }
 
+  // The MessengerBot phone is the only thing that turns queued Kakao alerts
+  // into delivered ones. This says whether it is still polling.
+  async sendBotHeartbeatAlertEmail({ minutesSinceLastPoll, lastPolledAt, recovered = false } = {}) {
+    if (!this.isConfigured()) {
+      return false;
+    }
+
+    const recipients = getAlertEmailRecipients();
+    if (recipients.length === 0) {
+      return false;
+    }
+
+    const text = recovered
+      ? [
+        '카카오 알림 봇이 다시 정상 동작합니다.',
+        lastPolledAt ? `최근 확인 시각: ${lastPolledAt}` : '',
+        '',
+        '중단 동안 쌓인 알림은 순차적으로 전달됩니다.',
+        ...PORTAL_GUIDE_LINES,
+      ]
+      : [
+        '카카오 알림 봇이 서버에 연결되지 않고 있습니다.',
+        Number.isFinite(minutesSinceLastPoll) ? `마지막 접속 이후 ${minutesSinceLastPoll}분 경과` : '',
+        lastPolledAt ? `마지막 접속 시각: ${lastPolledAt}` : '',
+        '',
+        '이 상태에서는 카카오톡으로 의료진 알림이 전달되지 않습니다.',
+        '알림 봇이 설치된 휴대폰의 전원, 네트워크, 앱 실행 상태를 확인해 주세요.',
+        '메일 알림은 계속 발송되므로 상담 확인은 포털에서 가능합니다.',
+        ...PORTAL_GUIDE_LINES,
+      ];
+
+    await this.sendMail({
+      to: recipients,
+      subject: recovered
+        ? '[해피닥터] 카카오 알림 봇 복구됨'
+        : '[해피닥터] 카카오 알림 봇 중단 - 확인 필요',
+      text: text.filter(Boolean).join('\n'),
+    });
+    return true;
+  }
+
   // Sent when a patient reply SMS is abandoned after repeated failures, so a
   // human knows one patient is unreachable. Carries no phone number and no
   // reply text - only the fact and the portal link.

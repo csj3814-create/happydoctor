@@ -222,12 +222,15 @@ function createApp() {
         });
       }
 
-      const [queueStatus, doctorRoomName, operatorRoomName, pending] = await Promise.all([
+      const [queueStatus, doctorRoomName, operatorRoomName, pending, heartbeat] = await Promise.all([
         notifyService.getQueueStatus(),
         notifyService.getDoctorRoomName(),
         notifyService.getOperatorAlertRoomName(),
         dbService.getActiveConsultations({ status: 'pending', limit: 100 }),
+        notifyService.getMessengerBotHeartbeat(),
       ]);
+
+      const lastPolledAtMs = heartbeat?.lastPolledAt ? heartbeat.lastPolledAt.getTime() : null;
 
       return res.status(200).json({
         ok: true,
@@ -238,6 +241,11 @@ function createApp() {
           doctorRoomRegistered: Boolean(doctorRoomName),
           operatorAlertRoomRegistered: Boolean(operatorRoomName),
           registeredRooms: queueStatus.registeredRooms,
+          // Queued alerts only become delivered ones while this phone polls.
+          lastBotPollAt: heartbeat?.lastPolledAt ? heartbeat.lastPolledAt.toISOString() : null,
+          minutesSinceLastBotPoll: lastPolledAtMs === null
+            ? null
+            : Math.floor((Date.now() - lastPolledAtMs) / 60000),
         },
         queues: {
           doctorNotificationsPending: queueStatus.pendingCount,

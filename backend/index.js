@@ -6,6 +6,7 @@ const { createApp } = require('./app');
 const followUpService = require('./services/followUpService');
 const patientSmsService = require('./services/patientSmsService');
 const unansweredDigestService = require('./services/unansweredDigestService');
+const botHeartbeatService = require('./services/botHeartbeatService');
 const {
   isKeepAliveDisabled,
   port,
@@ -46,6 +47,11 @@ async function startServer() {
       await unansweredDigestService.initialize();
     } catch (error) {
       console.error('[Unanswered Digest Init Error]', error);
+    }
+    try {
+      await botHeartbeatService.initialize();
+    } catch (error) {
+      console.error('[Bot Heartbeat Init Error]', error);
     }
   });
 

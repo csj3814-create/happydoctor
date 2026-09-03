@@ -11,6 +11,7 @@ const {
     registerOperatorAlertRoom,
     getDoctorRoomName,
     getOperatorAlertRoomName,
+    recordMessengerBotPoll,
 } = require('../services/notifyService');
 const { ConfigurationError, getMessengerApiKey } = require('../config');
 
@@ -94,6 +95,13 @@ async function resolveDoctorAlertDeliveryRoom() {
     }
 
     return null;
+}
+
+// Heartbeat bookkeeping must never break the polling that delivers alerts.
+function noteBotPoll(source) {
+    recordMessengerBotPoll(source).catch((error) => {
+        console.error('[MessengerBot Heartbeat Error]', error?.message || error);
+    });
 }
 
 function checkApiKey(req, res, next) {
@@ -238,6 +246,8 @@ router.post('/', checkApiKey, async (req, res) => {
 });
 
 router.get('/poll', checkApiKey, async (req, res) => {
+    noteBotPoll('doctor');
+
     const deliveryRoom = await resolveDoctorAlertDeliveryRoom();
     if (!deliveryRoom) {
         return res.status(200).json({ hasNew: false, reason: 'doctor_alert_room_not_registered' });
@@ -273,6 +283,8 @@ router.post('/poll/ack', checkApiKey, async (req, res) => {
 });
 
 async function handlePatientPushPoll(req, res) {
+    noteBotPoll('patient_push');
+
     const item = await claimPatientChannelPush();
     if (!item) {
         return res.status(200).json({ hasNew: false });

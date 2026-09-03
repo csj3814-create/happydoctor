@@ -1215,3 +1215,54 @@ test('a stored failure reason is capped so one SDK error cannot bloat the docume
     context.restore();
   }
 });
+
+test('bot heartbeat writes are throttled so 10-second polling is not 9k writes a day', { concurrency: false }, async () => {
+  const context = loadNotifyService();
+
+  try {
+    assert.equal(await context.service.recordMessengerBotPoll('doctor'), true);
+    // The bot polls roughly every 10 seconds; only the first lands.
+    assert.equal(await context.service.recordMessengerBotPoll('doctor'), false);
+    assert.equal(await context.service.recordMessengerBotPoll('patient_push'), false);
+
+    const heartbeat = await context.service.getMessengerBotHeartbeat();
+    assert.ok(heartbeat.lastPolledAt instanceof Date);
+    assert.equal(heartbeat.lastPollSource, 'doctor');
+    assert.equal(heartbeat.alertingSince, null);
+  } finally {
+    context.restore();
+  }
+});
+
+test('the bot alert flag is set and cleared on the heartbeat document', { concurrency: false }, async () => {
+  const context = loadNotifyService();
+
+  try {
+    await context.service.recordMessengerBotPoll('doctor');
+
+    const alertAt = new Date('2026-09-02T12:00:00.000Z');
+    await context.service.setMessengerBotAlertState({ alerting: true, at: alertAt });
+
+    let heartbeat = await context.service.getMessengerBotHeartbeat();
+    assert.equal(heartbeat.alertingSince.getTime(), alertAt.getTime());
+    assert.equal(heartbeat.lastAlertAt.getTime(), alertAt.getTime());
+
+    await context.service.setMessengerBotAlertState({ alerting: false });
+    heartbeat = await context.service.getMessengerBotHeartbeat();
+    assert.equal(heartbeat.alertingSince, null);
+    // The polling timestamp survives the alert bookkeeping.
+    assert.ok(heartbeat.lastPolledAt instanceof Date);
+  } finally {
+    context.restore();
+  }
+});
+
+test('no heartbeat document reads back as null rather than throwing', { concurrency: false }, async () => {
+  const context = loadNotifyService();
+
+  try {
+    assert.equal(await context.service.getMessengerBotHeartbeat(), null);
+  } finally {
+    context.restore();
+  }
+});

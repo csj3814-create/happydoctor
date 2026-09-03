@@ -70,6 +70,7 @@ function loadAppWithMocks({ dbOverrides = {}, notifyOverrides = {} } = {}) {
         }),
         getDoctorRoomName: async () => '',
         getOperatorAlertRoomName: async () => '',
+        getMessengerBotHeartbeat: async () => null,
         ...notifyOverrides,
       };
     }

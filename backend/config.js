@@ -274,6 +274,19 @@ function getUnansweredDigestConfig() {
   };
 }
 
+function getBotHeartbeatConfig() {
+  return {
+    enabled: getBooleanEnv('BOT_HEARTBEAT_ALERT_ENABLED', true),
+    // The MessengerBot phone polls about every 10 seconds, so a gap this long
+    // means it is off, crashed, or has lost its network.
+    staleMinutes: getNumberEnv('BOT_HEARTBEAT_STALE_MINUTES', 30, { min: 1, integer: true }),
+    checkIntervalMs: getNumberEnv('BOT_HEARTBEAT_CHECK_INTERVAL_MS', 5 * 60 * 1000, {
+      min: 60 * 1000,
+      integer: true,
+    }),
+  };
+}
+
 function isKeepAliveDisabled() {
   return getBooleanEnv('DISABLE_KEEP_ALIVE', false);
 }
@@ -297,6 +310,7 @@ function validateStartupConfig() {
   getPatientSmsRuntimeConfig();
   getFirebaseServiceAccount();
   getUnansweredDigestConfig();
+  getBotHeartbeatConfig();
 
   getNotificationChannelIssues().forEach(({ channel, issue }) => {
     console.error(`[Config] ${channel} notification channel is DISABLED: ${issue}`);
@@ -331,6 +345,7 @@ module.exports = {
   getNotificationChannelIssues,
   getAlertEmailRecipients,
   getUnansweredDigestConfig,
+  getBotHeartbeatConfig,
   isKeepAliveDisabled,
   validateStartupConfig,
   port: getEnv('PORT', '3000'),

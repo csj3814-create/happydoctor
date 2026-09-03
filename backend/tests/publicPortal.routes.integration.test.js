@@ -7,6 +7,7 @@ const express = require('express');
 const DB_SERVICE_PATH = path.resolve(__dirname, '../services/dbService.js');
 const FOLLOW_UP_SERVICE_PATH = path.resolve(__dirname, '../services/followUpService.js');
 const NOTIFY_SERVICE_PATH = path.resolve(__dirname, '../services/notifyService.js');
+const EMAIL_SERVICE_PATH = path.resolve(__dirname, '../services/emailService.js');
 const LLM_SERVICE_PATH = path.resolve(__dirname, '../services/llmService.js');
 const TRANSLATION_SERVICE_PATH = path.resolve(__dirname, '../services/translationService.js');
 const UI_COPY_SERVICE_PATH = path.resolve(__dirname, '../services/uiCopyService.js');
@@ -1189,7 +1190,8 @@ test('portal reply route authenticates the doctor and enqueues the patient reply
     );
 
     assert.equal(response.status, 200);
-    assert.deepEqual(response.body, { ok: true, replyId: 'reply-1' });
+    assert.equal(response.body.ok, true);
+    assert.equal(response.body.replyId, 'reply-1');
 
     const pushCall = calls.find((entry) => entry.type === 'enqueuePatientChannelPush');
     assert.equal(pushCall.userId, 'public_user_3');
@@ -1353,7 +1355,9 @@ test('portal reply route falls back to SMS queue for consented web contacts when
     );
 
     assert.equal(response.status, 200);
-    assert.deepEqual(response.body, { ok: true, replyId: 'reply-sms-1' });
+    assert.equal(response.body.ok, true);
+    assert.equal(response.body.replyId, 'reply-sms-1');
+    assert.deepEqual(response.body.notifiedChannels, ['sms']);
 
     const pushCall = calls.find((entry) => entry.type === 'enqueuePatientChannelPush');
     const smsCall = calls.find((entry) => entry.type === 'enqueuePatientSmsNotification');
@@ -1634,6 +1638,95 @@ test('portal reply route rejects closed consultations before saving a new doctor
       },
       { type: 'getConsultationById', consultationId: 'consult-closed' },
     ]);
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});
+
+test('portal reply route mails the patient alongside the other channels, not only as a last resort', { concurrency: false }, async () => {
+  const calls = [];
+  const routeModule = loadRouteWithMocks(PORTAL_ROUTE_PATH, {
+    [DB_SERVICE_PATH]: {
+      getActiveConsultations: async () => ({ consultations: [], total: 0 }),
+      getConsultationSummary: async () => ({ pending: 0, replied: 0, closed: 0, followUp: 0 }),
+      getConsultationById: async () => ({
+        id: 'consult-both',
+        userId: 'public_user_both',
+        status: 'ACTIVE',
+        aiAction: 'ESCALATE',
+        uiLanguage: 'ko',
+        patientReplyLanguage: 'ko',
+        patientNotificationContact: {
+          consented: true,
+          normalizedPhone: '01012345678',
+          normalizedEmail: 'patient@example.com',
+        },
+      }),
+      saveDoctorReply: async () => 'reply-both-1',
+      getConsultationTrackingById: async () => ({ trackingCode: 'PCBXWN', trackingToken: 'token-1' }),
+      awardHDT: async () => {},
+      getDoctorStats: async () => null,
+      getAdmin: () => ({
+        auth() {
+          return {
+            verifyIdToken: async () => ({ uid: 'doctor-uid', email: 'doctor@example.com', name: '김의사' }),
+          };
+        },
+      }),
+      getDoctorAccessRecordByEmail: async () => null,
+      upsertDoctorAccessRequest: async () => null,
+      ensureApprovedDoctorAccess: async (doctor) => ({ status: 'approved', email: doctor.email }),
+      approveDoctorAccessRequest: async () => null,
+      listPendingDoctorAccessRequests: async () => [],
+      HDT_REPLY: 50,
+    },
+    [NOTIFY_SERVICE_PATH]: {
+      // The Kakao channel succeeds here; mail must still go out.
+      enqueuePatientChannelPush: async () => true,
+      enqueuePatientSmsNotification: async () => {
+        calls.push({ type: 'enqueuePatientSmsNotification' });
+        return true;
+      },
+      clearPatientChannelPushes: async () => {},
+      clearPatientSmsNotifications: async () => {},
+      clearDoctorNotifications: async () => {},
+      clearOperatorUnansweredAlerts: async () => {},
+    },
+    [EMAIL_SERVICE_PATH]: {
+      isConfigured: () => true,
+      sendPatientReplyEmail: async (payload) => {
+        calls.push({ type: 'sendPatientReplyEmail', to: payload.to, text: payload.text });
+        return true;
+      },
+    },
+    [FOLLOW_UP_SERVICE_PATH]: {
+      cancelFollowUp: async () => {},
+    },
+    [CONFIG_PATH]: {
+      appSiteUrl: 'https://app.happydoctor.kr',
+      getAllowedDoctorEmails: () => ['doctor@example.com'],
+      getPortalAdminEmails: () => [],
+    },
+  });
+
+  const server = await startServer(routeModule.router, '/api/portal');
+
+  try {
+    const response = await postJson(
+      `${server.baseUrl}/consultations/consult-both/reply`,
+      { message: '경과를 지켜봐 주세요.' },
+      { headers: { Authorization: 'Bearer portal-token' } },
+    );
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body.notifiedChannels, ['kakao', 'email']);
+
+    const mailCall = calls.find((entry) => entry.type === 'sendPatientReplyEmail');
+    assert.ok(mailCall, 'the patient must be mailed even though Kakao succeeded');
+    assert.equal(mailCall.to, 'patient@example.com');
+    assert.match(mailCall.text, /경과를 지켜봐 주세요\./);
+    assert.match(mailCall.text, /PCBXWN/);
   } finally {
     await server.close();
     routeModule.restore();

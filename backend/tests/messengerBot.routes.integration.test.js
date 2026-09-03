@@ -108,6 +108,7 @@ test('messengerBot doctor poll returns the leased notification payload and ack f
   await withMessengerApiKey(async () => {
     const calls = [];
     const routeModule = loadMessengerBotRoute({
+      recordMessengerBotPoll: async () => false,
       claimDoctorNotification: async () => {
         calls.push({ type: 'claimDoctorNotification' });
         return {
@@ -188,6 +189,7 @@ test('messengerBot doctor poll falls back to the doctor group when no personal a
   await withMessengerApiKey(async () => {
     const calls = [];
     const routeModule = loadMessengerBotRoute({
+      recordMessengerBotPoll: async () => false,
       claimDoctorNotification: async () => {
         calls.push({ type: 'claimDoctorNotification' });
         return {
@@ -243,6 +245,7 @@ test('messengerBot doctor poll falls back to the doctor group when no personal a
 test('messengerBot doctor poll reports missing registration and rejects missing ack ids', { concurrency: false }, async () => {
   await withMessengerApiKey(async () => {
     const routeModule = loadMessengerBotRoute({
+      recordMessengerBotPoll: async () => false,
       claimDoctorNotification: async () => {
         throw new Error('not_used');
       },
@@ -288,6 +291,7 @@ test('messengerBot patient push poll and ack share the same contract for main an
   await withMessengerApiKey(async () => {
     const calls = [];
     const routeModule = loadMessengerBotRoute({
+      recordMessengerBotPoll: async () => false,
       claimDoctorNotification: async () => null,
       acknowledgeDoctorNotification: async () => {},
       confirmDoctorNotifications: async () => [],
@@ -392,6 +396,7 @@ test('messengerBot personal operator alert room commands register and show the t
   await withMessengerApiKey(async () => {
     const calls = [];
     const routeModule = loadMessengerBotRoute({
+      recordMessengerBotPoll: async () => false,
       claimDoctorNotification: async () => null,
       acknowledgeDoctorNotification: async () => {},
       confirmDoctorNotifications: async () => [],
@@ -462,6 +467,7 @@ test('messengerBot personal operator alert room commands register and show the t
 test('messengerBot endpoints reject requests without the configured API key', { concurrency: false }, async () => {
   await withMessengerApiKey(async () => {
     const routeModule = loadMessengerBotRoute({
+      recordMessengerBotPoll: async () => false,
       claimDoctorNotification: async () => null,
       acknowledgeDoctorNotification: async () => {},
       confirmDoctorNotifications: async () => [],

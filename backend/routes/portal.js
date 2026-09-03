@@ -561,9 +561,12 @@ router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
         },
       )
       : false;
+    // Sent alongside the other channels rather than only as a last resort. Each
+    // channel here has failed silently at some point, and a patient learning
+    // twice that their answer is ready beats not learning at all.
     const optedInEmail = getOptedInPatientNotificationEmail(consultation);
     let patientEmailSent = false;
-    if (!patientNotificationQueued && !patientSmsQueued && optedInEmail) {
+    if (optedInEmail) {
       try {
         patientEmailSent = await emailService.sendPatientReplyEmail({
           to: optedInEmail,
@@ -580,14 +583,16 @@ router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
         console.error(`[Portal] Patient reply email failed for ${consultation.userId}:`, error?.message || error);
       }
     }
-    if (!patientNotificationQueued) {
-      if (patientSmsQueued) {
-        console.log(`[Portal] SMS fallback queued for ${consultation.userId}.`);
-      } else if (patientEmailSent) {
-        console.log(`[Portal] Email fallback sent for ${consultation.userId}.`);
-      } else {
-        console.warn(`[Portal] No patient reply notification channel available for ${consultation.userId}.`);
-      }
+    const notifiedChannels = [
+      patientNotificationQueued ? 'kakao' : null,
+      patientSmsQueued ? 'sms' : null,
+      patientEmailSent ? 'email' : null,
+    ].filter(Boolean);
+
+    if (notifiedChannels.length === 0) {
+      console.warn(`[Portal] No patient reply notification channel available for ${consultation.userId}.`);
+    } else {
+      console.log(`[Portal] Patient reply notified via ${notifiedChannels.join('+')} for ${consultation.userId}.`);
     }
     await followUpService.cancelFollowUp(consultation.userId);
     await clearDoctorNotifications(consultation.userId);
@@ -596,7 +601,7 @@ router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
     await awardHDT(req.doctor.email, req.doctor.name, HDT_REPLY, 'reply');
     console.log(`[Portal] ${req.doctor.email} replied to ${consultation.userId} (${replyId})`);
 
-    return res.json({ ok: true, replyId });
+    return res.json({ ok: true, replyId, notifiedChannels });
   } catch (error) {
     if (error?.statusCode) {
       return res.status(error.statusCode).json({ error: error.message });

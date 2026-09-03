@@ -8,6 +8,11 @@ const FOLLOW_UP_PUSHES = 'follow_up_pushes';
 const PATIENT_CHANNEL_PUSHES = 'patient_channel_pushes';
 const PATIENT_SMS_NOTIFICATIONS = 'patient_sms_notifications';
 const MESSENGER_ROOMS = 'messenger_rooms';
+const SYSTEM_JOBS = 'system_jobs';
+const BOT_HEARTBEAT_DOC_ID = 'messenger_bot_heartbeat';
+// The bot polls roughly every 10 seconds; recording each one would be ~9k
+// writes a day for a value only read at minute granularity.
+const BOT_HEARTBEAT_WRITE_INTERVAL_MS = 60 * 1000;
 const DELIVERY_ROOMS = 'delivery_rooms';
 const DOCTOR_ROOM_DOC_ID = 'doctor_room';
 const DOCTOR_ROOM_KIND = 'doctor_group';
@@ -41,6 +46,8 @@ const DOCTOR_ROOM_TRUSTED_GROUP_NAME_PATTERNS = Object.freeze([
   /의료봉사자/,
   /^2기\s*행복한\s*의사\s*의료/,
 ]);
+
+let lastBotHeartbeatWriteMs = 0;
 
 function getCollection(name) {
   const db = getDb();
@@ -1423,6 +1430,57 @@ async function getOperatorAlertRoomName() {
   return getRoomName(OPERATOR_ALERT_USER_ID);
 }
 
+// Called from the bot's polling endpoints. Delivery was previously invisible
+// between "queued" and "delivered": if the phone stopped polling, nothing
+// recorded that fact and the queue simply went quiet.
+async function recordMessengerBotPoll(source = 'doctor') {
+  const now = Date.now();
+  if (now - lastBotHeartbeatWriteMs < BOT_HEARTBEAT_WRITE_INTERVAL_MS) {
+    return false;
+  }
+
+  const db = getDb();
+  if (!db) return false;
+
+  lastBotHeartbeatWriteMs = now;
+  await db.collection(SYSTEM_JOBS).doc(BOT_HEARTBEAT_DOC_ID).set({
+    lastPolledAt: new Date(now),
+    lastPollSource: source,
+  }, { merge: true });
+
+  return true;
+}
+
+async function getMessengerBotHeartbeat() {
+  const db = getDb();
+  if (!db) return null;
+
+  const snapshot = await db.collection(SYSTEM_JOBS).doc(BOT_HEARTBEAT_DOC_ID).get();
+  if (!snapshot.exists) return null;
+
+  const data = snapshot.data() || {};
+  return {
+    lastPolledAt: toDate(data.lastPolledAt),
+    lastPollSource: data.lastPollSource || null,
+    alertingSince: toDate(data.alertingSince),
+    lastAlertAt: toDate(data.lastAlertAt),
+  };
+}
+
+async function setMessengerBotAlertState({ alerting, at = new Date() }) {
+  const db = getDb();
+  if (!db) return false;
+
+  await db.collection(SYSTEM_JOBS).doc(BOT_HEARTBEAT_DOC_ID).set(
+    alerting
+      ? { alertingSince: at, lastAlertAt: at }
+      : { alertingSince: null },
+    { merge: true },
+  );
+
+  return true;
+}
+
 async function getQueueStatus() {
   const db = getDb();
   if (!db) {
@@ -1480,6 +1538,9 @@ module.exports = {
   clearPatientChannelPushes,
   enqueuePatientSmsNotification,
   isSmsDeliverableNumber,
+  recordMessengerBotPoll,
+  getMessengerBotHeartbeat,
+  setMessengerBotAlertState,
   claimPatientSmsNotification,
   acknowledgePatientSmsNotification,
   clearPatientSmsNotifications,
