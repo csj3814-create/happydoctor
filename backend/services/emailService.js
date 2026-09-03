@@ -213,9 +213,18 @@ class EmailService {
           signal: AbortSignal.timeout(config.timeoutMs),
         });
 
-        return response.ok
-          ? { provider, verified: true, error: null }
-          : { provider, verified: false, error: `resend_${response.status}` };
+        if (response.ok) {
+          return { provider, verified: true, error: null };
+        }
+
+        // The status alone cannot tell a bad key from a send-only key, which
+        // is rejected here but would deliver mail perfectly well.
+        const detail = await response.text().catch(() => '');
+        return {
+          provider,
+          verified: false,
+          error: `resend_${response.status}: ${detail.slice(0, 200)}`,
+        };
       } catch (error) {
         return {
           provider,

@@ -380,3 +380,37 @@ test('a rejected app password is reported as an authentication failure', { concu
     }
   });
 });
+
+test("the digest and health backlog use the portal's own unanswered filter", { concurrency: false }, async () => {
+  await withEnv({ MESSENGER_API_KEY: MESSENGER_KEY }, async () => {
+    const requestedStatuses = [];
+    const server = await startApp(loadAppWithMocks({
+      dbOverrides: {
+        getActiveConsultations: async (options) => {
+          requestedStatuses.push(options.status);
+          // Mirrors the real filter: only 'active'/'pending' select the
+          // unanswered stage. An unrecognised value used to skip filtering
+          // entirely and report every consultation as unanswered.
+          const unansweredOnly = options.status === 'active' || options.status === 'pending';
+          return unansweredOnly
+            ? { total: 0, consultations: [] }
+            : { total: 68, consultations: [] };
+        },
+      },
+    }));
+
+    try {
+      const { body } = await getJson(`${server.baseUrl}/api/notification-health`, {
+        headers: { 'x-api-key': MESSENGER_KEY },
+      });
+
+      assert.ok(
+        requestedStatuses.every((status) => status === 'active' || status === 'pending'),
+        `backlog must request the unanswered stage, got ${requestedStatuses.join(',')}`,
+      );
+      assert.equal(body.backlog.unansweredConsultations, 0);
+    } finally {
+      await server.close();
+    }
+  });
+});

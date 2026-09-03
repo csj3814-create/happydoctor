@@ -803,7 +803,10 @@ function applyConsultationViewOptions(docs, options = {}) {
   const normalizedSearch = (options.search || '').trim().toLowerCase();
   let filtered = docs;
 
-  if (status === 'active') {
+  // 'active' is the portal's name for the stage getPortalInboxStage() calls
+  // 'pending'. Accepting both matters because an unrecognised status silently
+  // skips filtering and returns every consultation as if it were unanswered.
+  if (status === 'active' || status === 'pending') {
     filtered = filtered.filter((doc) => getPortalInboxStage(doc) === 'pending');
   } else if (status === 'followup') {
     filtered = filtered.filter((doc) => getPortalInboxStage(doc) === 'followup');
@@ -811,6 +814,8 @@ function applyConsultationViewOptions(docs, options = {}) {
     filtered = filtered.filter((doc) => getPortalInboxStage(doc) === 'replied');
   } else if (status === 'closed') {
     filtered = filtered.filter((doc) => getPortalInboxStage(doc) === 'closed');
+  } else if (status !== 'all') {
+    console.warn(`[DB] Unknown consultation status "${status}"; returning every consultation unfiltered.`);
   }
 
   if (normalizedSearch) {
