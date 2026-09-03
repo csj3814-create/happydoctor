@@ -8,6 +8,7 @@ const DB_SERVICE_PATH = path.resolve(__dirname, '../services/dbService.js');
 const FOLLOW_UP_SERVICE_PATH = path.resolve(__dirname, '../services/followUpService.js');
 const NOTIFY_SERVICE_PATH = path.resolve(__dirname, '../services/notifyService.js');
 const EMAIL_SERVICE_PATH = path.resolve(__dirname, '../services/emailService.js');
+const DOCTOR_SUMMARY_SERVICE_PATH = path.resolve(__dirname, '../services/doctorSummaryService.js');
 const LLM_SERVICE_PATH = path.resolve(__dirname, '../services/llmService.js');
 const TRANSLATION_SERVICE_PATH = path.resolve(__dirname, '../services/translationService.js');
 const UI_COPY_SERVICE_PATH = path.resolve(__dirname, '../services/uiCopyService.js');
@@ -213,6 +214,7 @@ test('public start UI copy route returns the translated bundle for the selected 
     },
     [CONFIG_PATH]: {
       appSiteUrl: 'https://app.happydoctor.kr',
+      getDoctorSummaryConfig: () => ({ enabled: false }),
     },
   });
 
@@ -277,6 +279,7 @@ test('public create route stores an optional consented notification phone for we
     },
     [CONFIG_PATH]: {
       appSiteUrl: 'https://app.happydoctor.kr',
+      getDoctorSummaryConfig: () => ({ enabled: false }),
     },
   });
 
@@ -360,6 +363,7 @@ test('public create route rejects notification consent without a phone number', 
     },
     [CONFIG_PATH]: {
       appSiteUrl: 'https://app.happydoctor.kr',
+      getDoctorSummaryConfig: () => ({ enabled: false }),
     },
   });
 
@@ -421,6 +425,7 @@ test('public create route accepts an email-only reply notification contact', { c
     },
     [CONFIG_PATH]: {
       appSiteUrl: 'https://app.happydoctor.kr',
+      getDoctorSummaryConfig: () => ({ enabled: false }),
     },
   });
 
@@ -483,6 +488,7 @@ test('public create route rejects a malformed reply notification email', { concu
     },
     [CONFIG_PATH]: {
       appSiteUrl: 'https://app.happydoctor.kr',
+      getDoctorSummaryConfig: () => ({ enabled: false }),
     },
   });
 
@@ -547,6 +553,7 @@ test('public data deletion requires a long token and protects receipt status wit
     },
     [CONFIG_PATH]: {
       appSiteUrl: 'https://app.happydoctor.kr',
+      getDoctorSummaryConfig: () => ({ enabled: false }),
     },
   });
 
@@ -646,6 +653,7 @@ test('public follow-up route appends the question, queues a doctor notification,
     },
     [CONFIG_PATH]: {
       appSiteUrl: 'https://app.happydoctor.kr',
+      getDoctorSummaryConfig: () => ({ enabled: false }),
     },
   });
 
@@ -736,6 +744,7 @@ test('public status route acknowledges doctor replies and clears queued reply re
     },
     [CONFIG_PATH]: {
       appSiteUrl: 'https://app.happydoctor.kr',
+      getDoctorSummaryConfig: () => ({ enabled: false }),
     },
   });
 
@@ -804,6 +813,7 @@ test('public close route clears durable follow-up and reply delivery state befor
     },
     [CONFIG_PATH]: {
       appSiteUrl: 'https://app.happydoctor.kr',
+      getDoctorSummaryConfig: () => ({ enabled: false }),
     },
   });
 
@@ -865,6 +875,7 @@ test('public status routes reject malformed lookup values before hitting the dat
     },
     [CONFIG_PATH]: {
       appSiteUrl: 'https://app.happydoctor.kr',
+      getDoctorSummaryConfig: () => ({ enabled: false }),
     },
   });
 
@@ -916,6 +927,7 @@ test('public status route rate-limits repeated failed lookup attempts', { concur
     },
     [CONFIG_PATH]: {
       appSiteUrl: 'https://app.happydoctor.kr',
+      getDoctorSummaryConfig: () => ({ enabled: false }),
     },
   });
 
@@ -1727,6 +1739,91 @@ test('portal reply route mails the patient alongside the other channels, not onl
     assert.equal(mailCall.to, 'patient@example.com');
     assert.match(mailCall.text, /경과를 지켜봐 주세요\./);
     assert.match(mailCall.text, /PCBXWN/);
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});
+
+test('the AI summary is stored on the consultation and never reaches the doctor alert', { concurrency: false }, async () => {
+  const calls = [];
+  const routeModule = loadRouteWithMocks(PUBLIC_ROUTE_PATH, {
+    [DB_SERVICE_PATH]: {
+      logConsultation: async () => ({
+        consultationId: 'consult-summary-1',
+        trackingCode: 'PCBXWN',
+        trackingToken: 'token-1',
+      }),
+      addConsultationImagesById: async () => [],
+      saveAiDoctorSummary: async (consultationId, summary) => {
+        calls.push({ type: 'saveAiDoctorSummary', consultationId, summary });
+        return true;
+      },
+    },
+    [FOLLOW_UP_SERVICE_PATH]: {
+      cancelFollowUp: async () => {},
+      scheduleFollowUpWithOptions: async () => {},
+    },
+    [LLM_SERVICE_PATH]: {
+      analyzeAndRouteTriage: async () => ({
+        action: 'ESCALATE',
+        replyToPatient: '상담 내용이 접수되었습니다.',
+        soapChartForDoctor: ['[해피닥터] 새 상담 접수', '긴급도: 자동 분류하지 않음 - 의료진 확인 필요'].join('\n'),
+      }),
+      buildDoctorReviewNotice: () => '[해피닥터] 새 상담 접수',
+    },
+    [DOCTOR_SUMMARY_SERVICE_PATH]: {
+      isEnabled: () => true,
+      generateSafely: async (patientData) => {
+        calls.push({ type: 'generateSafely', cc: patientData.cc });
+        return { text: ['S: 기침 3일째', 'A: 상기도 감염 가능성 확인 필요'].join('\n'), status: 'ready' };
+      },
+    },
+    [TRANSLATION_SERVICE_PATH]: createTranslationServiceMock(),
+    [NOTIFY_SERVICE_PATH]: {
+      enqueueDoctorNotification: async (message) => {
+        calls.push({ type: 'enqueueDoctorNotification', message });
+        return true;
+      },
+      clearDoctorNotifications: async () => {},
+      clearPatientChannelPushes: async () => {},
+      clearPatientSmsNotifications: async () => {},
+    },
+    [CONFIG_PATH]: { appSiteUrl: 'https://app.happydoctor.kr' },
+  });
+
+  const server = await startServer(routeModule.router, '/api/public');
+
+  try {
+    const formData = new FormData();
+    formData.append('age', '44');
+    formData.append('gender', 'male');
+    formData.append('chiefComplaint', '기침이 3일째 납니다');
+    formData.append('symptomDetail', '밤에 심해집니다');
+    formData.append('privacyConsent', 'true');
+    formData.append('sensitiveInfoConsent', 'true');
+    formData.append('adultConfirmed', 'true');
+
+    const response = await postForm(`${server.baseUrl}/consultations`, formData);
+    assert.equal(response.status, 201, JSON.stringify(response.body));
+
+    // The summary is produced after the patient is answered.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const saveCall = calls.find((entry) => entry.type === 'saveAiDoctorSummary');
+    assert.ok(saveCall, 'the summary must be stored on the consultation');
+    assert.equal(saveCall.consultationId, 'consult-summary-1');
+    assert.match(saveCall.summary.text, /상기도 감염 가능성 확인 필요/);
+
+    // The alert still carries nothing clinical: it travels through KakaoTalk
+    // and ordinary inboxes.
+    const alertCall = calls.find((entry) => entry.type === 'enqueueDoctorNotification');
+    assert.ok(alertCall);
+    assert.match(alertCall.message, /자동 분류하지 않음/);
+    assert.doesNotMatch(alertCall.message, /기침|상기도 감염/);
+
+    // Nor does the patient receive any of it.
+    assert.doesNotMatch(response.body.replyToPatient, /상기도 감염/);
   } finally {
     await server.close();
     routeModule.restore();

@@ -647,6 +647,31 @@ async function logConsultation(userId, patientData, analysisResult, options = {}
   }
 }
 
+// Stored on the consultation, never on the notification message: doctor alerts
+// travel through KakaoTalk and ordinary inboxes, so health information stays
+// behind portal authentication.
+async function saveAiDoctorSummary(consultationId, summary) {
+  if (!db || !consultationId || !summary) return false;
+
+  try {
+    await db.collection('consultations').doc(consultationId).update({
+      aiDoctorSummary: {
+        text: summary.text || null,
+        disclaimer: summary.disclaimer || null,
+        model: summary.model || null,
+        status: summary.status || 'ready',
+        error: summary.error || null,
+        generatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+    });
+
+    return true;
+  } catch (error) {
+    console.error('[DB AI Summary Error]', error);
+    return false;
+  }
+}
+
 async function logFollowUp(userId, fuAnalysis) {
   if (!db) return;
 
@@ -1946,6 +1971,7 @@ async function releaseFollowUpLease(userId, reason = 'processing_failed') {
 module.exports = {
   logConsultation,
   logFollowUp,
+  saveAiDoctorSummary,
   closeConsultation,
   saveDoctorReply,
   getPendingDoctorReply,

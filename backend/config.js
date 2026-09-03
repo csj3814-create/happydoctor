@@ -141,6 +141,24 @@ function getRuntimeRevision() {
   };
 }
 
+function getGeminiApiKey() {
+  return getEnv('GEMINI_API_KEY');
+}
+
+// The patient-facing reply path stays free of any model output. This config
+// only governs the summary shown inside the authenticated doctor portal.
+function getDoctorSummaryConfig() {
+  const apiKey = getGeminiApiKey();
+
+  return {
+    enabled: getBooleanEnv('DOCTOR_SUMMARY_ENABLED', true) && Boolean(apiKey),
+    apiKey,
+    model: getEnv('DOCTOR_SUMMARY_MODEL', 'gemini-2.5-flash'),
+    timeoutMs: getNumberEnv('DOCTOR_SUMMARY_TIMEOUT_MS', 20 * 1000, { min: 1000, integer: true }),
+    maxOutputTokens: getNumberEnv('DOCTOR_SUMMARY_MAX_TOKENS', 1200, { min: 128, integer: true }),
+  };
+}
+
 function getGoogleTranslateApiKey() {
   return getEnv('GOOGLE_TRANSLATE_API_KEY');
 }
@@ -311,6 +329,7 @@ function validateStartupConfig() {
   getFirebaseServiceAccount();
   getUnansweredDigestConfig();
   getBotHeartbeatConfig();
+  getDoctorSummaryConfig();
 
   getNotificationChannelIssues().forEach(({ channel, issue }) => {
     console.error(`[Config] ${channel} notification channel is DISABLED: ${issue}`);
@@ -333,6 +352,8 @@ module.exports = {
   getPortalOrigins,
   getRuntimeRevision,
   getGoogleTranslateApiKey,
+  getGeminiApiKey,
+  getDoctorSummaryConfig,
   getMessengerApiKey,
   getFirebaseServiceAccount,
   getFirebaseStorageBucket,
