@@ -7,6 +7,7 @@ const Module = require('node:module');
 const APP_PATH = path.resolve(__dirname, '..', 'app.js');
 const DB_SERVICE_PATH = path.resolve(__dirname, '..', 'services', 'dbService.js');
 const NOTIFY_SERVICE_PATH = path.resolve(__dirname, '..', 'services', 'notifyService.js');
+const EMAIL_SERVICE_PATH = path.resolve(__dirname, '..', 'services', 'emailService.js');
 
 const MESSENGER_KEY = 'health-test-key';
 const OPERATOR_ROOM_NAME = '가족-최석재';
@@ -39,7 +40,7 @@ async function withEnv(overrides, fn) {
   }
 }
 
-function loadAppWithMocks({ dbOverrides = {}, notifyOverrides = {} } = {}) {
+function loadAppWithMocks({ dbOverrides = {}, notifyOverrides = {}, emailOverrides = null } = {}) {
   const originalLoad = Module._load;
 
   Module._load = function patchedLoad(request, parent, isMain) {
@@ -58,6 +59,10 @@ function loadAppWithMocks({ dbOverrides = {}, notifyOverrides = {} } = {}) {
         getActiveConsultations: async () => ({ total: 0, consultations: [] }),
         ...dbOverrides,
       };
+    }
+
+    if (resolved === EMAIL_SERVICE_PATH && emailOverrides) {
+      return emailOverrides;
     }
 
     if (resolved === NOTIFY_SERVICE_PATH) {
@@ -306,6 +311,65 @@ test('backlog age is computed from Firestore Timestamps, not just ISO strings', 
 
       assert.equal(body.backlog.unansweredConsultations, 3);
       assert.equal(body.backlog.oldestUnansweredAgeMinutes, 180);
+    } finally {
+      await server.close();
+    }
+  });
+});
+
+test('the health check can prove SMTP credentials authenticate without sending mail', { concurrency: false }, async () => {
+  await withEnv({ MESSENGER_API_KEY: MESSENGER_KEY }, async () => {
+    const sendCalls = [];
+    const server = await startApp(loadAppWithMocks({
+      emailOverrides: {
+        isConfigured: () => true,
+        verifyTransport: async () => ({ verified: true, error: null }),
+        sendMail: async (...args) => {
+          sendCalls.push(args);
+          return 1;
+        },
+      },
+    }));
+
+    try {
+      const withoutFlag = await getJson(`${server.baseUrl}/api/notification-health`, {
+        headers: { 'x-api-key': MESSENGER_KEY },
+      });
+      // A handshake on every health check would be wasteful; it is opt-in.
+      assert.equal(withoutFlag.body.smtpVerification, null);
+
+      const withFlag = await getJson(`${server.baseUrl}/api/notification-health?verify=1`, {
+        headers: { 'x-api-key': MESSENGER_KEY },
+      });
+      assert.equal(withFlag.body.smtpVerification.verified, true);
+
+      // Verification must never actually deliver anything.
+      assert.deepEqual(sendCalls, []);
+    } finally {
+      await server.close();
+    }
+  });
+});
+
+test('a rejected app password is reported as an authentication failure', { concurrency: false }, async () => {
+  await withEnv({ MESSENGER_API_KEY: MESSENGER_KEY }, async () => {
+    const server = await startApp(loadAppWithMocks({
+      emailOverrides: {
+        isConfigured: () => true,
+        verifyTransport: async () => ({
+          verified: false,
+          error: 'Invalid login: 535-5.7.8 Username and Password not accepted',
+        }),
+      },
+    }));
+
+    try {
+      const { body } = await getJson(`${server.baseUrl}/api/notification-health?verify=1`, {
+        headers: { 'x-api-key': MESSENGER_KEY },
+      });
+
+      assert.equal(body.smtpVerification.verified, false);
+      assert.match(body.smtpVerification.error, /Username and Password not accepted/);
     } finally {
       await server.close();
     }

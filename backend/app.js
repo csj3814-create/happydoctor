@@ -213,6 +213,13 @@ function createApp() {
     res.set('Cache-Control', 'no-store');
 
     try {
+      // Opt-in: an SMTP handshake on every health check would be wasteful, but
+      // proving the credentials authenticate is the only way to know mail will
+      // actually leave. Sends nothing.
+      const smtpVerification = req.query.verify === '1'
+        ? await emailService.verifyTransport()
+        : null;
+
       const db = dbService.getDb();
       if (!db) {
         return res.status(200).json({
@@ -236,6 +243,7 @@ function createApp() {
         ok: true,
         timestamp: new Date().toISOString(),
         notifications: createNotificationChannelSummary(),
+        smtpVerification,
         // Booleans only: room names identify people and stay out of this payload.
         kakao: {
           doctorRoomRegistered: Boolean(doctorRoomName),

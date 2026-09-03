@@ -88,6 +88,26 @@ class EmailService {
     return recipients.length;
   }
 
+  // Proves the credentials actually authenticate, which `isConfigured()` cannot:
+  // that only says the variables are present. Performs an SMTP handshake and
+  // AUTH exchange, then disconnects. No message is sent.
+  async verifyTransport() {
+    const transport = this.getTransport();
+    if (!transport) {
+      return { verified: false, error: 'email_not_configured' };
+    }
+
+    try {
+      await transport.verify();
+      return { verified: true, error: null };
+    } catch (error) {
+      return {
+        verified: false,
+        error: String(error?.message || 'smtp_verify_failed').slice(0, 300),
+      };
+    }
+  }
+
   // Every doctor alert also goes out by mail so a stopped MessengerBot phone
   // can no longer swallow the entire notification chain.
   async sendDoctorAlertEmail({ patientId, type, priority } = {}) {
