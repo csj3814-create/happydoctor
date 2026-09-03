@@ -1,3 +1,5 @@
+const dns = require('node:dns').promises;
+const net = require('node:net');
 const nodemailer = require('nodemailer');
 
 const { getAlertEmailRecipients, getSmtpConfig } = require('../config');
@@ -97,6 +99,55 @@ class EmailService {
     });
 
     return recipients.length;
+  }
+
+  // Reports, per resolved address, whether a TCP connection is even possible.
+  // The nodemailer error names only the last address it tried, which is not
+  // enough to tell a blocked port from an unusable route.
+  async diagnoseConnectivity() {
+    const smtpConfig = this.getConfig();
+    if (!smtpConfig) {
+      return { error: 'email_not_configured' };
+    }
+
+    const resolveFamily = async (resolver) => {
+      try {
+        return await resolver(smtpConfig.host);
+      } catch (error) {
+        return [];
+      }
+    };
+
+    const [ipv4, ipv6] = await Promise.all([
+      resolveFamily(dns.resolve4),
+      resolveFamily(dns.resolve6),
+    ]);
+
+    const probe = (address, family) => new Promise((resolve) => {
+      const socket = net.connect({ host: address, port: smtpConfig.port, family });
+      const finish = (ok, error) => {
+        socket.destroy();
+        resolve({ address, family, ok, error: error ? String(error).slice(0, 120) : null });
+      };
+
+      socket.setTimeout(SMTP_TIMEOUT_MS);
+      socket.once('connect', () => finish(true, null));
+      socket.once('timeout', () => finish(false, 'timeout'));
+      socket.once('error', (error) => finish(false, error?.message || 'connect_failed'));
+    });
+
+    const attempts = await Promise.all([
+      ...ipv4.slice(0, 2).map((address) => probe(address, 4)),
+      ...ipv6.slice(0, 2).map((address) => probe(address, 6)),
+    ]);
+
+    return {
+      host: smtpConfig.host,
+      port: smtpConfig.port,
+      ipv4Count: ipv4.length,
+      ipv6Count: ipv6.length,
+      attempts,
+    };
   }
 
   // Proves the credentials actually authenticate, which `isConfigured()` cannot:

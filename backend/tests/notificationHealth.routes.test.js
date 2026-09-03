@@ -324,6 +324,7 @@ test('the health check can prove SMTP credentials authenticate without sending m
       emailOverrides: {
         isConfigured: () => true,
         verifyTransport: async () => ({ verified: true, error: null }),
+        diagnoseConnectivity: async () => ({ host: 'smtp.gmail.com', port: 465, attempts: [] }),
         sendMail: async (...args) => {
           sendCalls.push(args);
           return 1;
@@ -360,6 +361,7 @@ test('a rejected app password is reported as an authentication failure', { concu
           verified: false,
           error: 'Invalid login: 535-5.7.8 Username and Password not accepted',
         }),
+        diagnoseConnectivity: async () => ({ host: 'smtp.gmail.com', port: 465, attempts: [] }),
       },
     }));
 

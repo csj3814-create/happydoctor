@@ -219,6 +219,9 @@ function createApp() {
       const smtpVerification = req.query.verify === '1'
         ? await emailService.verifyTransport()
         : null;
+      const smtpConnectivity = req.query.verify === '1'
+        ? await emailService.diagnoseConnectivity()
+        : null;
 
       const db = dbService.getDb();
       if (!db) {
@@ -244,6 +247,7 @@ function createApp() {
         timestamp: new Date().toISOString(),
         notifications: createNotificationChannelSummary(),
         smtpVerification,
+        smtpConnectivity,
         // Booleans only: room names identify people and stay out of this payload.
         kakao: {
           doctorRoomRegistered: Boolean(doctorRoomName),
