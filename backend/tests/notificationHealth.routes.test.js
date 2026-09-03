@@ -323,7 +323,8 @@ test('the health check can prove SMTP credentials authenticate without sending m
     const server = await startApp(loadAppWithMocks({
       emailOverrides: {
         isConfigured: () => true,
-        verifyTransport: async () => ({ verified: true, error: null }),
+        getProvider: () => 'smtp',
+        verifyTransport: async () => ({ provider: 'smtp', verified: true, error: null }),
         diagnoseConnectivity: async () => ({ host: 'smtp.gmail.com', port: 465, attempts: [] }),
         sendMail: async (...args) => {
           sendCalls.push(args);
@@ -357,7 +358,9 @@ test('a rejected app password is reported as an authentication failure', { concu
     const server = await startApp(loadAppWithMocks({
       emailOverrides: {
         isConfigured: () => true,
+        getProvider: () => 'smtp',
         verifyTransport: async () => ({
+          provider: 'smtp',
           verified: false,
           error: 'Invalid login: 535-5.7.8 Username and Password not accepted',
         }),

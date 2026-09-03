@@ -46,6 +46,7 @@ function createNotificationChannelSummary() {
 
   return {
     email: {
+      provider: emailService.getProvider(),
       configured: emailService.isConfigured(),
       issue: smtpIssue,
       recipientCount,

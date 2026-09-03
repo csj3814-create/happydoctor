@@ -7,7 +7,7 @@ const CONFIG_PATH = path.join(__dirname, '..', 'config.js');
 const NODEMAILER_PATH = require.resolve('nodemailer');
 const EMAIL_SERVICE_PATH = path.join(__dirname, '..', 'services', 'emailService.js');
 
-function loadEmailServiceWithMocks({ smtpConfig, recipients, sentMails }) {
+function loadEmailServiceWithMocks({ smtpConfig, recipients, sentMails, resendConfig = null, fetchImpl = null }) {
   const originalLoad = Module._load;
 
   Module._load = function patchedLoad(request, parent, isMain) {
@@ -22,6 +22,7 @@ function loadEmailServiceWithMocks({ smtpConfig, recipients, sentMails }) {
     if (resolved === CONFIG_PATH) {
       return {
         getSmtpConfig: () => smtpConfig,
+        getResendConfig: () => resendConfig,
         getAlertEmailRecipients: () => recipients,
       };
     }
@@ -178,7 +179,7 @@ test('the SMTP transport is built once and reused across sends', { concurrency: 
   assert.equal(first.options.auth.user, 'alerts@happydoctor.kr');
 });
 
-test('the transport pins IPv4 and bounds every timeout', { concurrency: false }, async () => {
+test('the SMTP transport bounds every timeout', { concurrency: false }, async () => {
   const emailService = loadEmailServiceWithMocks({
     smtpConfig: WORKING_SMTP,
     recipients: ['admin@happydoctor.kr'],
@@ -187,9 +188,8 @@ test('the transport pins IPv4 and bounds every timeout', { concurrency: false },
 
   const { options } = emailService.getTransport();
 
-  // Render has no IPv6 route; without this Node picks the AAAA record and
-  // every connection fails with ENETUNREACH.
-  assert.equal(options.family, 4);
+  // A host that drops SMTP packets rather than refusing them would otherwise
+  // hang for nodemailer's two-minute default.
   assert.equal(options.connectionTimeout, 8000);
   assert.equal(options.greetingTimeout, 8000);
   assert.equal(options.socketTimeout, 8000);
@@ -214,4 +214,71 @@ test('doctor alert subjects name the real notification types', { concurrency: fa
     '[해피닥터] 환자 추가 문의 접수 - 의료진 확인 필요',
     '[해피닥터] 새 상담 접수 - 의료진 확인 필요',
   ]);
+});
+
+const RESEND_CONFIG = Object.freeze({
+  apiKey: 'test-resend-key',
+  from: '해피닥터 <alerts@happydoctor.kr>',
+  endpoint: 'https://api.resend.com/emails',
+  timeoutMs: 10000,
+});
+
+test('mail goes over HTTPS when the API provider is configured', { concurrency: false }, async () => {
+  const requests = [];
+  const originalFetch = global.fetch;
+  global.fetch = async (url, options) => {
+    requests.push({ url, options });
+    return { ok: true, status: 200, text: async () => '' };
+  };
+
+  try {
+    const sentMails = [];
+    const emailService = loadEmailServiceWithMocks({
+      // Both configured: HTTPS must win, because SMTP does not survive a host
+      // that blocks the ports.
+      smtpConfig: WORKING_SMTP,
+      resendConfig: RESEND_CONFIG,
+      recipients: ['doctor@happydoctor.kr'],
+      sentMails,
+    });
+
+    assert.equal(emailService.getProvider(), 'resend');
+
+    await emailService.sendDoctorAlertEmail({ patientId: 'public_1', type: 'triage_initial' });
+
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].url, 'https://api.resend.com/emails');
+    assert.equal(requests[0].options.headers.Authorization, 'Bearer test-resend-key');
+
+    const body = JSON.parse(requests[0].options.body);
+    assert.deepEqual(body.to, ['doctor@happydoctor.kr']);
+    assert.match(body.text, /portal\.happydoctor\.kr/);
+    assert.match(body.text, /건강정보와 상담 내용은 이 메일에 담기지 않습니다\./);
+
+    // Nothing went through the SMTP transport.
+    assert.deepEqual(sentMails, []);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('an API rejection surfaces its status instead of failing silently', { concurrency: false }, async () => {
+  const originalFetch = global.fetch;
+  global.fetch = async () => ({ ok: false, status: 422, text: async () => 'domain not verified' });
+
+  try {
+    const emailService = loadEmailServiceWithMocks({
+      smtpConfig: null,
+      resendConfig: RESEND_CONFIG,
+      recipients: ['doctor@happydoctor.kr'],
+      sentMails: [],
+    });
+
+    await assert.rejects(
+      () => emailService.sendDoctorAlertEmail({ patientId: 'public_1' }),
+      /resend_422: domain not verified/,
+    );
+  } finally {
+    global.fetch = originalFetch;
+  }
 });

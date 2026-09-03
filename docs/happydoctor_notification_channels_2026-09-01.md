@@ -83,7 +83,22 @@ Play 출시 보안 강화 커밋 `d78e4e9`에서 AI 임상 응답 경로를 의�
 
 ## 3. Render 환경변수 설정
 
-### 3-1. Gmail 앱 비밀번호 발급 (사용자 직접 작업)
+### 3-0. ⚠️ Render에서는 Gmail SMTP가 작동하지 않습니다 (2026-09-04 확인)
+
+`/api/notification-health?verify=1`의 주소별 TCP 프로브 결과입니다.
+
+```
+IPv4 172.253.118.109:465  ok=false  timeout
+IPv6 2404:6800:4003:c06::6c:465  ok=false  ENETUNREACH
+```
+
+IPv4는 **거부가 아니라 타임아웃**입니다. 패킷이 조용히 버려진다는 뜻이고, 아웃바운드 SMTP 차단의
+전형적인 신호입니다. 앱 비밀번호를 재발급해도 결과는 같습니다.
+
+따라서 메일은 **HTTPS API로 보내야 합니다.** 아래 3-1은 SMTP가 허용되는 다른 호스트로 옮길 때만
+유효합니다. Render를 계속 쓰신다면 3-4로 가세요.
+
+### 3-1. Gmail 앱 비밀번호 발급 (SMTP 허용 호스트에서만 유효)
 1. Google 계정 → 보안 → 2단계 인증을 켭니다 (앱 비밀번호의 전제 조건).
 2. 보안 → 앱 비밀번호 → 이름을 `happydoctor-alerts` 등으로 만들고 16자리를 받습니다.
 3. 이 값은 저장소나 문서에 남기지 말고 Render 환경변수에만 붙여넣습니다.
@@ -104,6 +119,25 @@ Play 출시 보안 강화 커밋 `d78e4e9`에서 AI 임상 응답 경로를 의�
 `SMTP_USER`와 `SMTP_PASS`는 둘 다 있어야 메일이 켜집니다.
 하나만 넣어도 **서버는 정상 기동하고 메일 채널만 비활성화**됩니다(2026-09-01 수정).
 이유는 `/api/version`에 문자열로 표시되므로, 저장 후 아래 4절로 바로 확인하세요.
+
+### 3-4. Resend (HTTPS) 설정 — Render에서 쓸 실제 경로
+
+1. resend.com 가입 후 API 키를 발급합니다.
+2. `happydoctor.kr` 도메인을 등록하고 안내되는 DNS 레코드를 추가합니다.
+   도메인 인증 없이도 테스트 발신 주소로 시작할 수 있지만, 환자에게 보내는 메일은
+   도메인 인증을 해야 스팸함에 덜 들어갑니다.
+3. Render 환경변수:
+
+| 변수 | 값 |
+|---|---|
+| `RESEND_API_KEY` | 발급받은 키 |
+| `RESEND_FROM` | 예: `해피닥터 <noreply@happydoctor.kr>` |
+
+`RESEND_API_KEY`가 있으면 SMTP 설정이 남아 있어도 **HTTPS 경로가 우선**합니다.
+`SMTP_USER`/`SMTP_PASS`는 지워도 되고 그대로 두어도 무방합니다.
+
+4. 확인: `/api/version`의 `notifications.email.provider`가 `resend`로 바뀌고,
+   `/api/notification-health?verify=1`의 `smtpVerification.verified`가 `true`가 되면 완료입니다.
 
 ### 3-3. SOLAPI는 환경변수를 손댈 필요 없습니다
 SOLAPI 3종 변수는 이미 설정돼 있습니다. 큐 차단은 코드 문제였고 2026-09-02에 수정했습니다

@@ -266,6 +266,32 @@ function getSmtpConfigIssue() {
   return readSmtpSettings().issue;
 }
 
+// Render drops outbound SMTP: a direct TCP probe to smtp.gmail.com:465 times
+// out on IPv4 and has no route on IPv6. Mail therefore has to leave over
+// HTTPS, which is what this provider is for.
+function getResendConfig() {
+  const apiKey = getEnv('RESEND_API_KEY');
+  if (!apiKey) return null;
+
+  const from = getEnv('RESEND_FROM') || getEnv('SMTP_FROM');
+  if (!from) {
+    return null;
+  }
+
+  return {
+    apiKey,
+    from,
+    endpoint: getEnv('RESEND_ENDPOINT', 'https://api.resend.com/emails'),
+    timeoutMs: getNumberEnv('RESEND_TIMEOUT_MS', 10000, { min: 1000, integer: true }),
+  };
+}
+
+function getResendConfigIssue() {
+  if (!getEnv('RESEND_API_KEY')) return null;
+  if (getEnv('RESEND_FROM') || getEnv('SMTP_FROM')) return null;
+  return 'RESEND_FROM (or SMTP_FROM) must be set alongside RESEND_API_KEY.';
+}
+
 function getAlertEmailRecipients() {
   const configured = getEnv('ALERT_EMAIL_RECIPIENTS')
     .split(',')
@@ -316,6 +342,7 @@ function isKeepAliveDisabled() {
 function getNotificationChannelIssues() {
   return [
     ['smtp', getSmtpConfigIssue()],
+    ['resend', getResendConfigIssue()],
     ['solapi', getSolapiSmsConfigIssue()],
   ]
     .filter(([, issue]) => Boolean(issue))
@@ -365,6 +392,8 @@ module.exports = {
   getSmtpConfigIssue,
   getNotificationChannelIssues,
   getAlertEmailRecipients,
+  getResendConfig,
+  getResendConfigIssue,
   getUnansweredDigestConfig,
   getBotHeartbeatConfig,
   isKeepAliveDisabled,

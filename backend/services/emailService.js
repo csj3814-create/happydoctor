@@ -2,7 +2,11 @@ const dns = require('node:dns').promises;
 const net = require('node:net');
 const nodemailer = require('nodemailer');
 
-const { getAlertEmailRecipients, getSmtpConfig } = require('../config');
+const {
+  getAlertEmailRecipients,
+  getResendConfig,
+  getSmtpConfig,
+} = require('../config');
 
 const PORTAL_URL = 'https://portal.happydoctor.kr/open-browser?next=%2F';
 const SMTP_TIMEOUT_MS = 8000;
@@ -38,8 +42,16 @@ class EmailService {
     return getSmtpConfig();
   }
 
+  // HTTPS wins when both are present: SMTP does not survive hosts that block
+  // the ports, and this one is verified to.
+  getProvider() {
+    if (getResendConfig()) return 'resend';
+    if (getSmtpConfig()) return 'smtp';
+    return null;
+  }
+
   isConfigured() {
-    return Boolean(this.getConfig());
+    return Boolean(this.getProvider());
   }
 
   getTransport() {
@@ -58,13 +70,9 @@ class EmailService {
           user: smtpConfig.user,
           pass: smtpConfig.pass,
         },
-        // Node prefers the AAAA record, and this container has no IPv6 route:
-        // smtp.gmail.com resolved to 2404:6800:... and every connection died
-        // with ENETUNREACH. Pinning IPv4 is what makes mail leave at all.
-        family: 4,
-        // A host without a usable route drops packets rather than refusing
-        // them, so without these the socket hangs for nodemailer's two-minute
-        // default while a patient waits on their submission.
+        // A host that drops SMTP packets rather than refusing them makes the
+        // socket hang for nodemailer's two-minute default while a patient
+        // waits on their submission.
         connectionTimeout: SMTP_TIMEOUT_MS,
         greetingTimeout: SMTP_TIMEOUT_MS,
         socketTimeout: SMTP_TIMEOUT_MS,
@@ -75,11 +83,53 @@ class EmailService {
     return this.cachedTransport;
   }
 
-  async sendMail({ to, subject, text }) {
+  async sendViaResend({ recipients, subject, text }) {
+    const config = getResendConfig();
+
+    const response = await fetch(config.endpoint, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${config.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: config.from,
+        to: recipients,
+        subject,
+        text,
+      }),
+      signal: AbortSignal.timeout(config.timeoutMs),
+    });
+
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      throw new Error(`resend_${response.status}: ${detail.slice(0, 200)}`);
+    }
+
+    return recipients.length;
+  }
+
+  async sendViaSmtp({ recipients, subject, text }) {
     const transport = this.getTransport();
     const smtpConfig = this.getConfig();
 
     if (!transport || !smtpConfig) {
+      throw new Error('email_not_configured');
+    }
+
+    await transport.sendMail({
+      from: smtpConfig.from,
+      to: recipients.join(', '),
+      subject,
+      text,
+    });
+
+    return recipients.length;
+  }
+
+  async sendMail({ to, subject, text }) {
+    const provider = this.getProvider();
+    if (!provider) {
       throw new Error('email_not_configured');
     }
 
@@ -91,14 +141,9 @@ class EmailService {
       throw new Error('email_recipient_missing');
     }
 
-    await transport.sendMail({
-      from: smtpConfig.from,
-      to: recipients.join(', '),
-      subject,
-      text,
-    });
-
-    return recipients.length;
+    return provider === 'resend'
+      ? this.sendViaResend({ recipients, subject, text })
+      : this.sendViaSmtp({ recipients, subject, text });
   }
 
   // Reports, per resolved address, whether a TCP connection is even possible.
@@ -154,16 +199,38 @@ class EmailService {
   // that only says the variables are present. Performs an SMTP handshake and
   // AUTH exchange, then disconnects. No message is sent.
   async verifyTransport() {
-    const transport = this.getTransport();
-    if (!transport) {
-      return { verified: false, error: 'email_not_configured' };
+    const provider = this.getProvider();
+    if (!provider) {
+      return { provider: null, verified: false, error: 'email_not_configured' };
+    }
+
+    if (provider === 'resend') {
+      const config = getResendConfig();
+      try {
+        // Read-only: validates the key without sending anything.
+        const response = await fetch('https://api.resend.com/domains', {
+          headers: { Authorization: `Bearer ${config.apiKey}` },
+          signal: AbortSignal.timeout(config.timeoutMs),
+        });
+
+        return response.ok
+          ? { provider, verified: true, error: null }
+          : { provider, verified: false, error: `resend_${response.status}` };
+      } catch (error) {
+        return {
+          provider,
+          verified: false,
+          error: String(error?.message || 'resend_verify_failed').slice(0, 300),
+        };
+      }
     }
 
     try {
-      await transport.verify();
-      return { verified: true, error: null };
+      await this.getTransport().verify();
+      return { provider, verified: true, error: null };
     } catch (error) {
       return {
+        provider,
         verified: false,
         error: String(error?.message || 'smtp_verify_failed').slice(0, 300),
       };
