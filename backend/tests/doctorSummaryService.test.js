@@ -86,7 +86,7 @@ test('the patient-facing path still returns no model output', { concurrency: fal
 
 test('the chart sent to the model carries only what the patient supplied', { concurrency: false }, async () => {
   const { service, calls } = loadServiceWithMocks({
-    generate: async () => ({ text: 'S: ...' }),
+    generate: async () => ({ text: JSON.stringify({ soap: 'S: ...', replyDraft: '안녕하세요.' }) }),
   });
 
   await service.generate(PATIENT_DATA);
@@ -101,19 +101,28 @@ test('the chart sent to the model carries only what the patient supplied', { con
   assert.match(instruction, /진단명을 확정하지 마세요/);
   assert.match(instruction, /약물명, 용량, 복용법을 쓰지 마세요/);
   assert.match(instruction, /검사 지시/);
-  assert.match(instruction, /환자에게 전달할 문장을 쓰지 마세요/);
+  assert.match(instruction, /응급 여부를 단정하지 마세요/);
+  // The draft is written for a clinician to approve, never sent on its own.
+  assert.match(instruction, /환자에게 자동으로 전달되지 않습니다/);
 });
 
-test('a generated summary is labelled as an unverified draft', { concurrency: false }, async () => {
+test('a generated summary carries a SOAP note and a reply draft for approval', { concurrency: false }, async () => {
   const { service } = loadServiceWithMocks({
-    generate: async () => ({ text: '  S: 항문 주변 종괴감\nA: 확인 필요  ' }),
+    generate: async () => ({
+      text: JSON.stringify({
+        soap: '  S: 항문 주변 종괴감\nA: 확인 필요  ',
+        replyDraft: '  걱정되셨겠습니다. 말씀해 주신 내용을 확인했습니다.  ',
+      }),
+    }),
   });
 
   const summary = await service.generateSafely(PATIENT_DATA);
 
   assert.equal(summary.status, 'ready');
   assert.equal(summary.text, 'S: 항문 주변 종괴감\nA: 확인 필요');
+  assert.equal(summary.replyDraft, '걱정되셨겠습니다. 말씀해 주신 내용을 확인했습니다.');
   assert.match(summary.disclaimer, /진단·처방이 아니며 의료진 검토가 필요합니다/);
+  assert.match(summary.replyDraftDisclaimer, /의료진 검토 전에는 환자에게 전달되지 않습니다/);
   assert.equal(summary.model, 'gemini-2.5-flash');
 });
 
@@ -133,7 +142,7 @@ test('a model failure is recorded rather than thrown at the consultation', { con
 
 test('an empty model response yields no summary rather than an empty one', { concurrency: false }, async () => {
   const { service } = loadServiceWithMocks({
-    generate: async () => ({ text: '   ' }),
+    generate: async () => ({ text: JSON.stringify({ soap: '   ', replyDraft: '  ' }) }),
   });
 
   assert.equal(await service.generateSafely(PATIENT_DATA), null);

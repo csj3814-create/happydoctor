@@ -64,7 +64,7 @@ const policySections = [
         <p>서비스 제공에 필요한 범위에서 다음 사업자의 시스템을 사용할 수 있습니다. 실제 운영 계약과 기능 활성화 여부에 맞추어 수탁자 목록을 계속 갱신합니다.</p>
         <ul>
           <li><strong>Google Firebase / Google Cloud:</strong> 상담 데이터·사진 저장, 번역 등</li>
-          <li><strong>Google Gemini:</strong> 의료진이 문진 내용을 빠르게 파악하도록 SOAP 형식 요약 초안을 생성. 이 요약은 인증된 의료진 포털에서만 표시되며 환자에게 전달되지 않습니다. 자동 진단·처방·검사 지시는 생성하지 않으며, 모든 상담과 답변은 의료진이 직접 검토합니다.</li>
+          <li><strong>Google Gemini:</strong> 의료진이 문진 내용을 빠르게 파악하도록 SOAP 형식 요약과 답변 초안을 생성. 인증된 의료진 포털에서만 표시되며, 의료진이 검토·수정해 전송하기 전에는 환자에게 전달되지 않습니다. 자동 진단·처방·검사 지시는 생성하지 않으며, 모든 상담과 답변은 의료진이 직접 검토합니다.</li>
           <li><strong>Render:</strong> 백엔드 서버 운영</li>
           <li><strong>Vercel:</strong> 웹 화면 제공. 환자 화면의 Vercel Analytics는 사용하지 않습니다.</li>
           <li><strong>SOLAPI(누리고):</strong> 선택 동의한 이용자에게 답변 알림 문자 발송</li>

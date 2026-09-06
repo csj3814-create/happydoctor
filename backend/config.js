@@ -145,8 +145,7 @@ function getGeminiApiKey() {
   return getEnv('GEMINI_API_KEY');
 }
 
-// The patient-facing reply path stays free of any model output. This config
-// only governs the summary shown inside the authenticated doctor portal.
+// Governs the SOAP summary shown inside the authenticated doctor portal.
 function getDoctorSummaryConfig() {
   const apiKey = getGeminiApiKey();
 

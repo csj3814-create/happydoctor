@@ -657,6 +657,10 @@ async function saveAiDoctorSummary(consultationId, summary) {
     await db.collection('consultations').doc(consultationId).update({
       aiDoctorSummary: {
         text: summary.text || null,
+        // A draft for the clinician to edit and send. It never reaches the
+        // patient on its own: the portal reply route is the only sender.
+        replyDraft: summary.replyDraft || null,
+        replyDraftDisclaimer: summary.replyDraftDisclaimer || null,
         disclaimer: summary.disclaimer || null,
         model: summary.model || null,
         status: summary.status || 'ready',

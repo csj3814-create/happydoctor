@@ -1,5 +1,9 @@
 const DOCTOR_PORTAL_URL = 'https://portal.happydoctor.kr/open-browser?next=%2F';
 
+// This module is the patient-facing path and stays free of model output.
+// Commit d78e4e9 removed automated clinical replies to patients; the Bodeum
+// work that followed produces a draft for a clinician to approve, never text
+// that reaches a patient unreviewed. See services/doctorSummaryService.js.
 const INITIAL_PATIENT_REPLY = [
     '상담 내용이 접수되었습니다.',
     '자동 진단이나 치료 안내 없이 자원봉사 의료진이 직접 확인합니다.',
