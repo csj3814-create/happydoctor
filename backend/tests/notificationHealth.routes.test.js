@@ -414,3 +414,63 @@ test("the digest and health backlog use the portal's own unanswered filter", { c
     }
   });
 });
+
+test('the test-email route needs the key, uses POST, and mails only the configured recipients', { concurrency: false }, async () => {
+  await withEnv({ MESSENGER_API_KEY: MESSENGER_KEY }, async () => {
+    let called = 0;
+    const server = await startApp(loadAppWithMocks({
+      emailOverrides: {
+        isConfigured: () => true,
+        getProvider: () => 'resend',
+        sendTestEmail: async () => {
+          called += 1;
+          return { sent: true, provider: 'resend', recipientCount: 1, sentAt: '2026-09-04T00:00:00.000Z' };
+        },
+      },
+    }));
+
+    try {
+      const anonymous = await fetch(`${server.baseUrl}/api/notification-health/test-email`, { method: 'POST' });
+      assert.equal(anonymous.status, 401);
+      assert.equal(called, 0, 'an unauthenticated caller must not send mail');
+
+      const response = await fetch(`${server.baseUrl}/api/notification-health/test-email`, {
+        method: 'POST',
+        headers: { 'x-api-key': MESSENGER_KEY },
+      });
+      const body = await response.json();
+
+      assert.equal(response.status, 200);
+      assert.equal(body.sent, true);
+      assert.equal(called, 1);
+    } finally {
+      await server.close();
+    }
+  });
+});
+
+test('a failed test send answers with an error status rather than a false success', { concurrency: false }, async () => {
+  await withEnv({ MESSENGER_API_KEY: MESSENGER_KEY }, async () => {
+    const server = await startApp(loadAppWithMocks({
+      emailOverrides: {
+        isConfigured: () => true,
+        getProvider: () => 'resend',
+        sendTestEmail: async () => ({ sent: false, provider: 'resend', error: 'resend_403: domain not verified' }),
+      },
+    }));
+
+    try {
+      const response = await fetch(`${server.baseUrl}/api/notification-health/test-email`, {
+        method: 'POST',
+        headers: { 'x-api-key': MESSENGER_KEY },
+      });
+      const body = await response.json();
+
+      assert.equal(response.status, 502);
+      assert.equal(body.sent, false);
+      assert.match(body.error, /domain not verified/);
+    } finally {
+      await server.close();
+    }
+  });
+});

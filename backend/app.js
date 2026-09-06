@@ -277,6 +277,20 @@ function createApp() {
     }
   });
 
+  // Side-effecting, so POST and key-protected. Sends one message to the
+  // configured alert recipients and nobody else.
+  app.post('/api/notification-health/test-email', requireMessengerApiKey, async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+
+    try {
+      const result = await emailService.sendTestEmail();
+      return res.status(result.sent ? 200 : 502).json(result);
+    } catch (error) {
+      console.error('[Test Email Error]', error);
+      return res.status(500).json({ sent: false, error: 'test_email_failed' });
+    }
+  });
+
   app.get('/', (req, res) => {
     res.send('<h1>Happy Doctor Chatbot Server is running.</h1>');
   });

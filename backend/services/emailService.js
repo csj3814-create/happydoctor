@@ -252,6 +252,45 @@ class EmailService {
     }
   }
 
+  // Proves end to end that mail actually leaves and arrives. verifyTransport()
+  // only checks credentials; a verified sender can still be rejected at send
+  // time by an unverified domain.
+  async sendTestEmail() {
+    if (!this.isConfigured()) {
+      return { sent: false, error: 'email_not_configured' };
+    }
+
+    const recipients = getAlertEmailRecipients();
+    if (recipients.length === 0) {
+      return { sent: false, error: 'no_recipients_configured' };
+    }
+
+    const sentAt = new Date().toISOString();
+
+    try {
+      await this.sendMail({
+        to: recipients,
+        subject: '[해피닥터] 알림 메일 테스트',
+        text: [
+          '알림 메일 발송 경로가 정상 동작합니다.',
+          `발송 시각: ${sentAt}`,
+          `발송 방식: ${this.getProvider()}`,
+          '',
+          '이 메일은 설정 확인용이며 환자 상담과 무관합니다.',
+          '앞으로 새 상담 접수, 미답변 요약, 카카오 알림 봇 중단 경고가 이 주소로 도착합니다.',
+        ].join('\n'),
+      });
+
+      return { sent: true, provider: this.getProvider(), recipientCount: recipients.length, sentAt };
+    } catch (error) {
+      return {
+        sent: false,
+        provider: this.getProvider(),
+        error: String(error?.message || 'send_failed').slice(0, 300),
+      };
+    }
+  }
+
   // Every doctor alert also goes out by mail so a stopped MessengerBot phone
   // can no longer swallow the entire notification chain.
   async sendDoctorAlertEmail({ patientId, type, priority } = {}) {
