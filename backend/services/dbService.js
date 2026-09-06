@@ -391,7 +391,10 @@ async function upsertDoctorAccessRequest(profile = {}) {
   try {
     const snapshot = await ref.get();
     const current = snapshot.exists ? snapshot.data() || {} : {};
-    const alreadyApproved = current.status === 'approved';
+    // This runs on every login. A decision the representative already made -
+    // approved or rejected - must survive it, or a rejected account would
+    // reappear in the queue the next time it signs in.
+    const alreadyDecided = current.status === 'approved' || current.status === 'rejected';
 
     const payload = {
       email: normalizedEmail,
@@ -404,7 +407,7 @@ async function upsertDoctorAccessRequest(profile = {}) {
     if (!snapshot.exists) {
       payload.status = 'pending';
       payload.requestedAt = admin.firestore.FieldValue.serverTimestamp();
-    } else if (!alreadyApproved) {
+    } else if (!alreadyDecided) {
       payload.status = 'pending';
     }
 
@@ -459,6 +462,37 @@ async function approveDoctorAccessRequest(email, approver = null) {
     email,
     name: existing.name || email,
   }, approver);
+}
+
+// Kept as a record rather than deleted: the account keeps its rejected state
+// so it cannot re-enter the queue, and the decision stays auditable.
+async function rejectDoctorAccessRequest(email, reviewer = null, reason = '') {
+  const normalizedEmail = normalizeDoctorEmail(email);
+  if (!db || !normalizedEmail) return null;
+
+  const existing = await getDoctorAccessRecordByEmail(normalizedEmail);
+  if (!existing || existing.status !== 'pending') {
+    return null;
+  }
+
+  const ref = getDoctorAccessRequestRef(normalizedEmail);
+  if (!ref) return null;
+
+  try {
+    await ref.set({
+      status: 'rejected',
+      rejectedAt: admin.firestore.FieldValue.serverTimestamp(),
+      rejectedByEmail: normalizeDoctorEmail(reviewer?.email) || 'system',
+      rejectedByName: reviewer?.name || 'System',
+      rejectionReason: typeof reason === 'string' ? reason.trim().slice(0, 300) : '',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    return getDoctorAccessRecordByEmail(normalizedEmail);
+  } catch (error) {
+    console.error('[DB DoctorAccess Reject Error]', error);
+    return null;
+  }
 }
 
 async function listPendingDoctorAccessRequests() {
@@ -2004,6 +2038,7 @@ module.exports = {
   getHDTLeaderboard,
   getDoctorStats,
   getDoctorAccessRecordByEmail,
+  rejectDoctorAccessRequest,
   upsertDoctorAccessRequest,
   ensureApprovedDoctorAccess,
   approveDoctorAccessRequest,

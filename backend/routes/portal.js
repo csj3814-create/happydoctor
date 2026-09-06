@@ -10,6 +10,7 @@ const {
   getHDTLeaderboard,
   getDoctorStats,
   getDoctorAccessRecordByEmail,
+  rejectDoctorAccessRequest,
   upsertDoctorAccessRequest,
   ensureApprovedDoctorAccess,
   approveDoctorAccessRequest,
@@ -431,6 +432,33 @@ router.post('/admin/doctor-requests/:email/approve', requireAdminAuth, async (re
   } catch (error) {
     console.error('[Portal Approve Error]', error);
     return res.status(500).json({ error: '의료진 승인 처리에 실패했습니다.' });
+  }
+});
+
+router.post('/admin/doctor-requests/:email/reject', requireAdminAuth, async (req, res) => {
+  try {
+    const email = normalizeEmail(req.params.email);
+    if (!email) {
+      return res.status(400).json({ error: '거절할 이메일을 다시 확인해 주세요.' });
+    }
+
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason : '';
+    const rejected = await rejectDoctorAccessRequest(email, req.doctor, reason);
+    if (!rejected) {
+      return res.status(404).json({ error: '승인 대기 중인 의료진을 찾지 못했습니다.' });
+    }
+
+    const pendingRequests = await listPendingDoctorAccessRequests();
+    console.log(`[Portal] ${req.doctor.email} rejected doctor access for ${email}`);
+
+    return res.json({
+      ok: true,
+      rejected: serializeTimestamps(rejected),
+      pendingRequests: pendingRequests.map(serializeTimestamps),
+    });
+  } catch (error) {
+    console.error('[Portal Reject Error]', error);
+    return res.status(500).json({ error: '의료진 신청 거절 처리에 실패했습니다.' });
   }
 });
 

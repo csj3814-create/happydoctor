@@ -1829,3 +1829,123 @@ test('the AI summary is stored on the consultation and never reaches the doctor 
     routeModule.restore();
   }
 });
+
+test('portal reject route marks a pending doctor rejected and drops it from the queue', { concurrency: false }, async () => {
+  const calls = [];
+  const routeModule = loadRouteWithMocks(PORTAL_ROUTE_PATH, {
+    [DB_SERVICE_PATH]: {
+      getActiveConsultations: async () => ({ consultations: [], total: 0 }),
+      getConsultationSummary: async () => ({ pending: 0, replied: 0, closed: 0, followUp: 0 }),
+      getConsultationById: async () => null,
+      saveDoctorReply: async () => null,
+      getConsultationTrackingById: async () => null,
+      awardHDT: async () => {},
+      getDoctorStats: async () => null,
+      getAdmin: () => ({
+        auth() {
+          return {
+            verifyIdToken: async () => ({ uid: 'admin-uid', email: 'admin@happydoctor.kr', name: '대표' }),
+          };
+        },
+      }),
+      getDoctorAccessRecordByEmail: async () => ({ email: 'admin@happydoctor.kr', status: 'approved' }),
+      upsertDoctorAccessRequest: async () => null,
+      ensureApprovedDoctorAccess: async (doctor) => ({ status: 'approved', email: doctor.email }),
+      approveDoctorAccessRequest: async () => null,
+      rejectDoctorAccessRequest: async (email, reviewer, reason) => {
+        calls.push({ type: 'reject', email, reviewer: reviewer?.email, reason });
+        return { email, status: 'rejected', rejectionReason: reason };
+      },
+      listPendingDoctorAccessRequests: async () => [],
+      HDT_REPLY: 50,
+    },
+    [NOTIFY_SERVICE_PATH]: {
+      enqueuePatientChannelPush: async () => true,
+      clearDoctorNotifications: async () => {},
+    },
+    [FOLLOW_UP_SERVICE_PATH]: { cancelFollowUp: async () => {} },
+    [CONFIG_PATH]: {
+      appSiteUrl: 'https://app.happydoctor.kr',
+      getDoctorSummaryConfig: () => ({ enabled: false }),
+      getAllowedDoctorEmails: () => ['admin@happydoctor.kr'],
+      getPortalAdminEmails: () => ['admin@happydoctor.kr'],
+    },
+  });
+
+  const server = await startServer(routeModule.router, '/api/portal');
+
+  try {
+    const response = await postJson(
+      `${server.baseUrl}/admin/doctor-requests/nsb0927%40gmail.com/reject`,
+      { reason: '연락이 닿지 않음' },
+      { headers: { Authorization: 'Bearer portal-token' } },
+    );
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.ok, true);
+    assert.equal(response.body.rejected.status, 'rejected');
+    assert.deepEqual(response.body.pendingRequests, []);
+
+    const rejectCall = calls.find((entry) => entry.type === 'reject');
+    assert.equal(rejectCall.email, 'nsb0927@gmail.com');
+    assert.equal(rejectCall.reviewer, 'admin@happydoctor.kr');
+    assert.equal(rejectCall.reason, '연락이 닿지 않음');
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});
+
+test('rejecting someone who is not pending answers 404 rather than inventing a record', { concurrency: false }, async () => {
+  const routeModule = loadRouteWithMocks(PORTAL_ROUTE_PATH, {
+    [DB_SERVICE_PATH]: {
+      getActiveConsultations: async () => ({ consultations: [], total: 0 }),
+      getConsultationSummary: async () => ({ pending: 0, replied: 0, closed: 0, followUp: 0 }),
+      getConsultationById: async () => null,
+      saveDoctorReply: async () => null,
+      getConsultationTrackingById: async () => null,
+      awardHDT: async () => {},
+      getDoctorStats: async () => null,
+      getAdmin: () => ({
+        auth() {
+          return {
+            verifyIdToken: async () => ({ uid: 'admin-uid', email: 'admin@happydoctor.kr', name: '대표' }),
+          };
+        },
+      }),
+      getDoctorAccessRecordByEmail: async () => ({ email: 'admin@happydoctor.kr', status: 'approved' }),
+      upsertDoctorAccessRequest: async () => null,
+      ensureApprovedDoctorAccess: async (doctor) => ({ status: 'approved', email: doctor.email }),
+      approveDoctorAccessRequest: async () => null,
+      rejectDoctorAccessRequest: async () => null,
+      listPendingDoctorAccessRequests: async () => [],
+      HDT_REPLY: 50,
+    },
+    [NOTIFY_SERVICE_PATH]: {
+      enqueuePatientChannelPush: async () => true,
+      clearDoctorNotifications: async () => {},
+    },
+    [FOLLOW_UP_SERVICE_PATH]: { cancelFollowUp: async () => {} },
+    [CONFIG_PATH]: {
+      appSiteUrl: 'https://app.happydoctor.kr',
+      getDoctorSummaryConfig: () => ({ enabled: false }),
+      getAllowedDoctorEmails: () => ['admin@happydoctor.kr'],
+      getPortalAdminEmails: () => ['admin@happydoctor.kr'],
+    },
+  });
+
+  const server = await startServer(routeModule.router, '/api/portal');
+
+  try {
+    const response = await postJson(
+      `${server.baseUrl}/admin/doctor-requests/nobody%40example.com/reject`,
+      {},
+      { headers: { Authorization: 'Bearer portal-token' } },
+    );
+
+    assert.equal(response.status, 404);
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});

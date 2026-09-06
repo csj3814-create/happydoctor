@@ -234,6 +234,21 @@ export async function getPortalAuthStatus(): Promise<PortalAuthStatus> {
   return res.json();
 }
 
+export async function rejectDoctorRequest(email: string, reason?: string): Promise<{
+  ok: boolean
+  rejected: DoctorAccessRequest
+  pendingRequests: DoctorAccessRequest[]
+}> {
+  const headers = await authHeader();
+  const res = await fetch(`${BASE}/api/portal/admin/doctor-requests/${encodeURIComponent(email)}/reject`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason: reason || '' }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return res.json();
+}
+
 export async function approveDoctorRequest(email: string): Promise<{
   ok: boolean
   approved: DoctorAccessRequest

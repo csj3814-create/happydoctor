@@ -12,6 +12,7 @@ import {
   DoctorStats,
   PortalAuthStatus,
   approveDoctorRequest,
+  rejectDoctorRequest,
   getConsultationPage as fetchConsultationPage,
   getConsultationSummary as fetchConsultationSummary,
   getLeaderboard,
@@ -209,11 +210,15 @@ function SummaryShortcutCard({
 function ApprovalQueueCard({
   pendingRequests,
   approvingEmail,
+  rejectingEmail,
   onApprove,
+  onReject,
 }: {
   pendingRequests: DoctorAccessRequest[]
   approvingEmail: string | null
+  rejectingEmail: string | null
   onApprove: (email: string) => Promise<void>
+  onReject: (email: string) => Promise<void>
 }) {
   return (
     <section className="rounded-2xl border border-blue-200 bg-blue-50/70 p-5 shadow-sm">
@@ -250,13 +255,22 @@ function ApprovalQueueCard({
                     <span>최근 로그인 {formatDateTime(request.lastLoginAt)}</span>
                   </div>
                 </div>
-                <button
-                  onClick={() => onApprove(request.email)}
-                  disabled={approvingEmail === request.email}
-                  className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
-                >
-                  {approvingEmail === request.email ? '승인 중...' : '승인'}
-                </button>
+                <div className="flex shrink-0 gap-2">
+                  <button
+                    onClick={() => onReject(request.email)}
+                    disabled={approvingEmail === request.email || rejectingEmail === request.email}
+                    className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-600 transition hover:border-red-300 hover:text-red-600 disabled:cursor-not-allowed disabled:text-zinc-300"
+                  >
+                    {rejectingEmail === request.email ? '거절 중...' : '거절'}
+                  </button>
+                  <button
+                    onClick={() => onApprove(request.email)}
+                    disabled={approvingEmail === request.email || rejectingEmail === request.email}
+                    className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                  >
+                    {approvingEmail === request.email ? '승인 중...' : '승인'}
+                  </button>
+                </div>
               </div>
             </li>
           ))}
@@ -313,6 +327,7 @@ export default function HomePage() {
   const [portalAuth, setPortalAuth] = useState<PortalAuthStatus | null>(null)
   const [pendingRequests, setPendingRequests] = useState<DoctorAccessRequest[]>([])
   const [approvingEmail, setApprovingEmail] = useState<string | null>(null)
+  const [rejectingEmail, setRejectingEmail] = useState<string | null>(null)
   const [consultations, setConsultations] = useState<Consultation[]>([])
   const [summary, setSummary] = useState<ConsultationSummary>(EMPTY_SUMMARY)
   const [totalConsultations, setTotalConsultations] = useState(0)
@@ -496,6 +511,30 @@ export default function HomePage() {
     }
   }
 
+  async function handleReject(email: string) {
+    // Irreversible from this screen, and it stops the account re-entering the
+    // queue on its next login, so it asks first.
+    const confirmed = window.confirm(
+      `${email} 의 의료진 신청을 거절합니다.
+
+이 계정은 다시 로그인해도 승인 대기 목록에 나타나지 않습니다. 나중에 승인하려면 직접 상태를 되돌려야 합니다.
+
+진행할까요?`,
+    )
+    if (!confirmed) return
+
+    setRejectingEmail(email)
+    setError(null)
+    try {
+      const payload = await rejectDoctorRequest(email)
+      setPendingRequests(payload.pendingRequests || [])
+    } catch (rejectError) {
+      setError(rejectError instanceof Error ? rejectError.message : '의료진 신청 거절에 실패했습니다.')
+    } finally {
+      setRejectingEmail(null)
+    }
+  }
+
   const consultTabs: { key: Tab; label: string }[] = [
     { key: 'pending', label: '미답변' },
     { key: 'followup', label: 'Follow-up' },
@@ -584,7 +623,13 @@ export default function HomePage() {
         ) : null}
 
         {portalAuth?.isAdmin ? (
-          <ApprovalQueueCard pendingRequests={pendingRequests} approvingEmail={approvingEmail} onApprove={handleApprove} />
+          <ApprovalQueueCard
+            pendingRequests={pendingRequests}
+            approvingEmail={approvingEmail}
+            rejectingEmail={rejectingEmail}
+            onApprove={handleApprove}
+            onReject={handleReject}
+          />
         ) : null}
 
         {isApprovedDoctor ? (
