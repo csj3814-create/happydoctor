@@ -217,9 +217,15 @@ class EmailService {
           return { provider, verified: true, error: null };
         }
 
-        // The status alone cannot tell a bad key from a send-only key, which
-        // is rejected here but would deliver mail perfectly well.
         const detail = await response.text().catch(() => '');
+
+        // A send-only key is rejected by the domains endpoint, but that
+        // rejection is itself proof the key authenticated: an invalid key
+        // fails differently. Such a key delivers mail perfectly well.
+        if (detail.includes('restricted_api_key')) {
+          return { provider, verified: true, error: null, scope: 'sending_only' };
+        }
+
         return {
           provider,
           verified: false,

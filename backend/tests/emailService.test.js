@@ -282,3 +282,58 @@ test('an API rejection surfaces its status instead of failing silently', { concu
     global.fetch = originalFetch;
   }
 });
+
+test('a send-only key counts as verified, because its rejection proves it authenticated', { concurrency: false }, async () => {
+  const originalFetch = global.fetch;
+  global.fetch = async () => ({
+    ok: false,
+    status: 401,
+    text: async () => JSON.stringify({
+      statusCode: 401,
+      message: 'This API key is restricted to only send emails',
+      name: 'restricted_api_key',
+    }),
+  });
+
+  try {
+    const emailService = loadEmailServiceWithMocks({
+      smtpConfig: null,
+      resendConfig: RESEND_CONFIG,
+      recipients: ['doctor@happydoctor.kr'],
+      sentMails: [],
+    });
+
+    const result = await emailService.verifyTransport();
+
+    assert.equal(result.verified, true);
+    assert.equal(result.scope, 'sending_only');
+    assert.equal(result.error, null);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('a genuinely invalid key is still reported as unverified', { concurrency: false }, async () => {
+  const originalFetch = global.fetch;
+  global.fetch = async () => ({
+    ok: false,
+    status: 401,
+    text: async () => JSON.stringify({ statusCode: 401, message: 'API key is invalid', name: 'validation_error' }),
+  });
+
+  try {
+    const emailService = loadEmailServiceWithMocks({
+      smtpConfig: null,
+      resendConfig: RESEND_CONFIG,
+      recipients: ['doctor@happydoctor.kr'],
+      sentMails: [],
+    });
+
+    const result = await emailService.verifyTransport();
+
+    assert.equal(result.verified, false);
+    assert.match(result.error, /API key is invalid/);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
