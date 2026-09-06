@@ -42,6 +42,24 @@ const SYSTEM_INSTRUCTION = [
 const SUMMARY_DISCLAIMER = 'AI가 환자 입력만으로 정리한 초안입니다. 진단·처방이 아니며 의료진 검토가 필요합니다.';
 const REPLY_DRAFT_DISCLAIMER = '의료진 검토 전에는 환자에게 전달되지 않습니다. 확인 후 수정하여 보내 주세요.';
 
+// The model returns a SOAP string when asked plainly, but an object keyed by
+// S/O/A/P when it has been thinking. String() on that yields "[object Object]".
+function coerceText(value) {
+  if (typeof value === 'string') return value.trim();
+  if (Array.isArray(value)) return value.map(coerceText).filter(Boolean).join('\n');
+  if (value && typeof value === 'object') {
+    return Object.entries(value)
+      .map(([key, entry]) => {
+        const text = coerceText(entry);
+        return text ? `${key}: ${text}` : '';
+      })
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  return '';
+}
+
 function parseModelJson(raw) {
   const text = typeof raw === 'string' ? raw.trim() : '';
   if (!text) return null;
@@ -119,13 +137,18 @@ class DoctorSummaryService {
         temperature: 0.2,
         maxOutputTokens: config.maxOutputTokens,
         responseMimeType: 'application/json',
+        // Gemini 2.5 charges internal reasoning against maxOutputTokens. At the
+        // previous budget it spent 1,149 tokens thinking and had 37 left, which
+        // truncated the JSON mid-object and silently produced no summary. This
+        // is structured extraction, not reasoning, so the budget buys nothing.
+        thinkingConfig: { thinkingBudget: 0 },
         abortSignal: AbortSignal.timeout(config.timeoutMs),
       },
     });
 
     const parsed = parseModelJson(response?.text);
-    const soap = String(parsed?.soap || '').trim();
-    const replyDraft = String(parsed?.replyDraft || '').trim();
+    const soap = coerceText(parsed?.soap);
+    const replyDraft = coerceText(parsed?.replyDraft);
     if (!soap && !replyDraft) return null;
 
     return {
@@ -161,6 +184,7 @@ class DoctorSummaryService {
 module.exports = new DoctorSummaryService();
 module.exports.DoctorSummaryService = DoctorSummaryService;
 module.exports.buildPatientChartText = buildPatientChartText;
+module.exports.coerceText = coerceText;
 module.exports.SUMMARY_DISCLAIMER = SUMMARY_DISCLAIMER;
 module.exports.REPLY_DRAFT_DISCLAIMER = REPLY_DRAFT_DISCLAIMER;
 module.exports.SYSTEM_INSTRUCTION = SYSTEM_INSTRUCTION;

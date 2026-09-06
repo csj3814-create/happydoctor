@@ -154,7 +154,7 @@ function getDoctorSummaryConfig() {
     apiKey,
     model: getEnv('DOCTOR_SUMMARY_MODEL', 'gemini-2.5-flash'),
     timeoutMs: getNumberEnv('DOCTOR_SUMMARY_TIMEOUT_MS', 20 * 1000, { min: 1000, integer: true }),
-    maxOutputTokens: getNumberEnv('DOCTOR_SUMMARY_MAX_TOKENS', 1200, { min: 128, integer: true }),
+    maxOutputTokens: getNumberEnv('DOCTOR_SUMMARY_MAX_TOKENS', 2048, { min: 128, integer: true }),
   };
 }
 

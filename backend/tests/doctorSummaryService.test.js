@@ -167,3 +167,43 @@ test('an empty chart is not sent to the model at all', { concurrency: false }, a
   assert.equal(await service.generate({ age: '   ', cc: '' }), null);
   assert.deepEqual(calls.filter((entry) => entry.type === 'generateContent'), []);
 });
+
+test('internal reasoning is switched off so it cannot eat the output budget', { concurrency: false }, async () => {
+  const { service, calls } = loadServiceWithMocks({
+    generate: async () => ({ text: JSON.stringify({ soap: 'S: ...', replyDraft: '안녕하세요.' }) }),
+  });
+
+  await service.generate(PATIENT_DATA);
+
+  const call = calls.find((entry) => entry.type === 'generateContent');
+  // Gemini 2.5 charges thinking against maxOutputTokens. At 1200 it spent 1,149
+  // tokens reasoning, left 37 for output, and truncated the JSON mid-object.
+  assert.deepEqual(call.request.config.thinkingConfig, { thinkingBudget: 0 });
+  assert.equal(call.request.config.responseMimeType, 'application/json');
+});
+
+test('a SOAP note returned as an object is flattened, not stringified', { concurrency: false }, async () => {
+  const { service } = loadServiceWithMocks({
+    // What the model actually returns when it has been thinking.
+    generate: async () => ({
+      text: JSON.stringify({
+        soap: { S: '마른기침 3일', O: '환자 입력 없음', A: '확인 필요', P: '추가 문진' },
+        replyDraft: '안녕하세요.',
+      }),
+    }),
+  });
+
+  const summary = await service.generateSafely(PATIENT_DATA);
+
+  assert.equal(summary.text, ['S: 마른기침 3일', 'O: 환자 입력 없음', 'A: 확인 필요', 'P: 추가 문진'].join('\n'));
+  assert.ok(!summary.text.includes('[object Object]'));
+});
+
+test('truncated JSON yields no summary rather than a corrupt one', { concurrency: false }, async () => {
+  const { service } = loadServiceWithMocks({
+    // Exactly what the token exhaustion produced: a JSON object cut mid-value.
+    generate: async () => ({ text: '{   "soap": {     "S": "40-59세 여성 환자가 3일 전부터' }),
+  });
+
+  assert.equal(await service.generateSafely(PATIENT_DATA), null);
+});
