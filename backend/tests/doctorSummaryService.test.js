@@ -104,6 +104,10 @@ test('the chart sent to the model carries only what the patient supplied', { con
   assert.match(instruction, /응급 여부를 단정하지 마세요/);
   // The draft is written for a clinician to approve, never sent on its own.
   assert.match(instruction, /환자에게 자동으로 전달되지 않습니다/);
+  // A clinician sends the draft under their own name, so it must not introduce
+  // itself as the AI intern the way the first version of this prompt did.
+  assert.match(instruction, /자기소개나 서명을 쓰지 마세요/);
+  assert.match(instruction, /작성자를 밝히는 표현을 쓰지 마세요/);
 });
 
 test('a generated summary carries a SOAP note and a reply draft for approval', { concurrency: false }, async () => {
