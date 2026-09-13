@@ -43,6 +43,19 @@ export interface PatientNotificationContact {
   consentedAt?: string | null;
 }
 
+// Doctor-facing only. The backend never sends these fields to a patient; the
+// portal reply form is the only path by which any of this text can reach one.
+export interface AiDoctorSummary {
+  text?: string | null;
+  replyDraft?: string | null;
+  disclaimer?: string | null;
+  replyDraftDisclaimer?: string | null;
+  model?: string | null;
+  status?: 'ready' | 'failed' | string | null;
+  error?: string | null;
+  generatedAt?: string | null;
+}
+
 export interface ConsultationMediaItem {
   id?: string | null;
   kind?: string;
@@ -79,6 +92,7 @@ export interface Consultation {
   doctorRepliedAt?: string;
   mediaItems?: ConsultationMediaItem[];
   patientNotificationContact?: PatientNotificationContact | null;
+  aiDoctorSummary?: AiDoctorSummary | null;
 }
 
 export type ConsultationStatus = 'all' | 'active' | 'followup' | 'replied' | 'closed';

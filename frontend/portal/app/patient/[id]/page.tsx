@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { onAuthStateChanged, User } from 'firebase/auth'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -15,6 +15,7 @@ import {
   getConsultations,
   postReply,
 } from '@/lib/api'
+import { AiDoctorSummarySection } from './AiDoctorSummarySection'
 
 function formatDate(iso: string): string {
   const parsed = new Date(iso)
@@ -241,6 +242,8 @@ export default function PatientPage({ params }: PatientPageProps) {
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [fallbackNotice, setFallbackNotice] = useState<string | null>(null)
   const [replyText, setReplyText] = useState('')
+  const [draftNotice, setDraftNotice] = useState<string | null>(null)
+  const replyFieldRef = useRef<HTMLTextAreaElement | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitSuccess, setSubmitSuccess] = useState(false)
@@ -375,6 +378,21 @@ export default function PatientPage({ params }: PatientPageProps) {
   )
   const doctorFacingPatientData = consultation ? getDoctorFacingPatientData(consultation) : null
 
+  // Puts the draft in the reply form. It still needs a clinician to read it and
+  // press send, so anything already typed is never discarded without asking.
+  function handleUseDraft(draft: string) {
+    const current = replyText.trim()
+    if (current && current !== draft.trim()) {
+      const replace = window.confirm('작성 중인 답변이 있습니다. 보듬이 초안으로 바꿀까요?')
+      if (!replace) return
+    }
+
+    setReplyText(draft)
+    setSubmitSuccess(false)
+    setDraftNotice('보듬이 초안을 답변란에 넣었습니다. 내용을 확인하고 고쳐서 보내 주세요.')
+    replyFieldRef.current?.focus()
+  }
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
     if (!patientId || !replyText.trim() || derivedState.closed || fallbackNotice) return
@@ -385,6 +403,7 @@ export default function PatientPage({ params }: PatientPageProps) {
     try {
       await postReply(patientId, replyText.trim())
       setReplyText('')
+      setDraftNotice(null)
       setSubmitSuccess(true)
       const updated = await getConsultation(patientId)
       setConsultation(updated)
@@ -707,6 +726,14 @@ export default function PatientPage({ params }: PatientPageProps) {
               )}
             </section>
 
+            {consultation.aiDoctorSummary ? (
+              <AiDoctorSummarySection
+                summary={consultation.aiDoctorSummary}
+                onUseDraft={handleUseDraft}
+                canUseDraft={!derivedState.closed && !fallbackNotice && !submitting}
+              />
+            ) : null}
+
             <section className="rounded-2xl border border-zinc-200 bg-white px-5 py-5 shadow-sm">
               <div className="mb-4 flex flex-col gap-1">
                 <h2 className="text-sm font-bold text-zinc-800">답변 전송</h2>
@@ -730,6 +757,7 @@ export default function PatientPage({ params }: PatientPageProps) {
               </div>
               <form onSubmit={handleSubmit} className="flex flex-col gap-3">
                 <textarea
+                  ref={replyFieldRef}
                   value={replyText}
                   onChange={(event) => setReplyText(event.target.value)}
                   placeholder={
@@ -743,6 +771,12 @@ export default function PatientPage({ params }: PatientPageProps) {
                   disabled={submitting || derivedState.closed || Boolean(fallbackNotice)}
                   className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-800 placeholder:text-zinc-400 transition focus:border-blue-400 focus:bg-white focus:outline-none disabled:opacity-50"
                 />
+
+                {draftNotice && replyText.trim() ? (
+                  <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    {draftNotice}
+                  </p>
+                ) : null}
 
                 {submitError ? (
                   <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
