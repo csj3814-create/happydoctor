@@ -592,9 +592,12 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
   // Shown only while the consultation itself has not loaded yet; once it has,
   // the acknowledgement appears as the first notice in the thread.
   const chatbotReply = consultation?.chatbotReply || sessionChatbotReply
+  // Any open consultation can be ended. Someone whose symptom resolved while
+  // waiting should not have to wait for an answer they no longer need.
   const canCloseConsultation = consultation
-    ? consultation.status === 'doctor_replied' && !consultation.closedAt
+    ? consultation.status !== 'closed' && !consultation.closedAt
     : false
+  const hasDoctorReply = Boolean(consultation && consultation.doctorReplies.length > 0)
 
   // Message box first, then the way out of the conversation - the order a
   // patient meets them in: write another question, or finish here.
@@ -616,6 +619,7 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
         canClose={canCloseConsultation}
         isClosed={consultation?.status === 'closed'}
         uiLanguage={uiLanguage}
+        answered={hasDoctorReply}
         compact
         onUpdated={() => setRefreshKey((current) => current + 1)}
       />

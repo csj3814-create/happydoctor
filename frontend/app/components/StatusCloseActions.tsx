@@ -10,6 +10,8 @@ type StatusCloseActionsProps = {
   canClose: boolean
   isClosed: boolean
   uiLanguage: UiLanguage
+  // Only an answered consultation can be closed "after reading the reply".
+  answered?: boolean
   // Rendered inside the conversation card, under the message box, so it drops
   // the card chrome and the explanation that would repeat what is on screen.
   compact?: boolean
@@ -29,6 +31,7 @@ const copyByLanguage = {
     followUpSubmit: '전송',
     closeSending: '상담을 종료하고 있습니다...',
     closeSubmit: '답변 확인 후 상담 종료',
+    closeSubmitUnanswered: '상담 종료',
     closeSuccess: '상담이 종료되었습니다. 다시 도움이 필요하면 새 상담을 시작해 주세요.',
     closeError: '상담을 종료하지 못했습니다. 잠시 후 다시 시도해 주세요.',
     followUpSuccess:
@@ -47,6 +50,7 @@ const copyByLanguage = {
     followUpSubmit: 'Send',
     closeSending: 'Closing the consultation...',
     closeSubmit: 'Close consultation',
+    closeSubmitUnanswered: 'Close consultation',
     closeSuccess: 'This consultation is now closed. Please start a new one if you need more help.',
     closeError: 'We could not close the consultation right now. Please try again shortly.',
     followUpSuccess:
@@ -153,6 +157,7 @@ export default function StatusCloseActions({
   canClose,
   isClosed,
   uiLanguage,
+  answered = false,
   compact = false,
   onUpdated,
 }: StatusCloseActionsProps) {
@@ -224,7 +229,7 @@ export default function StatusCloseActions({
       className="w-full rounded-[1.2rem] bg-[var(--navy)] px-5 py-3 text-sm font-semibold text-white visited:text-white transition hover:bg-[#123c67] disabled:cursor-not-allowed disabled:bg-slate-400"
       style={{ color: '#ffffff' }}
     >
-      {closing ? copy.closeSending : copy.closeSubmit}
+      {closing ? copy.closeSending : (answered ? copy.closeSubmit : copy.closeSubmitUnanswered)}
     </button>
   )
 
