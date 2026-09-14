@@ -129,3 +129,80 @@ test('an empty summary is not written to the consultation', { concurrency: false
     restore();
   }
 });
+
+test('a follow-up draft answers the new question with the chart as context', { concurrency: false }, async () => {
+  const calls = [];
+  const originalLoad = Module._load;
+
+  Module._load = function patchedLoad(request, parent, isMain) {
+    const resolved = (() => {
+      try {
+        return Module._resolveFilename(request, parent, isMain);
+      } catch (error) {
+        return request;
+      }
+    })();
+
+    if (resolved === DB_SERVICE_PATH) {
+      return {
+        getConsultationById: async (id) => {
+          calls.push({ type: 'load', id });
+          return {
+            id,
+            patientData: { cc: '복통' },
+            translatedPatientDataKo: null,
+            doctorReplies: [{ message: '첫 답변입니다.' }, { message: '두 번째 답변입니다.' }],
+          };
+        },
+        saveAiFollowUpDraft: async (consultationId, draft) => {
+          calls.push({ type: 'save', consultationId, draft });
+          return true;
+        },
+      };
+    }
+
+    if (resolved === SUMMARY_SERVICE_PATH) {
+      return {
+        isEnabled: () => true,
+        generateFollowUpSafely: async (input) => {
+          calls.push({ type: 'generate', input });
+          return { question: input.question, replyDraft: '초안입니다.', status: 'ready' };
+        },
+      };
+    }
+
+    return originalLoad(request, parent, isMain);
+  };
+
+  delete require.cache[SCHEDULER_PATH];
+  const scheduler = require(SCHEDULER_PATH);
+
+  try {
+    scheduler.scheduleFollowUpDraft('consult-fu', '약은 언제까지 먹나요?');
+    await flush();
+    await flush();
+
+    assert.deepEqual(calls.map((call) => call.type), ['load', 'generate', 'save']);
+    assert.equal(calls[1].input.question, '약은 언제까지 먹나요?');
+    assert.deepEqual(calls[1].input.patientData, { cc: '복통' });
+    // The most recent reply is the context that matters, not the first one.
+    assert.equal(calls[1].input.priorReply, '두 번째 답변입니다.');
+    assert.equal(calls[2].consultationId, 'consult-fu');
+    assert.equal(calls[2].draft.replyDraft, '초안입니다.');
+  } finally {
+    Module._load = originalLoad;
+    delete require.cache[SCHEDULER_PATH];
+  }
+});
+
+test('no follow-up draft is attempted without a question', { concurrency: false }, async () => {
+  const { scheduler, calls, restore } = loadSchedulerWithMocks({});
+
+  try {
+    scheduler.scheduleFollowUpDraft('consult-fu', '   ');
+    await flush();
+    assert.deepEqual(calls, []);
+  } finally {
+    restore();
+  }
+});

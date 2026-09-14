@@ -697,6 +697,34 @@ async function logConsultation(userId, patientData, analysisResult, options = {}
 // Stored on the consultation, never on the notification message: doctor alerts
 // travel through KakaoTalk and ordinary inboxes, so health information stays
 // behind portal authentication.
+// Kept separate from aiDoctorSummary rather than overwriting it: the intake
+// SOAP note stays valid after a follow-up, and the clinician needs both. Only
+// the latest question is held, because that is the one being answered.
+async function saveAiFollowUpDraft(consultationId, draft) {
+  if (!db || !consultationId || !draft) return false;
+
+  try {
+    await db.collection('consultations').doc(consultationId).update({
+      aiFollowUpDraft: {
+        question: draft.question || null,
+        // Never sent on its own. The portal reply route remains the only sender.
+        replyDraft: draft.replyDraft || null,
+        disclaimer: draft.disclaimer || null,
+        replyDraftDisclaimer: draft.replyDraftDisclaimer || null,
+        model: draft.model || null,
+        status: draft.status || 'ready',
+        error: draft.error || null,
+        generatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+    });
+
+    return true;
+  } catch (error) {
+    console.error('[DB AI Follow-Up Draft Error]', error);
+    return false;
+  }
+}
+
 async function saveAiDoctorSummary(consultationId, summary) {
   if (!db || !consultationId || !summary) return false;
 
@@ -2049,6 +2077,7 @@ module.exports = {
   logConsultation,
   logFollowUp,
   saveAiDoctorSummary,
+  saveAiFollowUpDraft,
   closeConsultation,
   saveDoctorReply,
   getPendingDoctorReply,

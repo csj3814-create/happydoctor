@@ -41,6 +41,38 @@ const SYSTEM_INSTRUCTION = [
   '[출력] 반드시 JSON: {"soap": "...", "replyDraft": "..."}',
 ].join('\n');
 
+// A follow-up needs no fresh SOAP note: the chart above it has not changed.
+// What the clinician is about to do is answer one new question, so that is the
+// only thing drafted here. The prohibitions are the same ones the initial
+// draft carries - they do not relax because the conversation continued.
+const FOLLOW_UP_SYSTEM_INSTRUCTION = [
+  "당신은 비영리 온라인 의료상담 '해피닥터'의 예진 보조 '인턴 닥터 보듬'입니다.",
+  '환자가 기존 상담에 추가 질문을 남겼습니다. 자원봉사 의료진이 검토·수정해 보낼 답변 초안을 작성합니다.',
+  '',
+  '[중요] 이 초안은 의료진만 봅니다. 환자에게 자동으로 전달되지 않습니다.',
+  '의료진이 읽고 판단해 직접 전송합니다. 당신은 판단하지 않고 초안만 제공합니다.',
+  '',
+  '[절대 금지]',
+  '- 진단명을 확정하지 마세요.',
+  '- 약물명, 용량, 복용법을 쓰지 마세요.',
+  '- 검사 지시(Lab, 영상, 처치)를 쓰지 마세요.',
+  '- 응급 여부를 단정하지 마세요. 그 판단은 의료진이 합니다.',
+  '- 환자가 입력하지 않은 사실을 지어내지 마세요.',
+  '',
+  '[작성 규칙]',
+  '- 환자가 이번에 물은 것에만 답하세요. 앞선 답변을 반복하지 마세요.',
+  '- 이 글은 의료진이 자기 이름으로 보냅니다. 자기소개나 서명을 쓰지 마세요.',
+  '- "보듬", "인턴", "AI" 처럼 작성자를 밝히는 표현을 쓰지 마세요.',
+  '- 환자가 읽을 글이므로 따뜻하고 쉬운 한국어로 쓰세요.',
+  '- 확정적인 표현 대신 "의료진이 확인한 바로는" 같은 여지를 두세요.',
+  '- 판단에 필요한 정보가 부족하면 무엇을 더 알려달라고 요청하세요.',
+  '- 어떤 변화가 생기면 병원을 찾아야 하는지 알려주세요.',
+  '',
+  '[출력] 반드시 JSON: {"replyDraft": "..."}',
+].join('\n');
+
+const FOLLOW_UP_DISCLAIMER = 'AI가 추가 질문만 보고 작성한 초안입니다. 진단·처방이 아니며 의료진 검토가 필요합니다.';
+
 const SUMMARY_DISCLAIMER = 'AI가 환자 입력만으로 정리한 초안입니다. 진단·처방이 아니며 의료진 검토가 필요합니다.';
 const REPLY_DRAFT_DISCLAIMER = '의료진 검토 전에는 환자에게 전달되지 않습니다. 확인 후 수정하여 보내 주세요.';
 
@@ -163,6 +195,71 @@ class DoctorSummaryService {
     };
   }
 
+  // Drafts an answer to one new question asked on an existing consultation.
+  // The chart is passed for context but is not re-summarised: the clinician
+  // already has the SOAP note from intake above this.
+  async generateFollowUp({ patientData = {}, question = '', priorReply = '' } = {}) {
+    const config = this.getConfig();
+    if (!config.enabled) return null;
+
+    const trimmedQuestion = String(question || '').trim();
+    if (!trimmedQuestion) return null;
+
+    const client = this.getClient();
+    if (!client) return null;
+
+    const chart = buildPatientChartText(patientData);
+    const contents = [
+      chart ? `[기존 문진]\n${chart}` : '',
+      priorReply ? `[의료진이 이미 보낸 답변]\n${String(priorReply).trim()}` : '',
+      `[환자의 추가 질문]\n${trimmedQuestion}`,
+    ].filter(Boolean).join('\n\n');
+
+    const response = await client.models.generateContent({
+      model: config.model,
+      contents,
+      config: {
+        systemInstruction: FOLLOW_UP_SYSTEM_INSTRUCTION,
+        temperature: 0.2,
+        maxOutputTokens: config.maxOutputTokens,
+        responseMimeType: 'application/json',
+        thinkingConfig: { thinkingBudget: 0 },
+        abortSignal: AbortSignal.timeout(config.timeoutMs),
+      },
+    });
+
+    const replyDraft = coerceText(parseModelJson(response?.text)?.replyDraft);
+    if (!replyDraft) return null;
+
+    return {
+      question: trimmedQuestion,
+      replyDraft,
+      disclaimer: FOLLOW_UP_DISCLAIMER,
+      replyDraftDisclaimer: REPLY_DRAFT_DISCLAIMER,
+      model: config.model,
+      status: 'ready',
+    };
+  }
+
+  async generateFollowUpSafely(input = {}) {
+    if (!this.isEnabled()) return null;
+
+    try {
+      return await this.generateFollowUp(input);
+    } catch (error) {
+      console.error('[Doctor Follow-Up Draft Error]', error?.message || error);
+      return {
+        question: String(input?.question || '').trim() || null,
+        replyDraft: null,
+        disclaimer: FOLLOW_UP_DISCLAIMER,
+        replyDraftDisclaimer: REPLY_DRAFT_DISCLAIMER,
+        model: this.getConfig().model,
+        status: 'failed',
+        error: String(error?.message || 'follow_up_draft_failed').slice(0, 300),
+      };
+    }
+  }
+
   async generateSafely(patientData = {}) {
     if (!this.isEnabled()) return null;
 
@@ -190,3 +287,5 @@ module.exports.coerceText = coerceText;
 module.exports.SUMMARY_DISCLAIMER = SUMMARY_DISCLAIMER;
 module.exports.REPLY_DRAFT_DISCLAIMER = REPLY_DRAFT_DISCLAIMER;
 module.exports.SYSTEM_INSTRUCTION = SYSTEM_INSTRUCTION;
+module.exports.FOLLOW_UP_SYSTEM_INSTRUCTION = FOLLOW_UP_SYSTEM_INSTRUCTION;
+module.exports.FOLLOW_UP_DISCLAIMER = FOLLOW_UP_DISCLAIMER;

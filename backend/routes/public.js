@@ -8,7 +8,7 @@ const router = express.Router();
 const dbService = require('../services/dbService');
 const followUpService = require('../services/followUpService');
 const { analyzeAndRouteTriage, buildDoctorReviewNotice } = require('../services/llmService');
-const { scheduleDoctorSummary } = require('../services/doctorSummaryScheduler');
+const { scheduleDoctorSummary, scheduleFollowUpDraft } = require('../services/doctorSummaryScheduler');
 const {
   TRANSLATION_PROVIDER,
   detectLanguage,
@@ -665,6 +665,10 @@ router.post(['/consultations/status/follow-up', '/consultations/status/:lookup/f
       priority: 'high',
       reminderDelaysMinutes: [0, 5, 15],
     });
+
+    // A follow-up reached the clinician as an alert and nothing else, while the
+    // first message arrived with a draft. Same portal, same question to answer.
+    scheduleFollowUpDraft(followUp.consultationId, followUp.translatedQuestionKo || followUp.question);
     try {
       await clearPatientChannelPushes(followUp.userId, 'doctor_reply');
     } catch (clearError) {
