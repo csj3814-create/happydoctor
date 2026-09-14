@@ -63,6 +63,7 @@ const copyByLanguage = {
     conversationTitle: '상담 대화',
     conversationEmpty: '아직 주고받은 내용이 없습니다.',
     submissionLabel: '상담 접수',
+    submissionNoticeLabel: '접수 안내',
     followUpLabel: '추가 질문',
     patientLabel: '나',
     infoTitle: '안내',
@@ -136,6 +137,7 @@ const copyByLanguage = {
     conversationTitle: 'Consultation thread',
     conversationEmpty: 'Nothing has been exchanged yet.',
     submissionLabel: 'Submitted',
+    submissionNoticeLabel: 'Submission notice',
     followUpLabel: 'Follow-up question',
     patientLabel: 'You',
     infoTitle: 'Notes',
@@ -591,8 +593,9 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
     consultation && consultation.doctorReplies.length > 0
       ? consultation.doctorReplies[consultation.doctorReplies.length - 1]
       : null
+  // Shown only while the consultation itself has not loaded yet; once it has,
+  // the acknowledgement appears as the first notice in the thread.
   const chatbotReply = consultation?.chatbotReply || sessionChatbotReply
-  const hasDoctorReply = Boolean(latestReply)
   const canCloseConsultation = consultation
     ? consultation.status === 'doctor_replied' && !consultation.closedAt
     : false
@@ -731,20 +734,6 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
               </div>
             ) : null}
 
-            {chatbotReply && !hasDoctorReply ? (
-              <div className="rounded-[2rem] border border-[#cfe0ff] bg-[#f5f9ff] p-6 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
-                <p className="display-face text-xs font-semibold uppercase tracking-[0.24em] text-[var(--blue)]">
-                  {copy.firstReplyEyebrow}
-                </p>
-                <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-[var(--ink)]">
-                  {copy.firstReplyTitle}
-                </h2>
-                <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-[var(--ink)]">
-                  {chatbotReply}
-                </p>
-              </div>
-            ) : null}
-
             <div className="rounded-[2rem] bg-[var(--navy)] p-6 text-white shadow-[0_24px_60px_rgba(7,28,49,0.18)]">
               <p className="display-face text-xs font-semibold uppercase tracking-[0.24em] text-white/66">
                 {statusPanelCopy.badge}
@@ -755,7 +744,7 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
               <p className="mt-4 text-sm leading-7 text-white/82">{statusPanelCopy.body}</p>
             </div>
 
-            {hasDoctorReply ? doctorReplyCard : null}
+            {doctorReplyCard}
 
             <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
               <p className="text-sm font-semibold text-[var(--ink)]">{copy.trackingCode}</p>
@@ -812,28 +801,7 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
             </div>
 
             <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
-              {!hasDoctorReply ? (
-                <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
-                  <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
-                    {copy.doctorReplyEyebrow}
-                  </p>
-                  <p className="mt-4 rounded-[1.4rem] bg-[var(--surface)] p-4 text-sm leading-7 text-[var(--muted)]">
-                    {copy.noDoctorReply}
-                  </p>
-                </div>
-              ) : null}
-
               <div className="space-y-5">
-                {!hasDoctorReply && resolvedLookup ? (
-                  <StatusCloseActions
-                    lookup={resolvedLookup}
-                    canClose={canCloseConsultation}
-                    isClosed={consultation.status === 'closed'}
-                    uiLanguage={uiLanguage}
-                    onUpdated={() => setRefreshKey((current) => current + 1)}
-                  />
-                ) : null}
-
                 {(consultation.closedAt || consultation.closeReason) ? (
                   <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
                     <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">

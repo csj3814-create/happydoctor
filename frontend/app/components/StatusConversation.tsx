@@ -11,7 +11,10 @@ import { getUiLocale } from '@/lib/ui-language'
 // asked a follow-up could not see what they had asked or what came before it.
 // This is the same exchange the clinician sees, from the patient's side.
 type ThreadItem = {
-  kind: 'patient' | 'doctor'
+  // 'notice' is the fixed acknowledgement the service sends on intake. It is
+  // something the patient received, so it belongs in the thread - but it is
+  // not from a clinician and must not wear a clinician's name.
+  kind: 'patient' | 'doctor' | 'notice'
   at: number
   label: string
   text: string
@@ -21,6 +24,7 @@ type StatusConversationCopy = {
   conversationTitle: string
   conversationEmpty: string
   submissionLabel: string
+  submissionNoticeLabel: string
   followUpLabel: string
   patientLabel: string
   timeMissing: string
@@ -54,6 +58,17 @@ export function buildStatusThread(
       at: timestampMs(consultation.createdAt),
       label: copy.submissionLabel,
       text: chiefComplaint,
+    })
+  }
+
+  const acknowledgement = (consultation.chatbotReply || '').trim()
+  if (acknowledgement) {
+    items.push({
+      kind: 'notice',
+      // A moment after intake so it sits under what the patient wrote.
+      at: timestampMs(consultation.createdAt) + 1,
+      label: copy.submissionNoticeLabel,
+      text: acknowledgement,
     })
   }
 
@@ -124,7 +139,9 @@ export default function StatusConversation({
                 className={`max-w-[88%] px-4 py-3 text-sm leading-7 ${
                   item.kind === 'patient'
                     ? 'rounded-[1.4rem] rounded-tr-sm bg-[var(--sky)] text-[var(--ink)]'
-                    : 'rounded-[1.4rem] rounded-tl-sm bg-[var(--surface)] text-[var(--ink)]'
+                    : item.kind === 'notice'
+                      ? 'rounded-[1.4rem] rounded-tl-sm border border-[var(--line)] bg-white text-[var(--muted)]'
+                      : 'rounded-[1.4rem] rounded-tl-sm bg-[var(--surface)] text-[var(--ink)]'
                 }`}
               >
                 <p className="whitespace-pre-wrap break-words">{item.text}</p>
