@@ -1,5 +1,26 @@
 @import "tailwindcss";
 
+/* Tailwind v4 dropped the Preflight rule that gave buttons a pointer cursor, so
+   every control in this app showed a plain arrow and did not read as clickable.
+   Restore it for the elements a person can actually press, and mark disabled
+   ones as unavailable rather than merely faded. */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+label[for],
+summary,
+select:not(:disabled),
+input:not(:disabled):is([type="submit"], [type="button"], [type="checkbox"], [type="radio"], [type="file"]) {
+  cursor: pointer;
+}
+
+button:disabled,
+select:disabled,
+[role="button"][aria-disabled="true"],
+input:disabled:is([type="submit"], [type="button"], [type="checkbox"], [type="radio"], [type="file"]) {
+  cursor: not-allowed;
+}
+
+
 :root {
   --navy: #083c6d;
   --blue: #0f5f9c;
