@@ -662,7 +662,16 @@ router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
     await awardHDT(req.doctor.email, req.doctor.name, HDT_REPLY, 'reply');
     console.log(`[Portal] ${req.doctor.email} replied to ${consultation.userId} (${replyId})`);
 
-    return res.json({ ok: true, replyId, notifiedChannels, translationFailed });
+    // A KakaoTalk channel consultation has no push: the channel cannot speak
+    // first without a paid alert template. The reply is not undeliverable
+    // though - the fallback block hands it over the moment the patient says
+    // anything to the channel again, and marks it read. Saying "no way to
+    // reach them" would be wrong, and would send a clinician chasing a
+    // contact detail that was never needed.
+    const awaitingKakaoPickup = notifiedChannels.length === 0
+      && consultation.entryChannel === 'kakao';
+
+    return res.json({ ok: true, replyId, notifiedChannels, translationFailed, awaitingKakaoPickup });
   } catch (error) {
     if (error?.statusCode) {
       return res.status(error.statusCode).json({ error: error.message });

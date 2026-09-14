@@ -217,6 +217,9 @@ export interface DoctorReplyResult {
   notifiedChannels: PatientNotifyChannel[];
   // The patient received the Korean original because translation was down.
   translationFailed: boolean;
+  // A KakaoTalk channel consultation: the reply waits in the channel until the
+  // patient writes again, rather than being pushed to them.
+  awaitingKakaoPickup: boolean;
 }
 
 export async function postReply(consultationId: string, message: string): Promise<DoctorReplyResult> {
@@ -231,6 +234,7 @@ export async function postReply(consultationId: string, message: string): Promis
     replyId: body?.replyId ?? null,
     notifiedChannels: Array.isArray(body?.notifiedChannels) ? body.notifiedChannels : [],
     translationFailed: Boolean(body?.translationFailed),
+    awaitingKakaoPickup: Boolean(body?.awaitingKakaoPickup),
   };
 }
 

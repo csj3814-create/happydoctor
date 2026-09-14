@@ -227,6 +227,7 @@ export default function PatientPage({ params }: PatientPageProps) {
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [notifiedChannels, setNotifiedChannels] = useState<PatientNotifyChannel[] | null>(null)
   const [translationFailed, setTranslationFailed] = useState(false)
+  const [awaitingKakaoPickup, setAwaitingKakaoPickup] = useState(false)
   const [patientId, setPatientId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -437,6 +438,7 @@ export default function PatientPage({ params }: PatientPageProps) {
       setDraftNotice(null)
       setNotifiedChannels(result.notifiedChannels)
       setTranslationFailed(result.translationFailed)
+      setAwaitingKakaoPickup(result.awaitingKakaoPickup)
       setSubmitSuccess(true)
       const updated = await getConsultation(patientId)
       setConsultation(updated)
@@ -748,7 +750,14 @@ export default function PatientPage({ params }: PatientPageProps) {
                         </p>
                       ) : null}
 
-                      {submitSuccess && notifiedChannels ? (
+                      {submitSuccess && awaitingKakaoPickup ? (
+                        <p className="rounded-lg bg-blue-50 px-3 py-2 text-sm leading-6 text-blue-900">
+                          답변이 저장되었습니다. 카카오톡 채널 상담이라 먼저 알림을 보낼 수는 없고,
+                          <strong> 환자가 채널에 다시 말을 걸면 그 자리에서 전달</strong>됩니다.
+                        </p>
+                      ) : null}
+
+                      {submitSuccess && notifiedChannels && !awaitingKakaoPickup ? (
                         notifiedChannels.length > 0 ? (
                           <p className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
                             답변이 전송되었습니다. 환자에게 {formatNotifyChannels(notifiedChannels)}로 알렸습니다.
