@@ -222,17 +222,6 @@ function getStatusPanelCopy(status: PublicConsultationStatus, copy: StatusCopy) 
   }
 }
 
-function getLatestUpdate(
-  status: PublicConsultationStatus,
-  uiLanguage: UiLanguage,
-  copy: StatusCopy,
-) {
-  if (status.doctorRepliedAt) return formatDateTime(status.doctorRepliedAt, uiLanguage, copy)
-  if (status.latestFollowUpAt) return formatDateTime(status.latestFollowUpAt, uiLanguage, copy)
-  if (status.requiresDoctorReview) return copy.latestUpdateWaitingDoctor
-  return copy.latestUpdateInitial
-}
-
 export default function StatusPageClient({ initialUiLanguage }: StatusPageClientProps) {
   const searchParams = useSearchParams()
 
@@ -768,53 +757,22 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
 
             {hasDoctorReply ? doctorReplyCard : null}
 
-            {chatbotReply && hasDoctorReply ? (
-              <div className="rounded-[2rem] border border-[#cfe0ff] bg-[#f5f9ff] p-6 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
-                <p className="display-face text-xs font-semibold uppercase tracking-[0.24em] text-[var(--blue)]">
-                  {copy.firstReplyEyebrow}
-                </p>
-                <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-[var(--ink)]">
-                  {copy.firstReplyTitle}
-                </h2>
-                <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-[var(--ink)]">
-                  {chatbotReply}
-                </p>
-              </div>
-            ) : null}
-
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
-                <p className="text-sm font-semibold text-[var(--ink)]">{copy.createdAt}</p>
-                <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
-                  {formatDateTime(consultation.createdAt, uiLanguage, copy)}
-                </p>
-              </div>
-              <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
-                <p className="text-sm font-semibold text-[var(--ink)]">{copy.chiefComplaint}</p>
-                <p className="mt-3 text-base font-semibold text-[var(--navy)]">
-                  {consultation.chiefComplaint || copy.chiefComplaintMissing}
-                </p>
-              </div>
-              <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
-                <p className="text-sm font-semibold text-[var(--ink)]">{copy.trackingCode}</p>
-                <p className="mt-3 text-3xl font-semibold tracking-[0.14em] text-[var(--navy)]">
-                  {consultation.trackingCode || copy.trackingCodePending}
-                </p>
-              </div>
-              <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
-                <p className="text-sm font-semibold text-[var(--ink)]">{copy.latestUpdate}</p>
-                <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
-                  {getLatestUpdate(consultation, uiLanguage, copy)}
-                </p>
-              </div>
+            <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
+              <p className="text-sm font-semibold text-[var(--ink)]">{copy.trackingCode}</p>
+              <p className="mt-2 text-3xl font-semibold tracking-[0.14em] text-[var(--navy)]">
+                {consultation.trackingCode || copy.trackingCodePending}
+              </p>
+              <p className="mt-2 text-xs leading-6 text-[var(--muted)]">
+                {copy.createdAt} · {formatDateTime(consultation.createdAt, uiLanguage, copy)}
+              </p>
             </div>
 
-            <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-              <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
-                <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
-                  {copy.mediaTitle}
-                </p>
-                {mediaItems.length > 0 ? (
+            <div className={`grid gap-5 ${mediaItems.length > 0 ? 'lg:grid-cols-[1.1fr_0.9fr]' : ''}`}>
+              {mediaItems.length > 0 ? (
+                <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
+                  <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
+                    {copy.mediaTitle}
+                  </p>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     {mediaItems
                       .filter((item) => item.kind === 'image' && item.url)
@@ -839,12 +797,8 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
                         </a>
                       ))}
                   </div>
-                ) : (
-                  <p className="mt-4 rounded-[1.4rem] bg-[var(--surface)] p-4 text-sm leading-7 text-[var(--muted)]">
-                    {copy.noMedia}
-                  </p>
-                )}
-              </div>
+                </div>
+              ) : null}
 
               {resolvedLookup ? (
                 <ConsultationImageUploader
