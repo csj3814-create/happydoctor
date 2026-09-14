@@ -39,6 +39,10 @@ export interface PatientNotificationContact {
   consented: boolean;
   phone: string;
   normalizedPhone?: string | null;
+  // A patient may consent with an email instead of a phone - the only reachable
+  // channel for an overseas number, which the domestic SMS carrier refuses.
+  email?: string | null;
+  normalizedEmail?: string | null;
   source?: string | null;
   consentedAt?: string | null;
 }

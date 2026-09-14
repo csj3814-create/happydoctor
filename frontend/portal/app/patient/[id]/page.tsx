@@ -569,7 +569,10 @@ export default function PatientPage({ params }: PatientPageProps) {
                 <LabelValue label="과거력 / 복용약" value={consultation.patientData.pmhx} multiline />
                 <LabelValue label="접수 시각" value={formatDate(consultation.createdAt)} />
                 {consultation.patientNotificationContact?.consented ? (
-                  <LabelValue label="알림 동의 연락처" value={consultation.patientNotificationContact.phone} />
+                  <>
+                    <LabelValue label="알림 동의 휴대폰" value={consultation.patientNotificationContact.phone} />
+                    <LabelValue label="알림 동의 이메일" value={consultation.patientNotificationContact.email} />
+                  </>
                 ) : null}
                 {consultation.patientNotificationContact?.consentedAt ? (
                   <LabelValue label="알림 동의 시각" value={formatDate(consultation.patientNotificationContact.consentedAt)} />
