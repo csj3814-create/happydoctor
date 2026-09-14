@@ -21,6 +21,7 @@ import {
   AiDoctorSummarySection,
   AiFollowUpDraftSection,
 } from './AiDoctorSummarySection'
+import ConversationThread from './ConversationThread'
 
 // The summary is written a few seconds after intake. Past this age an absent
 // summary means it was never generated, not that it is still coming.
@@ -161,48 +162,6 @@ function statusMeta(consultation: Consultation) {
   }
 }
 
-function followUpActionLabel(action?: string): string {
-  switch (action) {
-    case 'ESCALATE':
-      return '의료진 검토 유지'
-    case 'FOLLOW_UP':
-      return '추가 문진 진행'
-    case 'AUTO_CLOSE':
-      return '자동 종료'
-    case 'COMPLETE':
-      return '상담 정리'
-    case 'PATIENT_FOLLOW_UP_QUESTION':
-      return '환자 추가 질문'
-    default:
-      return action || '기록'
-  }
-}
-
-function FollowUpItem({ log, index }: { log: FollowUpLog; index: number }) {
-  return (
-    <li className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-blue-600 px-2 text-xs font-semibold text-white">
-            {index + 1}
-          </span>
-          <span className="text-sm font-semibold text-zinc-800">
-            {followUpActionLabel(log.action)}
-          </span>
-        </div>
-        <span className="text-xs text-zinc-400">
-          {log.timestamp ? formatDate(log.timestamp) : '시각 정보 없음'}
-        </span>
-      </div>
-      {log.alertMessage ? (
-        <pre className="mt-3 whitespace-pre-wrap break-words rounded-xl border border-zinc-200 bg-white p-3 text-sm leading-relaxed text-zinc-700">
-          {log.alertMessage}
-        </pre>
-      ) : null}
-    </li>
-  )
-}
-
 function SummaryCard({
   label,
   value,
@@ -241,10 +200,6 @@ function formatNotifyChannels(channels: PatientNotifyChannel[]): string {
 
 function getDoctorFacingPatientData(consultation: Consultation): PatientData {
   return consultation.translatedPatientDataKo || consultation.patientData
-}
-
-function hasDeliveredTranslation(replyMessage?: string | null, deliveredMessage?: string | null) {
-  return Boolean(deliveredMessage && deliveredMessage !== replyMessage)
 }
 
 interface PatientPageProps {
@@ -698,97 +653,7 @@ export default function PatientPage({ params }: PatientPageProps) {
               </section>
             ) : null}
 
-            <section className="rounded-2xl border border-zinc-200 bg-white px-5 py-5 shadow-sm">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-sm font-bold text-zinc-800">Follow-up 기록</h2>
-                  <p className="mt-1 text-xs text-zinc-400">추가 문진, 재분석, 알림 메시지 흐름을 한 번에 확인할 수 있습니다.</p>
-                </div>
-                <span className="inline-flex items-center rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-500">
-                  {derivedState.followUpLogs.length}건
-                </span>
-              </div>
-
-              {derivedState.followUpLogs.length === 0 ? (
-                <p className="text-sm text-zinc-400">추가 follow-up 기록이 없습니다.</p>
-              ) : (
-                <ol className="flex flex-col gap-3">
-                  {derivedState.followUpLogs.map((log, index) => (
-                    <FollowUpItem
-                      key={`${log.timestamp || 'follow-up'}-${index}`}
-                      log={log}
-                      index={index}
-                    />
-                  ))}
-                </ol>
-              )}
-            </section>
-
-            <section className="rounded-2xl border border-zinc-200 bg-white px-5 py-5 shadow-sm">
-              <h2 className="mb-4 text-sm font-bold text-zinc-800">
-                답변 내역
-                {consultation.doctorReplies && consultation.doctorReplies.length > 0 ? (
-                  <span className="ml-2 text-xs font-normal text-zinc-400">
-                    {consultation.doctorReplies.length}건
-                  </span>
-                ) : null}
-              </h2>
-
-              {!consultation.doctorReplies || consultation.doctorReplies.length === 0 ? (
-                <p className="text-sm text-zinc-400">아직 답변이 없습니다.</p>
-              ) : (
-                <ul className="flex flex-col gap-3">
-                  {consultation.doctorReplies.map((reply) => (
-                    <li
-                      key={reply.id}
-                      className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3"
-                    >
-                      <div className="mb-1.5 flex items-center justify-between gap-2">
-                        <span className="text-xs font-semibold text-blue-700">
-                          {reply.doctorName}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                              reply.seen
-                                ? 'bg-emerald-50 text-emerald-700'
-                                : 'bg-amber-50 text-amber-700'
-                            }`}
-                          >
-                            {reply.seen
-                              ? reply.seenAt
-                                ? `읽음 ${formatDate(reply.seenAt)}`
-                                : '읽음'
-                              : '미확인'}
-                          </span>
-                          <span className="text-xs text-zinc-400">
-                            {formatDate(reply.createdAt)}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="space-y-3">
-                        <div>
-                          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">의사 작성 원문</p>
-                          <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-700">
-                            {reply.message}
-                          </p>
-                        </div>
-                        {hasDeliveredTranslation(reply.message, reply.patientDeliveredMessage) ? (
-                          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3">
-                            <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
-                              환자에게 전달된 번역본 ({languageLabel(reply.patientDeliveredLanguage)})
-                            </p>
-                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-700">
-                              {reply.patientDeliveredMessage}
-                            </p>
-                          </div>
-                        ) : null}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
+            <ConversationThread consultation={consultation} />
 
             <section className="rounded-2xl border border-zinc-200 bg-white px-5 py-5 shadow-sm">
               <div className="mb-4 flex flex-col gap-1">
