@@ -8,7 +8,7 @@ const router = express.Router();
 const dbService = require('../services/dbService');
 const followUpService = require('../services/followUpService');
 const { analyzeAndRouteTriage, buildDoctorReviewNotice } = require('../services/llmService');
-const doctorSummaryService = require('../services/doctorSummaryService');
+const { scheduleDoctorSummary } = require('../services/doctorSummaryScheduler');
 const {
   TRANSLATION_PROVIDER,
   detectLanguage,
@@ -221,24 +221,6 @@ function buildReplyNotificationContact(body = {}) {
     normalizedEmail: normalizedEmail || null,
     source: 'web_start',
   };
-}
-
-// Nothing in here may fail a consultation. The summary is a convenience for
-// the reviewing clinician; losing it must never cost us the patient's request.
-function scheduleDoctorSummary(consultationId, patientData) {
-  try {
-    if (!consultationId || !doctorSummaryService.isEnabled()) return;
-
-    setImmediate(() => {
-      doctorSummaryService.generateSafely(patientData)
-        .then((summary) => (summary ? dbService.saveAiDoctorSummary(consultationId, summary) : false))
-        .catch((error) => {
-          console.error('[Public Doctor Summary Error]', error?.message || error);
-        });
-    });
-  } catch (error) {
-    console.error('[Public Doctor Summary Schedule Error]', error?.message || error);
-  }
 }
 
 function buildPublicStatusUrl(trackingCode, trackingToken) {

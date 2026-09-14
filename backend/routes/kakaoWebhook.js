@@ -15,6 +15,7 @@ const {
 const clearOperatorUnansweredAlerts = notifyService.clearOperatorUnansweredAlerts || (async () => 0);
 const followUpService = require('../services/followUpService');
 const dbService = require('../services/dbService');
+const { scheduleDoctorSummary } = require('../services/doctorSummaryScheduler');
 const { appSiteUrl, ConfigurationError, getMessengerApiKey } = require('../config');
 
 function buildStatusLinkText(trackingInfo) {
@@ -79,6 +80,11 @@ async function logConsultationAndGetStatusLink(userId, patientData, analysisResu
                 console.error('[Kakao Consultation Image Save Error]', imageError);
             }
         }
+
+        // Same doctor-facing summary the web intake generates. A KakaoTalk
+        // consultation reaches the same portal and the same clinician, so it
+        // had no business arriving there without one.
+        scheduleDoctorSummary(saved?.consultationId, patientData);
 
         return buildStatusLinkText(saved);
     } catch (error) {
