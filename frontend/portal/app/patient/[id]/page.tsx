@@ -653,81 +653,84 @@ export default function PatientPage({ params }: PatientPageProps) {
               </section>
             ) : null}
 
-            <ConversationThread consultation={consultation} />
+            <ConversationThread
+              consultation={consultation}
+              composer={(
+                <>
+                    <div className="mb-4 flex flex-col gap-1">
+                      <h2 className="text-sm font-bold text-zinc-800">답변 전송</h2>
+                      {patientReplyLanguage && patientReplyLanguage.toLowerCase() !== 'ko' ? (
+                        <p className="text-xs text-zinc-500">
+                          한국어로 작성하면 환자에게는 {languageLabel(patientReplyLanguage)}로 자동 번역되어 전달됩니다.
+                        </p>
+                      ) : (
+                        <p className="text-xs text-zinc-500">
+                          한국어로 바로 작성해 전달할 수 있습니다.
+                        </p>
+                      )}
+                      {derivedState.closed ? (
+                        <p className="text-xs text-zinc-500">종료된 상담은 추가 회신을 보낼 수 없습니다.</p>
+                      ) : null}
+                      {!derivedState.closed && fallbackNotice ? (
+                        <p className="text-xs text-zinc-500">
+                          상세 데이터 동기화가 완료되면 답변 전송을 다시 사용할 수 있습니다.
+                        </p>
+                      ) : null}
+                    </div>
+                    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+                      <textarea
+                        ref={replyFieldRef}
+                        value={replyText}
+                        onChange={(event) => setReplyText(event.target.value)}
+                        placeholder={
+                          derivedState.closed
+                            ? '종료된 상담입니다.'
+                            : fallbackNotice
+                              ? '상세 데이터 동기화 후 답변 전송을 사용할 수 있습니다.'
+                              : '환자에게 전달할 답변을 한국어로 입력하세요...'
+                        }
+                        rows={5}
+                        disabled={submitting || derivedState.closed || Boolean(fallbackNotice)}
+                        className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-800 placeholder:text-zinc-400 transition focus:border-blue-400 focus:bg-white focus:outline-none disabled:opacity-50"
+                      />
 
-            <section className="rounded-2xl border border-zinc-200 bg-white px-5 py-5 shadow-sm">
-              <div className="mb-4 flex flex-col gap-1">
-                <h2 className="text-sm font-bold text-zinc-800">답변 전송</h2>
-                {patientReplyLanguage && patientReplyLanguage.toLowerCase() !== 'ko' ? (
-                  <p className="text-xs text-zinc-500">
-                    한국어로 작성하면 환자에게는 {languageLabel(patientReplyLanguage)}로 자동 번역되어 전달됩니다.
-                  </p>
-                ) : (
-                  <p className="text-xs text-zinc-500">
-                    한국어로 바로 작성해 전달할 수 있습니다.
-                  </p>
-                )}
-                {derivedState.closed ? (
-                  <p className="text-xs text-zinc-500">종료된 상담은 추가 회신을 보낼 수 없습니다.</p>
-                ) : null}
-                {!derivedState.closed && fallbackNotice ? (
-                  <p className="text-xs text-zinc-500">
-                    상세 데이터 동기화가 완료되면 답변 전송을 다시 사용할 수 있습니다.
-                  </p>
-                ) : null}
-              </div>
-              <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-                <textarea
-                  ref={replyFieldRef}
-                  value={replyText}
-                  onChange={(event) => setReplyText(event.target.value)}
-                  placeholder={
-                    derivedState.closed
-                      ? '종료된 상담입니다.'
-                      : fallbackNotice
-                        ? '상세 데이터 동기화 후 답변 전송을 사용할 수 있습니다.'
-                        : '환자에게 전달할 답변을 한국어로 입력하세요...'
-                  }
-                  rows={5}
-                  disabled={submitting || derivedState.closed || Boolean(fallbackNotice)}
-                  className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-800 placeholder:text-zinc-400 transition focus:border-blue-400 focus:bg-white focus:outline-none disabled:opacity-50"
-                />
+                      {draftNotice && replyText.trim() ? (
+                        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                          {draftNotice}
+                        </p>
+                      ) : null}
 
-                {draftNotice && replyText.trim() ? (
-                  <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                    {draftNotice}
-                  </p>
-                ) : null}
+                      {submitError ? (
+                        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+                          {submitError}
+                        </p>
+                      ) : null}
 
-                {submitError ? (
-                  <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
-                    {submitError}
-                  </p>
-                ) : null}
+                      {submitSuccess && notifiedChannels ? (
+                        notifiedChannels.length > 0 ? (
+                          <p className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
+                            답변이 전송되었습니다. 환자에게 {formatNotifyChannels(notifiedChannels)}로 알렸습니다.
+                          </p>
+                        ) : (
+                          <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-900">
+                            답변은 저장했지만 <strong>환자에게 알릴 연락 수단이 없습니다.</strong> 환자가 상태
+                            확인 링크를 직접 열어야 답변을 볼 수 있습니다. 연락이 필요하면 위 알림 동의
+                            연락처를 확인해 주세요.
+                          </p>
+                        )
+                      ) : null}
 
-                {submitSuccess && notifiedChannels ? (
-                  notifiedChannels.length > 0 ? (
-                    <p className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
-                      답변이 전송되었습니다. 환자에게 {formatNotifyChannels(notifiedChannels)}로 알렸습니다.
-                    </p>
-                  ) : (
-                    <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-900">
-                      답변은 저장했지만 <strong>환자에게 알릴 연락 수단이 없습니다.</strong> 환자가 상태
-                      확인 링크를 직접 열어야 답변을 볼 수 있습니다. 연락이 필요하면 위 알림 동의
-                      연락처를 확인해 주세요.
-                    </p>
-                  )
-                ) : null}
-
-                <button
-                  type="submit"
-                  disabled={submitting || !replyText.trim() || derivedState.closed || Boolean(fallbackNotice)}
-                  className="self-end rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {submitting ? '전송 중...' : '환자에게 전송'}
-                </button>
-              </form>
-            </section>
+                      <button
+                        type="submit"
+                        disabled={submitting || !replyText.trim() || derivedState.closed || Boolean(fallbackNotice)}
+                        className="self-end rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {submitting ? '전송 중...' : '환자에게 전송'}
+                      </button>
+                    </form>
+                </>
+              )}
+            />
           </>
         ) : null}
       </main>

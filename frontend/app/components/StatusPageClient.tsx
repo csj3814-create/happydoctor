@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 
 import ConsultationImageUploader from '@/components/ConsultationImageUploader'
-import StatusCloseActions from '@/components/StatusCloseActions'
+import StatusCloseActions, { StatusFollowUpComposer } from '@/components/StatusCloseActions'
 import StatusConversation from '@/components/StatusConversation'
 import {
   getActiveConsultationSession,
@@ -608,8 +608,21 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
     ? consultation.status === 'doctor_replied' && !consultation.closedAt
     : false
 
+  const followUpComposer = resolvedLookup && latestReply && consultation?.status !== 'closed' ? (
+    <StatusFollowUpComposer
+      lookup={resolvedLookup}
+      uiLanguage={uiLanguage}
+      onUpdated={() => setRefreshKey((current) => current + 1)}
+    />
+  ) : null
+
   const doctorReplyCard = consultation ? (
-    <StatusConversation consultation={consultation} uiLanguage={uiLanguage} copy={copy} />
+    <StatusConversation
+      consultation={consultation}
+      uiLanguage={uiLanguage}
+      copy={copy}
+      composer={followUpComposer}
+    />
   ) : null
 
   const nextActionCard = resolvedLookup ? (
@@ -618,7 +631,6 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
       canClose={canCloseConsultation}
       isClosed={consultation?.status === 'closed'}
       uiLanguage={uiLanguage}
-      allowFollowUp={Boolean(latestReply) && consultation?.status !== 'closed'}
       onUpdated={() => setRefreshKey((current) => current + 1)}
     />
   ) : null
@@ -866,7 +878,6 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
                     canClose={canCloseConsultation}
                     isClosed={consultation.status === 'closed'}
                     uiLanguage={uiLanguage}
-                    allowFollowUp={Boolean(latestReply) && consultation.status !== 'closed'}
                     onUpdated={() => setRefreshKey((current) => current + 1)}
                   />
                 ) : null}

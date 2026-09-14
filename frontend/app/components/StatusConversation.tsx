@@ -1,5 +1,8 @@
 'use client'
 
+import type { ReactNode } from 'react'
+import { useEffect, useRef } from 'react'
+
 import type { PublicConsultationStatus } from '@/lib/status'
 import type { UiLanguage } from '@/lib/ui-language'
 import { getUiLocale } from '@/lib/ui-language'
@@ -76,12 +79,22 @@ export default function StatusConversation({
   consultation,
   uiLanguage,
   copy,
+  composer,
 }: {
   consultation: PublicConsultationStatus
   uiLanguage: UiLanguage
   copy: StatusConversationCopy
+  // Rendered under the thread, where a messenger keeps the place to write.
+  composer?: ReactNode
 }) {
   const items = buildStatusThread(consultation, copy)
+  const listRef = useRef<HTMLOListElement | null>(null)
+
+  // A messenger opens on the newest message, not the oldest.
+  useEffect(() => {
+    const list = listRef.current
+    if (list) list.scrollTop = list.scrollHeight
+  }, [items.length])
 
   return (
     <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
@@ -94,7 +107,7 @@ export default function StatusConversation({
           {copy.conversationEmpty}
         </p>
       ) : (
-        <ol className="mt-4 flex flex-col gap-4">
+        <ol ref={listRef} className="mt-4 flex max-h-[60vh] flex-col gap-4 overflow-y-auto pr-1">
           {items.map((item, index) => (
             <li
               key={`${item.kind}-${index}`}
@@ -120,6 +133,8 @@ export default function StatusConversation({
           ))}
         </ol>
       )}
+
+      {composer ? <div className="mt-4 border-t border-[var(--line)] pt-4">{composer}</div> : null}
     </div>
   )
 }

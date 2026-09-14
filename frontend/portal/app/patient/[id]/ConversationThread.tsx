@@ -1,5 +1,8 @@
 'use client'
 
+import type { ReactNode } from 'react'
+import { useEffect, useRef } from 'react'
+
 import type { Consultation, FollowUpLog } from '@/lib/api'
 
 // The patient's questions and the doctor's replies were two separate lists on
@@ -112,8 +115,23 @@ function languageLabel(language?: string | null): string {
   }
 }
 
-export default function ConversationThread({ consultation }: { consultation: Consultation }) {
+export default function ConversationThread({
+  consultation,
+  composer,
+}: {
+  consultation: Consultation
+  // The reply form lives at the foot of the conversation, where a messenger
+  // keeps it, rather than in a separate card below the page.
+  composer?: ReactNode
+}) {
   const items = buildThread(consultation)
+  const listRef = useRef<HTMLOListElement | null>(null)
+
+  // Open on the newest message: that is the one being answered.
+  useEffect(() => {
+    const list = listRef.current
+    if (list) list.scrollTop = list.scrollHeight
+  }, [items.length])
 
   return (
     <section className="rounded-2xl border border-zinc-200 bg-white px-5 py-5 shadow-sm">
@@ -130,7 +148,7 @@ export default function ConversationThread({ consultation }: { consultation: Con
       {items.length === 0 ? (
         <p className="text-sm text-zinc-400">아직 주고받은 내용이 없습니다.</p>
       ) : (
-        <ol className="flex flex-col gap-3">
+        <ol ref={listRef} className="flex max-h-[60vh] flex-col gap-3 overflow-y-auto pr-1">
           {items.map((item, index) => {
             if (item.kind === 'system') {
               return (
@@ -194,6 +212,8 @@ export default function ConversationThread({ consultation }: { consultation: Con
           })}
         </ol>
       )}
+
+      {composer ? <div className="mt-5 border-t border-zinc-200 pt-5">{composer}</div> : null}
     </section>
   )
 }

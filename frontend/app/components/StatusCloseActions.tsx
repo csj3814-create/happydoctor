@@ -10,7 +10,6 @@ type StatusCloseActionsProps = {
   canClose: boolean
   isClosed: boolean
   uiLanguage: UiLanguage
-  allowFollowUp?: boolean
   onUpdated?: () => void
 }
 
@@ -53,12 +52,104 @@ const copyByLanguage = {
   },
 } as const
 
+type StatusFollowUpComposerProps = {
+  lookup: string
+  uiLanguage: UiLanguage
+  onUpdated?: () => void
+}
+
+// Sits at the bottom of the conversation, where the place to write a message
+// is in every messenger the patient already uses. It used to live in a
+// separate card beside the thread, which read as a form rather than a reply.
+export function StatusFollowUpComposer({
+  lookup,
+  uiLanguage,
+  onUpdated,
+}: StatusFollowUpComposerProps) {
+  const router = useRouter()
+  const copy = copyByLanguage[uiLanguage]
+  const [question, setQuestion] = useState('')
+  const [sending, setSending] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!question.trim()) return
+
+    setSending(true)
+    setError(null)
+    setMessage(null)
+
+    try {
+      const response = await fetch('/api/public/consultations/status/follow-up', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Consultation-Lookup': lookup,
+        },
+        body: JSON.stringify({ question: question.trim(), uiLanguage }),
+      })
+
+      if (!response.ok) {
+        setError(copy.followUpError)
+        return
+      }
+
+      setQuestion('')
+      setMessage(copy.followUpSuccess)
+      router.refresh()
+      onUpdated?.()
+    } catch {
+      setError(copy.followUpError)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div>
+      {/* Side by side once there is room; stacked on a phone, where a
+          half-width box is too small to write more than a few words in. */}
+      <form onSubmit={handleSubmit} className="flex flex-col gap-2 sm:flex-row sm:items-end">
+        <textarea
+          value={question}
+          onChange={(event) => setQuestion(event.target.value)}
+          placeholder={copy.placeholder}
+          rows={2}
+          disabled={sending}
+          className="min-h-[3.5rem] w-full resize-none rounded-[1.2rem] border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm leading-6 text-[var(--ink)] outline-none transition focus:border-[var(--blue)] focus:bg-white sm:flex-1"
+        />
+        <button
+          type="submit"
+          disabled={sending || !question.trim()}
+          className="w-full shrink-0 rounded-[1.2rem] bg-[var(--navy)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#123c67] disabled:cursor-not-allowed disabled:bg-slate-400 sm:w-auto"
+          style={{ color: '#ffffff' }}
+        >
+          {sending ? copy.followUpSending : copy.followUpSubmit}
+        </button>
+      </form>
+
+      {message ? (
+        <p className="mt-3 rounded-[1.2rem] bg-[var(--soft-blue)] px-4 py-3 text-sm leading-7 text-[var(--ink)]">
+          {message}
+        </p>
+      ) : null}
+
+      {error ? (
+        <p className="mt-3 rounded-[1.2rem] border border-[#ffd2c5] bg-[#fff6f2] px-4 py-3 text-sm leading-7 text-[#9b5031]">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
 export default function StatusCloseActions({
   lookup,
   canClose,
   isClosed,
   uiLanguage,
-  allowFollowUp = false,
   onUpdated,
 }: StatusCloseActionsProps) {
   const router = useRouter()
@@ -66,10 +157,6 @@ export default function StatusCloseActions({
   const [closing, setClosing] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [followUpQuestion, setFollowUpQuestion] = useState('')
-  const [sendingFollowUp, setSendingFollowUp] = useState(false)
-  const [followUpMessage, setFollowUpMessage] = useState<string | null>(null)
-  const [followUpError, setFollowUpError] = useState<string | null>(null)
 
   if (isClosed) {
     return (
@@ -84,7 +171,7 @@ export default function StatusCloseActions({
     )
   }
 
-  if (!canClose && !allowFollowUp) {
+  if (!canClose) {
     return null
   }
 
@@ -121,46 +208,6 @@ export default function StatusCloseActions({
     }
   }
 
-  async function handleFollowUpSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!followUpQuestion.trim()) return
-
-    setSendingFollowUp(true)
-    setFollowUpError(null)
-    setFollowUpMessage(null)
-
-    try {
-      const response = await fetch(
-        '/api/public/consultations/status/follow-up',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Consultation-Lookup': lookup,
-          },
-          body: JSON.stringify({
-            question: followUpQuestion.trim(),
-            uiLanguage,
-          }),
-        },
-      )
-
-      if (!response.ok) {
-        setFollowUpError(copy.followUpError)
-        return
-      }
-
-      setFollowUpQuestion('')
-      setFollowUpMessage(copy.followUpSuccess)
-      router.refresh()
-      onUpdated?.()
-    } catch {
-      setFollowUpError(copy.followUpError)
-    } finally {
-      setSendingFollowUp(false)
-    }
-  }
-
   return (
     <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
       <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
@@ -170,27 +217,6 @@ export default function StatusCloseActions({
         {copy.body}
         {canClose ? ` ${copy.closeBodySuffix}` : ''}
       </p>
-
-      {allowFollowUp ? (
-        <form onSubmit={handleFollowUpSubmit} className="mt-4 space-y-3">
-          <textarea
-            value={followUpQuestion}
-            onChange={(event) => setFollowUpQuestion(event.target.value)}
-            placeholder={copy.placeholder}
-            rows={4}
-            disabled={sendingFollowUp}
-            className="w-full rounded-[1.2rem] border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm leading-7 text-[var(--ink)] outline-none transition focus:border-[var(--blue)] focus:bg-white"
-          />
-
-          <button
-            type="submit"
-            disabled={sendingFollowUp || !followUpQuestion.trim()}
-            className="w-full rounded-[1.2rem] border border-[var(--navy)] bg-white px-5 py-3 text-sm font-semibold text-[var(--navy)] transition hover:bg-[var(--soft-blue)] disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400"
-          >
-            {sendingFollowUp ? copy.followUpSending : copy.followUpSubmit}
-          </button>
-        </form>
-      ) : null}
 
       {canClose ? (
         <button
@@ -210,21 +236,9 @@ export default function StatusCloseActions({
         </p>
       ) : null}
 
-      {followUpMessage ? (
-        <p className="mt-4 rounded-[1.2rem] bg-[var(--soft-blue)] px-4 py-3 text-sm leading-7 text-[var(--ink)]">
-          {followUpMessage}
-        </p>
-      ) : null}
-
       {error ? (
         <p className="mt-4 rounded-[1.2rem] border border-[#ffd2c5] bg-[#fff6f2] px-4 py-3 text-sm leading-7 text-[#9b5031]">
           {error}
-        </p>
-      ) : null}
-
-      {followUpError ? (
-        <p className="mt-4 rounded-[1.2rem] border border-[#ffd2c5] bg-[#fff6f2] px-4 py-3 text-sm leading-7 text-[#9b5031]">
-          {followUpError}
         </p>
       ) : null}
     </div>
