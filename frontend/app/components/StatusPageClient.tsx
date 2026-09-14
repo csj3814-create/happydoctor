@@ -49,6 +49,7 @@ const copyByLanguage = {
     missingConsultation: '상담 상태를 찾지 못했습니다. 받은 링크나 코드를 다시 확인해 주세요.',
     loadError: '지금은 상태를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.',
     loading: '상담 상태를 불러오고 있습니다...',
+    lookupRefreshed: '최신 상태를 확인했습니다.',
     liveUpdate: '새 의료진 답변이 도착했습니다. 아래 최신 답변을 확인해 주세요.',
     firstReplyEyebrow: 'Submission received',
     firstReplyTitle: '상담 접수 안내',
@@ -115,6 +116,7 @@ const copyByLanguage = {
     missingConsultation: 'We could not find this consultation. Please check the link or code again.',
     loadError: 'We could not load the consultation status right now. Please try again shortly.',
     loading: 'Loading your consultation status...',
+    lookupRefreshed: 'Status is up to date.',
     liveUpdate: 'A new doctor reply has arrived. Please check the latest reply below.',
     firstReplyEyebrow: 'Submission received',
     firstReplyTitle: 'Consultation submission notice',
@@ -239,6 +241,9 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [lookupNotice, setLookupNotice] = useState<string | null>(null)
+  const manualLookupRef = useRef(false)
+  const lookupNoticeTimeoutRef = useRef<number | null>(null)
   const [restoredRecentSession, setRestoredRecentSession] = useState(false)
   const [checkingStoredSession, setCheckingStoredSession] = useState(true)
   const [liveUpdateMessage, setLiveUpdateMessage] = useState<string | null>(null)
@@ -277,12 +282,30 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
     setRestoredRecentSession(false)
     setSessionChatbotReply(null)
     setResolvedLookup(normalizedLookup)
+    // Usually the field already holds the consultation on screen, so none of
+    // the state above changes and no effect re-runs. The button is labelled
+    // "check status": it has to actually check, and say that it did.
+    manualLookupRef.current = true
+    setRefreshKey((current) => current + 1)
 
     if (typeof window !== 'undefined') {
       const href = buildStatusPageHref(normalizedLookup, uiLanguage, window.location.origin)
       window.history.pushState(null, '', href)
       setFragmentLookup(isStatusCode(normalizedLookup) ? '' : normalizedLookup)
     }
+  }
+
+  function showLookupNotice(message: string) {
+    if (typeof window === 'undefined') return
+
+    setLookupNotice(message)
+    if (lookupNoticeTimeoutRef.current) {
+      window.clearTimeout(lookupNoticeTimeoutRef.current)
+    }
+    lookupNoticeTimeoutRef.current = window.setTimeout(() => {
+      setLookupNotice(null)
+      lookupNoticeTimeoutRef.current = null
+    }, STATUS_LOADING_NOTICE_VISIBLE_MS)
   }
 
   function queueBackgroundLoadingNotice() {
@@ -340,8 +363,12 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
 
   useEffect(() => {
     return () => {
-      if (loadingNoticeTimeoutRef.current && typeof window !== 'undefined') {
+      if (typeof window === 'undefined') return
+      if (loadingNoticeTimeoutRef.current) {
         window.clearTimeout(loadingNoticeTimeoutRef.current)
+      }
+      if (lookupNoticeTimeoutRef.current) {
+        window.clearTimeout(lookupNoticeTimeoutRef.current)
       }
     }
   }, [])
@@ -409,12 +436,17 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
     const activeLookup = resolvedLookup
 
     async function loadConsultation() {
+      const manual = manualLookupRef.current
+      manualLookupRef.current = false
       const hasVisibleConsultation = Boolean(latestConsultationRef.current)
-      if (hasVisibleConsultation) {
+      if (manual) {
+        setLoading(true)
+      } else if (hasVisibleConsultation) {
         queueBackgroundLoadingNotice()
       } else {
         setLoading(true)
       }
+      setLookupNotice(null)
       setFetchError(null)
 
       try {
@@ -430,6 +462,7 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
         }
 
         const nextUiLanguage = status.uiLanguage || uiLanguage
+        if (manual) showLookupNotice(copy.lookupRefreshed)
         setConsultation(status)
         setUiLanguage(nextUiLanguage)
         saveUiLanguage(nextUiLanguage)
@@ -452,7 +485,7 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
           setFetchError(copy.loadError)
         }
       } finally {
-        if (!cancelled && !hasVisibleConsultation) {
+        if (!cancelled && (manual || !hasVisibleConsultation)) {
           setLoading(false)
         }
       }
@@ -463,7 +496,7 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
     return () => {
       cancelled = true
     }
-  }, [copy.loadError, copy.missingConsultation, resolvedLookup, refreshKey, uiLanguage])
+  }, [copy.loadError, copy.lookupRefreshed, copy.missingConsultation, resolvedLookup, refreshKey, uiLanguage])
 
   useEffect(() => {
     if (!consultation) {
@@ -638,6 +671,9 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
               {copy.lookupSubmit}
             </button>
           </form>
+          {lookupNotice ? (
+            <p className="mt-3 text-sm leading-6 text-[var(--blue)]">{lookupNotice}</p>
+          ) : null}
         </section>
 
         {restoredRecentSession ? (
