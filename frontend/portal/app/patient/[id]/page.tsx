@@ -16,7 +16,11 @@ import {
   postReply,
 } from '@/lib/api'
 import type { PatientNotifyChannel } from '@/lib/api'
-import { AiDoctorSummaryPending, AiDoctorSummarySection } from './AiDoctorSummarySection'
+import {
+  AiDoctorSummaryPending,
+  AiDoctorSummarySection,
+  AiFollowUpDraftSection,
+} from './AiDoctorSummarySection'
 
 // The summary is written a few seconds after intake. Past this age an absent
 // summary means it was never generated, not that it is still coming.
@@ -650,6 +654,14 @@ export default function PatientPage({ params }: PatientPageProps) {
               />
             ) : awaitingSummary ? (
               <AiDoctorSummaryPending />
+            ) : null}
+
+            {consultation.aiFollowUpDraft ? (
+              <AiFollowUpDraftSection
+                draft={consultation.aiFollowUpDraft}
+                onUseDraft={handleUseDraft}
+                canUseDraft={!derivedState.closed && !fallbackNotice && !submitting}
+              />
             ) : null}
 
             {consultation.doctorChart ? (

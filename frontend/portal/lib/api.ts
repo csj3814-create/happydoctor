@@ -60,6 +60,19 @@ export interface AiDoctorSummary {
   generatedAt?: string | null;
 }
 
+// Drafted for the newest follow-up question only, and kept apart from
+// aiDoctorSummary so the intake SOAP note survives a follow-up.
+export interface AiFollowUpDraft {
+  question?: string | null;
+  replyDraft?: string | null;
+  disclaimer?: string | null;
+  replyDraftDisclaimer?: string | null;
+  model?: string | null;
+  status?: 'ready' | 'failed' | string | null;
+  error?: string | null;
+  generatedAt?: string | null;
+}
+
 export interface ConsultationMediaItem {
   id?: string | null;
   kind?: string;
@@ -97,6 +110,7 @@ export interface Consultation {
   mediaItems?: ConsultationMediaItem[];
   patientNotificationContact?: PatientNotificationContact | null;
   aiDoctorSummary?: AiDoctorSummary | null;
+  aiFollowUpDraft?: AiFollowUpDraft | null;
 }
 
 export type ConsultationStatus = 'all' | 'active' | 'followup' | 'replied' | 'closed';

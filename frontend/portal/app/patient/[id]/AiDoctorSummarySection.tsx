@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
-import { AiDoctorSummary } from '@/lib/api'
+import type { AiDoctorSummary, AiFollowUpDraft } from '@/lib/api'
 
 function formatGeneratedAt(iso: string): string {
   const parsed = new Date(iso)
@@ -159,6 +159,88 @@ export function AiDoctorSummaryPending() {
       <p className="mt-2 text-sm text-amber-800">
         보듬이가 문진을 정리하는 중입니다. 잠시 후 이 자리에 SOAP 정리와 답변 초안이 표시됩니다.
       </p>
+    </section>
+  )
+}
+
+// The latest follow-up question and a draft answer to it. Shown apart from the
+// intake summary because the clinician is answering this one now; the SOAP note
+// above still describes the original chart.
+export function AiFollowUpDraftSection({
+  draft,
+  onUseDraft,
+  canUseDraft,
+}: {
+  draft: AiFollowUpDraft
+  onUseDraft: (draft: string) => void
+  canUseDraft: boolean
+}) {
+  const question = draft.question?.trim() || ''
+  const replyDraft = draft.replyDraft?.trim() || ''
+
+  if (draft.status === 'failed' || !replyDraft) {
+    if (!question) return null
+    return (
+      <section className="rounded-2xl border border-zinc-200 bg-white px-5 py-5 shadow-sm">
+        <h2 className="mb-2 text-sm font-bold text-zinc-800">추가 질문</h2>
+        <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-zinc-700">
+          {question}
+        </pre>
+        <p className="mt-3 text-sm text-zinc-500">이 질문은 보듬이 초안을 만들지 못했습니다.</p>
+      </section>
+    )
+  }
+
+  return (
+    <section className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-5 shadow-sm">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-bold text-zinc-800">추가 질문 답변 초안 (의료진 전용)</h2>
+          <p className="mt-1 text-xs text-amber-800">
+            {draft.disclaimer || 'AI가 추가 질문만 보고 작성한 초안입니다. 진단·처방이 아니며 의료진 검토가 필요합니다.'}
+          </p>
+        </div>
+        {draft.generatedAt ? (
+          <p className="text-xs text-amber-700">
+            {formatGeneratedAt(draft.generatedAt)}
+            {draft.model ? ` · ${draft.model}` : ''}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="space-y-4">
+        {question ? (
+          <div className="rounded-xl border border-amber-200 bg-white px-4 py-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">환자가 물은 것</p>
+            <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-zinc-700">
+              {question}
+            </pre>
+          </div>
+        ) : null}
+
+        <div className="rounded-xl border border-amber-200 bg-white px-4 py-4">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">답변 초안</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <CopyButton text={replyDraft} label="복사" />
+              <button
+                type="button"
+                onClick={() => onUseDraft(replyDraft)}
+                disabled={!canUseDraft}
+                className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-amber-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                답변란에 넣기
+              </button>
+            </div>
+          </div>
+          <p className="mb-3 text-xs text-amber-800">
+            {draft.replyDraftDisclaimer || '의료진 검토 전에는 환자에게 전달되지 않습니다. 확인 후 수정하여 보내 주세요.'}
+          </p>
+          <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-zinc-700">
+            {replyDraft}
+          </pre>
+        </div>
+      </div>
     </section>
   )
 }
