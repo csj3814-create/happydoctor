@@ -10,6 +10,9 @@ type StatusCloseActionsProps = {
   canClose: boolean
   isClosed: boolean
   uiLanguage: UiLanguage
+  // Rendered inside the conversation card, under the message box, so it drops
+  // the card chrome and the explanation that would repeat what is on screen.
+  compact?: boolean
   onUpdated?: () => void
 }
 
@@ -23,7 +26,7 @@ const copyByLanguage = {
     placeholder:
       '예: 약은 어떻게 먹으면 되는지, 언제 다시 병원에 가야 하는지처럼 이어서 궁금한 점을 적어 주세요.',
     followUpSending: '추가 질문을 보내고 있습니다...',
-    followUpSubmit: '추가 질문 보내기',
+    followUpSubmit: '전송',
     closeSending: '상담을 종료하고 있습니다...',
     closeSubmit: '답변 확인 후 상담 종료',
     closeSuccess: '상담이 종료되었습니다. 다시 도움이 필요하면 새 상담을 시작해 주세요.',
@@ -40,8 +43,8 @@ const copyByLanguage = {
     closeBodySuffix: 'If the reply was enough, you can also close the consultation here.',
     placeholder:
       'Example: when should I visit a clinic again, or what should I watch for next?',
-    followUpSending: 'Sending your follow-up question...',
-    followUpSubmit: 'Send follow-up question',
+    followUpSending: 'Sending...',
+    followUpSubmit: 'Send',
     closeSending: 'Closing the consultation...',
     closeSubmit: 'Close consultation',
     closeSuccess: 'This consultation is now closed. Please start a new one if you need more help.',
@@ -109,21 +112,21 @@ export function StatusFollowUpComposer({
 
   return (
     <div>
-      {/* Side by side once there is room; stacked on a phone, where a
-          half-width box is too small to write more than a few words in. */}
-      <form onSubmit={handleSubmit} className="flex flex-col gap-2 sm:flex-row sm:items-end">
+      {/* Side by side at every width. The button carries a one-word label, so
+          it stays narrow enough to leave the box usable on a phone. */}
+      <form onSubmit={handleSubmit} className="flex items-end gap-2">
         <textarea
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
           placeholder={copy.placeholder}
           rows={2}
           disabled={sending}
-          className="min-h-[3.5rem] w-full resize-none rounded-[1.2rem] border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm leading-6 text-[var(--ink)] outline-none transition focus:border-[var(--blue)] focus:bg-white sm:flex-1"
+          className="min-h-[3.5rem] flex-1 resize-none rounded-[1.2rem] border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm leading-6 text-[var(--ink)] outline-none transition focus:border-[var(--blue)] focus:bg-white"
         />
         <button
           type="submit"
           disabled={sending || !question.trim()}
-          className="w-full shrink-0 rounded-[1.2rem] bg-[var(--navy)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#123c67] disabled:cursor-not-allowed disabled:bg-slate-400 sm:w-auto"
+          className="shrink-0 rounded-[1.1rem] bg-[var(--navy)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#123c67] disabled:cursor-not-allowed disabled:bg-slate-400"
           style={{ color: '#ffffff' }}
         >
           {sending ? copy.followUpSending : copy.followUpSubmit}
@@ -150,6 +153,7 @@ export default function StatusCloseActions({
   canClose,
   isClosed,
   uiLanguage,
+  compact = false,
   onUpdated,
 }: StatusCloseActionsProps) {
   const router = useRouter()
@@ -159,6 +163,10 @@ export default function StatusCloseActions({
   const [error, setError] = useState<string | null>(null)
 
   if (isClosed) {
+    if (compact) {
+      return <p className="text-sm leading-7 text-[var(--muted)]">{copy.closedBody}</p>
+    }
+
     return (
       <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
         <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
@@ -206,6 +214,38 @@ export default function StatusCloseActions({
     } finally {
       setClosing(false)
     }
+  }
+
+  const closeButton = (
+    <button
+      type="button"
+      onClick={handleClose}
+      disabled={closing}
+      className="w-full rounded-[1.2rem] bg-[var(--navy)] px-5 py-3 text-sm font-semibold text-white visited:text-white transition hover:bg-[#123c67] disabled:cursor-not-allowed disabled:bg-slate-400"
+      style={{ color: '#ffffff' }}
+    >
+      {closing ? copy.closeSending : copy.closeSubmit}
+    </button>
+  )
+
+  if (compact) {
+    return (
+      <div>
+        {canClose ? closeButton : null}
+
+        {message ? (
+          <p className="mt-3 rounded-[1.2rem] bg-[var(--soft-blue)] px-4 py-3 text-sm leading-7 text-[var(--ink)]">
+            {message}
+          </p>
+        ) : null}
+
+        {error ? (
+          <p className="mt-3 rounded-[1.2rem] border border-[#ffd2c5] bg-[#fff6f2] px-4 py-3 text-sm leading-7 text-[#9b5031]">
+            {error}
+          </p>
+        ) : null}
+      </div>
+    )
   }
 
   return (

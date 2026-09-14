@@ -608,12 +608,27 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
     ? consultation.status === 'doctor_replied' && !consultation.closedAt
     : false
 
-  const followUpComposer = resolvedLookup && latestReply && consultation?.status !== 'closed' ? (
-    <StatusFollowUpComposer
-      lookup={resolvedLookup}
-      uiLanguage={uiLanguage}
-      onUpdated={() => setRefreshKey((current) => current + 1)}
-    />
+  // Message box first, then the way out of the conversation - the order a
+  // patient meets them in: write another question, or finish here.
+  const conversationFooter = resolvedLookup ? (
+    <div className="space-y-4">
+      {latestReply && consultation?.status !== 'closed' ? (
+        <StatusFollowUpComposer
+          lookup={resolvedLookup}
+          uiLanguage={uiLanguage}
+          onUpdated={() => setRefreshKey((current) => current + 1)}
+        />
+      ) : null}
+
+      <StatusCloseActions
+        lookup={resolvedLookup}
+        canClose={canCloseConsultation}
+        isClosed={consultation?.status === 'closed'}
+        uiLanguage={uiLanguage}
+        compact
+        onUpdated={() => setRefreshKey((current) => current + 1)}
+      />
+    </div>
   ) : null
 
   const doctorReplyCard = consultation ? (
@@ -621,17 +636,7 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
       consultation={consultation}
       uiLanguage={uiLanguage}
       copy={copy}
-      composer={followUpComposer}
-    />
-  ) : null
-
-  const nextActionCard = resolvedLookup ? (
-    <StatusCloseActions
-      lookup={resolvedLookup}
-      canClose={canCloseConsultation}
-      isClosed={consultation?.status === 'closed'}
-      uiLanguage={uiLanguage}
-      onUpdated={() => setRefreshKey((current) => current + 1)}
+      composer={conversationFooter}
     />
   ) : null
 
@@ -761,14 +766,7 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
               <p className="mt-4 text-sm leading-7 text-white/82">{statusPanelCopy.body}</p>
             </div>
 
-            {hasDoctorReply ? (
-              <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
-                {doctorReplyCard}
-                <div className="space-y-5">
-                  {nextActionCard}
-                </div>
-              </div>
-            ) : null}
+            {hasDoctorReply ? doctorReplyCard : null}
 
             {chatbotReply && hasDoctorReply ? (
               <div className="rounded-[2rem] border border-[#cfe0ff] bg-[#f5f9ff] p-6 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
