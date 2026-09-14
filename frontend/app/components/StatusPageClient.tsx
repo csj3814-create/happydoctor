@@ -7,6 +7,7 @@ import { useSearchParams } from 'next/navigation'
 
 import ConsultationImageUploader from '@/components/ConsultationImageUploader'
 import StatusCloseActions from '@/components/StatusCloseActions'
+import StatusConversation from '@/components/StatusConversation'
 import {
   getActiveConsultationSession,
   saveActiveConsultationSession,
@@ -59,6 +60,11 @@ const copyByLanguage = {
     firstReplyTitle: '상담 접수 안내',
     doctorReplyEyebrow: '의료진 답변',
     noDoctorReply: '아직 의료진 답변이 없습니다.',
+    conversationTitle: '상담 대화',
+    conversationEmpty: '아직 주고받은 내용이 없습니다.',
+    submissionLabel: '상담 접수',
+    followUpLabel: '추가 질문',
+    patientLabel: '나',
     infoTitle: '안내',
     infoItems: [
       '응급 상황이라고 느껴지면 119나 가까운 응급실 이용이 우선입니다.',
@@ -127,6 +133,11 @@ const copyByLanguage = {
     firstReplyTitle: 'Consultation submission notice',
     doctorReplyEyebrow: 'Doctor reply',
     noDoctorReply: 'There is no doctor reply yet.',
+    conversationTitle: 'Consultation thread',
+    conversationEmpty: 'Nothing has been exchanged yet.',
+    submissionLabel: 'Submitted',
+    followUpLabel: 'Follow-up question',
+    patientLabel: 'You',
     infoTitle: 'Notes',
     infoItems: [
       'If this feels urgent, please use emergency services first.',
@@ -597,35 +608,9 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
     ? consultation.status === 'doctor_replied' && !consultation.closedAt
     : false
 
-  const doctorReplyCard = (
-    <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
-      <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
-        {copy.doctorReplyEyebrow}
-      </p>
-      {latestReply ? (
-        <article className="mt-4 rounded-[1.4rem] bg-[var(--surface)] p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-[var(--ink)]">
-              {latestReply.doctorName}
-              {consultation && consultation.doctorReplies.length > 1
-                ? ` · ${consultation.doctorReplies.length}`
-                : ''}
-            </p>
-            <p className="text-xs text-[var(--muted)]">
-              {formatDateTime(latestReply.createdAt, uiLanguage, copy)}
-            </p>
-          </div>
-          <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--ink)]">
-            {latestReply.message}
-          </p>
-        </article>
-      ) : (
-        <p className="mt-4 rounded-[1.4rem] bg-[var(--surface)] p-4 text-sm leading-7 text-[var(--muted)]">
-          {copy.noDoctorReply}
-        </p>
-      )}
-    </div>
-  )
+  const doctorReplyCard = consultation ? (
+    <StatusConversation consultation={consultation} uiLanguage={uiLanguage} copy={copy} />
+  ) : null
 
   const nextActionCard = resolvedLookup ? (
     <StatusCloseActions

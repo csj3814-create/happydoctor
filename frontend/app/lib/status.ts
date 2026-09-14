@@ -30,6 +30,11 @@ export type PublicConsultationStage =
   | 'doctor_replied'
   | 'closed'
 
+export interface PublicFollowUpQuestion {
+  question: string
+  createdAt: string | null
+}
+
 export interface PublicConsultationStatus {
   consultationId: string
   trackingCode: string | null
@@ -46,6 +51,7 @@ export interface PublicConsultationStatus {
   requiresDoctorReview: boolean
   followUpCount: number
   latestFollowUpAt: string | null
+  patientQuestions: PublicFollowUpQuestion[]
   doctorReplies: PublicDoctorReply[]
   mediaItems: PublicConsultationMediaItem[]
   entryChannel: 'kakao' | 'web' | string
