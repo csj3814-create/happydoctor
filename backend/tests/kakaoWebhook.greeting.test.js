@@ -207,3 +207,56 @@ test('closing a consultation carries the support notice and says it is optional'
     routeModule.restore();
   }
 });
+
+test('a phone number typed into the channel becomes the reply contact', { concurrency: false }, async () => {
+  const saved = [];
+  const trackingCalls = [];
+  const mocks = buildMocks({ trackingCalls });
+  mocks[DB_SERVICE_PATH].savePatientNotificationContactByUserId = async (userId, contact) => {
+    saved.push({ userId, contact });
+    return 'consult-open';
+  };
+
+  const routeModule = loadKakaoRoute(mocks);
+  const server = await startServer(routeModule.router);
+
+  try {
+    const { status, text } = await postUtterance(server.baseUrl, '010-1234-5678');
+
+    assert.equal(status, 200);
+    assert.equal(saved.length, 1);
+    assert.equal(saved[0].contact.normalizedPhone, '01012345678');
+    assert.equal(saved[0].contact.consented, true);
+    assert.equal(saved[0].contact.source, 'kakao_channel');
+    // Echoed back masked: a channel conversation can be read over a shoulder.
+    assert.match(text, /010-\*\*\*\*-5678/);
+    assert.doesNotMatch(text, /1234-5678(?!\s)/);
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});
+
+test('a sentence that merely mentions a number is not taken as a contact', { concurrency: false }, async () => {
+  const saved = [];
+  const trackingCalls = [];
+  const mocks = buildMocks({ trackingCalls });
+  mocks[DB_SERVICE_PATH].savePatientNotificationContactByUserId = async (userId, contact) => {
+    saved.push({ userId, contact });
+    return 'consult-open';
+  };
+
+  const routeModule = loadKakaoRoute(mocks);
+  const server = await startServer(routeModule.router);
+
+  try {
+    const { text } = await postUtterance(server.baseUrl, '3일째 열이 38도까지 올라요');
+
+    assert.deepEqual(saved, []);
+    // Falls through to the ordinary greeting.
+    assert.match(text, /상담 시작/);
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});

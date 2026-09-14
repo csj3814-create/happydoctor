@@ -711,6 +711,40 @@ async function logConsultation(userId, patientData, analysisResult, options = {}
 // Kept separate from aiDoctorSummary rather than overwriting it: the intake
 // SOAP note stays valid after a follow-up, and the clinician needs both. Only
 // the latest question is held, because that is the one being answered.
+// Attaches a reply-notification contact to the consultation a KakaoTalk user
+// is currently in. Only an open one: a contact given today should not be
+// written onto a consultation that closed last month.
+async function savePatientNotificationContactByUserId(userId, contact) {
+  if (!db || !userId || !contact) return null;
+
+  try {
+    const snapshot = await db.collection('consultations')
+      .where('userId', '==', userId)
+      .orderBy('createdAt', 'desc')
+      .limit(1)
+      .get();
+
+    if (snapshot.empty) return null;
+
+    const doc = snapshot.docs[0];
+    const data = doc.data() || {};
+    if (isConsultationClosed(data) || data.status === 'CLOSED') return null;
+
+    await doc.ref.set({
+      patientNotificationContact: {
+        ...contact,
+        consentedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    return doc.id;
+  } catch (error) {
+    console.error('[DB Patient Contact Error]', error);
+    return null;
+  }
+}
+
 async function saveAiFollowUpDraft(consultationId, draft) {
   if (!db || !consultationId || !draft) return false;
 
@@ -2093,6 +2127,7 @@ module.exports = {
   buildPublicConsultationStatus,
   saveAiDoctorSummary,
   saveAiFollowUpDraft,
+  savePatientNotificationContactByUserId,
   closeConsultation,
   saveDoctorReply,
   getPendingDoctorReply,

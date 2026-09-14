@@ -9,6 +9,14 @@ const dbService = require('../services/dbService');
 const followUpService = require('../services/followUpService');
 const { analyzeAndRouteTriage, buildDoctorReviewNotice } = require('../services/llmService');
 const { scheduleDoctorSummary, scheduleFollowUpDraft } = require('../services/doctorSummaryScheduler');
+// Shared with the KakaoTalk intake so the two paths cannot drift on what
+// counts as a reachable phone number or address.
+const {
+  EMAIL_PATTERN,
+  PHONE_PATTERN,
+  normalizeEmailAddress,
+  normalizePhoneNumber,
+} = require('../services/patientContactService');
 const {
   TRANSLATION_PROVIDER,
   detectLanguage,
@@ -165,25 +173,8 @@ function validatePublicPatientData(patientData) {
   return null;
 }
 
-const REPLY_NOTIFICATION_EMAIL_PATTERN = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
-
 function parseConsentFlag(value) {
   return value === true || value === 'true' || value === '1' || value === 'on';
-}
-
-function normalizePhoneNumber(value) {
-  if (typeof value !== 'string') return '';
-
-  return value
-    .trim()
-    .replace(/[^\d+]/g, '')
-    .replace(/(?!^)\+/g, '')
-    .slice(0, 20);
-}
-
-function normalizeEmailAddress(value) {
-  if (typeof value !== 'string') return '';
-  return value.trim().toLowerCase().slice(0, 254);
 }
 
 function buildReplyNotificationContact(body = {}) {
@@ -205,11 +196,11 @@ function buildReplyNotificationContact(body = {}) {
     throw createRequestValidationError('답변 알림을 받으려면 휴대폰 번호나 이메일 중 하나를 입력해 주세요.');
   }
 
-  if (normalizedPhone && !/^\+?\d{10,15}$/.test(normalizedPhone)) {
+  if (normalizedPhone && !PHONE_PATTERN.test(normalizedPhone)) {
     throw createRequestValidationError('휴대폰 번호를 다시 확인해 주세요.');
   }
 
-  if (normalizedEmail && !REPLY_NOTIFICATION_EMAIL_PATTERN.test(normalizedEmail)) {
+  if (normalizedEmail && !EMAIL_PATTERN.test(normalizedEmail)) {
     throw createRequestValidationError('이메일 주소를 다시 확인해 주세요.');
   }
 

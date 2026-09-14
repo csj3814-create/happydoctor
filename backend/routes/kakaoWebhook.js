@@ -16,6 +16,11 @@ const clearOperatorUnansweredAlerts = notifyService.clearOperatorUnansweredAlert
 const followUpService = require('../services/followUpService');
 const dbService = require('../services/dbService');
 const { scheduleDoctorSummary } = require('../services/doctorSummaryScheduler');
+const {
+    buildConsentedContact,
+    parseContactFromUtterance,
+    maskContact,
+} = require('../services/patientContactService');
 const { appSiteUrl, ConfigurationError, getMessengerApiKey } = require('../config');
 
 function buildStatusLinkText(trackingInfo) {
@@ -65,9 +70,11 @@ function collectKakaoImageUrls(value) {
     return [...new Set(collected)];
 }
 
-async function logConsultationAndGetStatusLink(userId, patientData, analysisResult) {
+async function logConsultationAndGetStatusLink(userId, patientData, analysisResult, options = {}) {
     try {
-        const saved = await dbService.logConsultation(userId, patientData, analysisResult);
+        const saved = await dbService.logConsultation(userId, patientData, analysisResult, {
+            patientNotificationContact: options.patientNotificationContact || null,
+        });
         const symptomImageUrls = collectKakaoImageUrls(patientData?.symptomImage);
 
         if (saved?.consultationId && symptomImageUrls.length > 0) {
@@ -93,11 +100,6 @@ async function logConsultationAndGetStatusLink(userId, patientData, analysisResu
     }
 }
 
-// A status link says "here is the thing you are waiting on". Only a
-// consultation that is still open, and recent enough that the patient could
-// plausibly be waiting on it, qualifies. Offering the newest one regardless
-// handed a patient a link to a months-old, already-answered case right after
-// they described a new symptom.
 // Restored from commit af3c7db, which removed it for want of anywhere to send
 // people. The homepage now carries the account, so the ask has a destination.
 // It goes out only at the close of a consultation, and says plainly that it is
@@ -110,6 +112,23 @@ const SUPPORT_NOTICE = [
     '후원은 의무가 아닙니다. 주변에 도움이 필요한 분께 이 채널을 알려주시는 것만으로도 큰 힘이 됩니다.',
 ].join('\n');
 
+// A channel cannot speak first without a paid alert template, so a patient
+// who does not come back never learns their answer arrived. Asking for a phone
+// or an email here gives the reply somewhere to go - and asking is what makes
+// a number typed afterwards consent rather than a guess on our part.
+const CONTACT_PROMPT = [
+    '',
+    '',
+    '답변이 준비되면 문자나 이메일로 알려드릴까요?',
+    '휴대폰 번호 또는 이메일 주소만 보내주시면 그 주소로 알림을 보내드립니다.',
+    '원하지 않으시면 보내지 않으셔도 됩니다. 위 링크로 언제든 직접 확인하실 수 있습니다.',
+].join('\n');
+
+// A status link says "here is the thing you are waiting on". Only a
+// consultation that is still open, and recent enough that the patient could
+// plausibly be waiting on it, qualifies. Offering the newest one regardless
+// handed a patient a link to a months-old, already-answered case right after
+// they described a new symptom.
 const OPEN_STATUS_LINK_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 
 async function getLatestStatusLinkForUser(userId) {
@@ -331,6 +350,15 @@ router.post('/triage-complete', async (req, res) => {
         // ※ consumePendingFollowUp() 이후에 호출해야 pending 플래그가 유지됨
         await followUpService.resetSession(userId);
 
+        // Used when OpenBuilder is configured to collect a contact during
+        // intake. Until then these slots are simply absent and the patient is
+        // asked for one in the reply instead.
+        const patientNotificationContact = buildConsentedContact({
+            phone: merged.reply_notification_phone || '',
+            email: merged.reply_notification_email || '',
+            source: 'kakao_start',
+        });
+
         if (callbackUrl) {
             // 콜백 모드: 대기 메시지 먼저 반환 후 비동기 처리
             res.status(200).json({
@@ -342,10 +370,10 @@ router.post('/triage-complete', async (req, res) => {
                     }]
                 }
             });
-            processTriageAsync(callbackUrl, userId, patientData);
+            processTriageAsync(callbackUrl, userId, patientData, { patientNotificationContact });
         } else {
             // 동기 모드: 5초 내 직접 응답
-            const result = await processTriageSync(userId, patientData);
+            const result = await processTriageSync(userId, patientData, { patientNotificationContact });
             return res.status(200).json(result);
         }
 
@@ -357,7 +385,7 @@ router.post('/triage-complete', async (req, res) => {
     }
 });
 
-async function processTriageSync(userId, patientData) {
+async function processTriageSync(userId, patientData, options = {}) {
     try {
         const startTime = Date.now();
         const routingResult = await analyzeAndRouteTriage(patientData);
@@ -379,7 +407,8 @@ async function processTriageSync(userId, patientData) {
             reminderDelaysMinutes: [15, 180, 1440],
         });
         let finalResponseText = analysisResult.replyToPatient;
-        finalResponseText += await logConsultationAndGetStatusLink(userId, patientData, analysisResult);
+        finalResponseText += await logConsultationAndGetStatusLink(userId, patientData, analysisResult, options);
+        finalResponseText += CONTACT_PROMPT;
         return {
             version: "2.0",
             template: {
@@ -399,7 +428,7 @@ async function processTriageSync(userId, patientData) {
     }
 }
 
-async function processTriageAsync(callbackUrl, userId, patientData) {
+async function processTriageAsync(callbackUrl, userId, patientData, options = {}) {
     try {
         const startTime = Date.now();
         const routingResult = await analyzeAndRouteTriage(patientData);
@@ -421,7 +450,8 @@ async function processTriageAsync(callbackUrl, userId, patientData) {
         });
         let finalResponseText = analysisResult.replyToPatient;
 
-        finalResponseText += await logConsultationAndGetStatusLink(userId, patientData, analysisResult);
+        finalResponseText += await logConsultationAndGetStatusLink(userId, patientData, analysisResult, options);
+        finalResponseText += CONTACT_PROMPT;
 
         // 콜백 URL로 실제 분석 결과 전송
         if (callbackUrl) {
@@ -667,6 +697,26 @@ router.post('/check-doctor-reply', async (req, res) => {
         if (!payload) return;
 
         const userId = getKakaoUserId(payload);
+
+        // The intake message asks for a phone or an email. A reply that is one
+        // is an answer to that question, so it is stored and confirmed before
+        // anything else - including a pending doctor reply, which would
+        // otherwise bury it.
+        const offeredContact = parseContactFromUtterance(getKakaoUtterance(payload));
+        if (offeredContact) {
+            const consultationId = await dbService.savePatientNotificationContactByUserId(userId, offeredContact);
+            if (consultationId) {
+                return res.status(200).json({
+                    ...createKakaoTextResponse(
+                        `${maskContact(offeredContact)}(으)로 답변 알림을 보내드릴게요.
+`
+                        + '의료진 답변이 준비되면 알려드립니다.',
+                        [START_CONSULTATION_QUICK_REPLY],
+                    ),
+                });
+            }
+        }
+
         const pending = await dbService.getPendingDoctorReply(userId);
 
         if (pending) {
