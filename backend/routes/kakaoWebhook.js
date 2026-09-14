@@ -98,6 +98,18 @@ async function logConsultationAndGetStatusLink(userId, patientData, analysisResu
 // plausibly be waiting on it, qualifies. Offering the newest one regardless
 // handed a patient a link to a months-old, already-answered case right after
 // they described a new symptom.
+// Restored from commit af3c7db, which removed it for want of anywhere to send
+// people. The homepage now carries the account, so the ask has a destination.
+// It goes out only at the close of a consultation, and says plainly that it is
+// optional: this service exists for people who cannot easily pay for care.
+const SUPPORT_NOTICE = [
+    '',
+    '행복한 의사는 의료진이 자원봉사로 운영하는 비영리단체입니다.',
+    '오늘 상담이 도움이 되셨다면 작은 응원이 다음 상담을 가능하게 합니다. 💛',
+    '신한은행 100-034-864699 (예금주: 행복한의사)',
+    '후원은 의무가 아닙니다. 주변에 도움이 필요한 분께 이 채널을 알려주시는 것만으로도 큰 힘이 됩니다.',
+].join('\n');
+
 const OPEN_STATUS_LINK_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 
 async function getLatestStatusLinkForUser(userId) {
@@ -622,7 +634,7 @@ router.post('/close-consultation', async (req, res) => {
         const personalMsg = closeMessages[reason] || '오늘 상담은 여기서 마무리할게요.\n필요하실 때 언제든 다시 찾아주세요.';
 
         const statusLinkText = await getLatestStatusLinkForUser(userId);
-        const finalText = `보듬입니다.\n${personalMsg}\n\n해피닥터는 의료 접근성 취약계층을 위한 무료 온라인 의료상담입니다.\n필요하실 때 다시 이어서 도와드릴게요.${statusLinkText}`;
+        const finalText = `보듬입니다.\n${personalMsg}\n\n해피닥터는 의료 접근성 취약계층을 위한 무료 온라인 의료상담입니다.\n필요하실 때 다시 이어서 도와드릴게요.${statusLinkText}\n${SUPPORT_NOTICE}`;
 
         return res.status(200).json({
             version: "2.0",

@@ -81,6 +81,7 @@ function buildMocks({ trackingCalls, tracking = null }) {
       getConsultationTrackingById: async () => null,
       markReplyAsSeen: async () => {},
       awardHDT: async () => {},
+      closeConsultation: async () => true,
       HDT_SEEN: 50,
     },
     [NOTIFY_SERVICE_PATH]: {
@@ -172,6 +173,35 @@ test('an open consultation still gets its status link', { concurrency: false }, 
     assert.match(text, /진행 상태 확인하기/);
     assert.match(text, /status#token=token-abc/);
     assert.match(text, /직접 입력 코드: MRK7U8/);
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});
+
+test('closing a consultation carries the support notice and says it is optional', { concurrency: false }, async () => {
+  const trackingCalls = [];
+  const routeModule = loadKakaoRoute(buildMocks({ trackingCalls }));
+  const server = await startServer(routeModule.router);
+
+  try {
+    const response = await fetch(`${server.baseUrl}/close-consultation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userRequest: { user: { id: 'kakao-user-1' }, utterance: '상담종료' },
+        action: { params: { close_reason: '증상 호전' }, detailParams: {} },
+      }),
+    });
+
+    const body = await response.json();
+    const text = body?.template?.outputs?.[0]?.simpleText?.text || '';
+
+    assert.equal(response.status, 200);
+    assert.match(text, /신한은행 100-034-864699/);
+    // This service exists for people who cannot easily pay for care, so the
+    // ask has to carry its own way out.
+    assert.match(text, /후원은 의무가 아닙니다/);
   } finally {
     await server.close();
     routeModule.restore();

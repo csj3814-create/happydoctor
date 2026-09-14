@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import type { UiLanguage } from '@/lib/ui-language'
 
@@ -22,6 +22,16 @@ const copyByLanguage = {
   ko: {
     closedTitle: '상담 상태',
     closedBody: '이 상담은 이미 종료되었습니다. 다시 도움이 필요하면 새 상담을 시작해 주세요.',
+    supportTitle: '함께해 주세요',
+    supportBody:
+      '행복한 의사는 병원에 가기 어려운 분들을 위해 의료진이 자원봉사로 운영하는 비영리단체입니다. 오늘 상담이 도움이 되셨다면 작은 응원이 다음 상담을 가능하게 합니다.',
+    supportOptional: '후원은 전혀 의무가 아닙니다. 부담되신다면 주변에 도움이 필요한 분께 이 채널을 알려주시는 것만으로도 큰 힘이 됩니다.',
+    supportBank: '신한은행',
+    supportAccount: '100-034-864699',
+    supportHolder: '예금주: 행복한의사',
+    supportCopy: '계좌번호 복사',
+    supportCopied: '복사됨',
+    supportCopyFailed: '복사 실패',
     title: '다음 행동',
     body: '의료진 답변 뒤에 더 궁금한 점이 있으면 같은 상담 안에서 추가 질문을 남길 수 있습니다.',
     closeBodySuffix: '답변을 충분히 확인했다면 상담 종료도 바로 진행할 수 있습니다.',
@@ -41,6 +51,16 @@ const copyByLanguage = {
   en: {
     closedTitle: 'Consultation status',
     closedBody: 'This consultation is already closed. Please start a new one if you still need help.',
+    supportTitle: 'Support this service',
+    supportBody:
+      'Happy Doctor is a non-profit run by volunteer clinicians for people who struggle to reach a hospital. If today helped, a small gift keeps the next consultation possible.',
+    supportOptional: 'Giving is entirely optional. Telling someone who needs this about the service helps just as much.',
+    supportBank: 'Shinhan Bank',
+    supportAccount: '100-034-864699',
+    supportHolder: 'Account holder: 행복한의사',
+    supportCopy: 'Copy account number',
+    supportCopied: 'Copied',
+    supportCopyFailed: 'Copy failed',
     title: 'Next steps',
     body: 'If you still have questions after the doctor reply, you can leave a follow-up message in this consultation.',
     closeBodySuffix: 'If the reply was enough, you can also close the consultation here.',
@@ -58,6 +78,80 @@ const copyByLanguage = {
     followUpError: 'We could not send your follow-up question right now. Please try again shortly.',
   },
 } as const
+
+
+// Shown once a consultation is finished, never before: a patient deciding
+// whether to ask another question should not be reading an appeal. Commit
+// af3c7db removed the original notice for want of somewhere to send people;
+// the homepage now carries the account, so it has a destination again.
+function SupportNotice({ copy }: { copy: (typeof copyByLanguage)[UiLanguage] }) {
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
+
+  useEffect(() => {
+    if (copyState === 'idle') return undefined
+    const timer = window.setTimeout(() => setCopyState('idle'), 2000)
+    return () => window.clearTimeout(timer)
+  }, [copyState])
+
+  async function handleCopy() {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(copy.supportAccount)
+        setCopyState('copied')
+        return
+      }
+    } catch {
+      // fall through to the legacy path
+    }
+
+    try {
+      const area = document.createElement('textarea')
+      area.value = copy.supportAccount
+      area.setAttribute('readonly', '')
+      area.style.position = 'fixed'
+      area.style.opacity = '0'
+      document.body.appendChild(area)
+      area.select()
+      const copied = document.execCommand('copy')
+      document.body.removeChild(area)
+      setCopyState(copied ? 'copied' : 'failed')
+    } catch {
+      setCopyState('failed')
+    }
+  }
+
+  return (
+    <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
+      <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
+        {copy.supportTitle}
+      </p>
+      <p className="mt-4 text-sm leading-7 text-[var(--muted)]">{copy.supportBody}</p>
+
+      <div className="mt-4 rounded-[1.4rem] bg-[var(--surface)] p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
+          {copy.supportBank}
+        </p>
+        <p className="mt-2 text-2xl font-bold tracking-[0.02em] text-[var(--ink)]">
+          {copy.supportAccount}
+        </p>
+        <p className="mt-1 text-sm text-[var(--muted)]">{copy.supportHolder}</p>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="mt-3 rounded-[1.1rem] border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--navy)] transition hover:bg-[var(--soft-blue)]"
+        >
+          {copyState === 'copied'
+            ? copy.supportCopied
+            : copyState === 'failed'
+              ? copy.supportCopyFailed
+              : copy.supportCopy}
+        </button>
+      </div>
+
+      <p className="mt-4 text-xs leading-6 text-[var(--muted)]">{copy.supportOptional}</p>
+    </div>
+  )
+}
 
 type StatusFollowUpComposerProps = {
   lookup: string
@@ -169,7 +263,12 @@ export default function StatusCloseActions({
 
   if (isClosed) {
     if (compact) {
-      return <p className="text-sm leading-7 text-[var(--muted)]">{copy.closedBody}</p>
+      return (
+        <div className="space-y-4">
+          <p className="text-sm leading-7 text-[var(--muted)]">{copy.closedBody}</p>
+          <SupportNotice copy={copy} />
+        </div>
+      )
     }
 
     return (
@@ -239,9 +338,12 @@ export default function StatusCloseActions({
         {canClose ? closeButton : null}
 
         {message ? (
-          <p className="mt-3 rounded-[1.2rem] bg-[var(--soft-blue)] px-4 py-3 text-sm leading-7 text-[var(--ink)]">
-            {message}
-          </p>
+          <div className="mt-3 space-y-4">
+            <p className="rounded-[1.2rem] bg-[var(--soft-blue)] px-4 py-3 text-sm leading-7 text-[var(--ink)]">
+              {message}
+            </p>
+            <SupportNotice copy={copy} />
+          </div>
         ) : null}
 
         {error ? (
