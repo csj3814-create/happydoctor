@@ -25,7 +25,7 @@ const copyByLanguage = {
     supportTitle: '함께해 주세요',
     supportBody:
       '행복한 의사는 병원에 가기 어려운 분들을 위해 의료진이 자원봉사로 운영하는 비영리단체입니다. 오늘 상담이 도움이 되셨다면 작은 응원이 다음 상담을 가능하게 합니다.',
-    supportOptional: '후원은 전혀 의무가 아닙니다. 부담되신다면 주변에 도움이 필요한 분께 이 채널을 알려주시는 것만으로도 큰 힘이 됩니다.',
+    supportOptional: '후원은 전혀 의무가 아닙니다. 주변에 도움이 필요한 분께 이 채널을 알려주시는 것만으로도 큰 힘이 됩니다.',
     supportBank: '신한은행',
     supportAccount: '100-034-864699',
     supportHolder: '예금주: 행복한의사',

@@ -112,7 +112,7 @@ export default function StatusConversation({
   }, [items.length])
 
   return (
-    <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-5 shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
+    <div className="rounded-[1.8rem] border border-[var(--line)] bg-white p-4 shadow-[0_18px_50px_rgba(8,34,55,0.06)] sm:p-5">
       <p className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
         {copy.conversationTitle}
       </p>
@@ -122,7 +122,7 @@ export default function StatusConversation({
           {copy.conversationEmpty}
         </p>
       ) : (
-        <ol ref={listRef} className="mt-4 flex max-h-[60vh] flex-col gap-4 overflow-y-auto pr-1">
+        <ol ref={listRef} className="mt-4 flex max-h-[70vh] flex-col gap-4 overflow-y-auto pr-1">
           {items.map((item, index) => (
             <li
               key={`${item.kind}-${index}`}
@@ -136,7 +136,7 @@ export default function StatusConversation({
                 <span>{formatTime(item.at, uiLanguage, copy)}</span>
               </div>
               <div
-                className={`max-w-[88%] px-4 py-3 text-sm leading-7 ${
+                className={`max-w-[94%] px-4 py-3 text-sm leading-7 ${
                   item.kind === 'patient'
                     ? 'rounded-[1.4rem] rounded-tr-sm bg-[var(--sky)] text-[var(--ink)]'
                     : item.kind === 'notice'

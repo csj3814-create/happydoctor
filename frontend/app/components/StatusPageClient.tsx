@@ -46,6 +46,7 @@ const copyByLanguage = {
     lookupLabel: 'Lookup',
     lookupPlaceholder: '받은 링크 또는 코드',
     lookupSubmit: '상태 확인',
+    lookupToggleHint: '다른 코드로 조회',
     restoredRecentSession: '최근 상담을 다시 불러오고 있습니다.',
     lookupMissing:
       '상담을 시작하면 상태 확인 링크와 코드를 바로 안내해 드립니다. 최근 1시간 안에 시작한 상담이 있으면 이 화면에서 자동으로 다시 불러옵니다.',
@@ -120,6 +121,7 @@ const copyByLanguage = {
     lookupLabel: 'Lookup',
     lookupPlaceholder: 'The link or code you received',
     lookupSubmit: 'Check status',
+    lookupToggleHint: 'Look up another',
     restoredRecentSession: 'Restoring your recent consultation...',
     lookupMissing:
       'When you start a consultation, we immediately show a status link and lookup code. If you started one within the last hour, this page can restore it automatically.',
@@ -668,21 +670,31 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
           </div>
         </header>
 
-        <section className="mt-8 rounded-[2rem] border border-[var(--line)] bg-white/88 p-5 shadow-[0_24px_60px_rgba(8,34,55,0.08)] sm:p-7">
-          <form onSubmit={handleLookupSubmit} className="grid gap-3 lg:grid-cols-[1fr_auto]">
-            <label className="block">
-              <span className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
-                {copy.lookupLabel}
-              </span>
-              <input
-                type="text"
-                name="lookup"
-                value={lookupValue}
-                onChange={(event) => setLookupValue(event.target.value)}
-                placeholder={copy.lookupPlaceholder}
-                className="mt-3 w-full rounded-[1.2rem] border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--blue)] focus:bg-white"
-              />
-            </label>
+        {/* Once a consultation is on screen the patient arrived by link or
+            code and does not need the box that got them here. Folded away, it
+            gives the conversation the room instead - and one tap brings it
+            back for looking up a different consultation. */}
+        <details
+          className="group mt-8 rounded-[2rem] border border-[var(--line)] bg-white/88 p-5 shadow-[0_24px_60px_rgba(8,34,55,0.08)] sm:p-7"
+          open={!consultation}
+        >
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+            <span className="display-face text-xs font-semibold uppercase tracking-[0.2em] text-[var(--blue)]">
+              {copy.lookupLabel}
+            </span>
+            <span className="text-xs text-[var(--muted)] group-open:hidden">
+              {copy.lookupToggleHint}
+            </span>
+          </summary>
+          <form onSubmit={handleLookupSubmit} className="mt-4 grid gap-3 lg:grid-cols-[1fr_auto]">
+            <input
+              type="text"
+              name="lookup"
+              value={lookupValue}
+              onChange={(event) => setLookupValue(event.target.value)}
+              placeholder={copy.lookupPlaceholder}
+              className="w-full rounded-[1.2rem] border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--blue)] focus:bg-white"
+            />
             <button
               type="submit"
               className="self-end rounded-[1.2rem] bg-[var(--navy)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#123c67]"
@@ -693,7 +705,7 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
           {lookupNotice ? (
             <p className="mt-3 text-sm leading-6 text-[var(--blue)]">{lookupNotice}</p>
           ) : null}
-        </section>
+        </details>
 
         {restoredRecentSession ? (
           <section className="mt-6 rounded-[1.8rem] border border-blue-200 bg-blue-50 px-5 py-4 text-sm leading-7 text-blue-800">
@@ -737,14 +749,20 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
               </div>
             ) : null}
 
-            <div className="rounded-[2rem] bg-[var(--navy)] p-6 text-white shadow-[0_24px_60px_rgba(7,28,49,0.18)]">
+            {/* Kept small on purpose: this panel sits above the conversation,
+                and every line it takes is a line of the exchange pushed off
+                screen. The body only earns its place while there is nothing to
+                read below it. */}
+            <div className="rounded-[2rem] bg-[var(--navy)] p-5 text-white shadow-[0_24px_60px_rgba(7,28,49,0.18)]">
               <p className="display-face text-xs font-semibold uppercase tracking-[0.24em] text-white/66">
                 {statusPanelCopy.badge}
               </p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em]">
+              <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em]">
                 {statusPanelCopy.title}
               </h2>
-              <p className="mt-4 text-sm leading-7 text-white/82">{statusPanelCopy.body}</p>
+              {consultation.doctorReplies.length === 0 ? (
+                <p className="mt-3 text-sm leading-7 text-white/82">{statusPanelCopy.body}</p>
+              ) : null}
             </div>
 
             {doctorReplyCard}
