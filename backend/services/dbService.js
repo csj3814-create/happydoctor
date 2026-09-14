@@ -562,6 +562,17 @@ async function buildPublicConsultationStatus(consultation, replies) {
     requiresDoctorReview,
     followUpCount: followUpLogs.length,
     latestFollowUpAt: toIsoString(latestFollowUp?.timestamp),
+    // The patient's own questions, in the words they used. The Korean
+    // translation on the log is for the clinician; showing it back to someone
+    // who wrote in another language would read as if they had been rewritten.
+    patientQuestions: followUpLogs
+      .filter((log) => log?.action === 'PATIENT_FOLLOW_UP_QUESTION')
+      .map((log) => ({
+        question: String(log.originalQuestion || log.alertMessage || '').trim(),
+        createdAt: toIsoString(log.timestamp),
+      }))
+      .filter((entry) => entry.question)
+      .sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0)),
     doctorReplies: replies.map(mapDoctorReplyForPatient),
     entryChannel: consultation.entryChannel || 'kakao',
     mediaItems,
@@ -2076,6 +2087,7 @@ async function releaseFollowUpLease(userId, reason = 'processing_failed') {
 module.exports = {
   logConsultation,
   logFollowUp,
+  buildPublicConsultationStatus,
   saveAiDoctorSummary,
   saveAiFollowUpDraft,
   closeConsultation,
