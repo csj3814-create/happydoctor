@@ -589,10 +589,6 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
 
   const statusPanelCopy = consultation ? getStatusPanelCopy(consultation, copy) : null
   const mediaItems = consultation?.mediaItems ?? []
-  const latestReply =
-    consultation && consultation.doctorReplies.length > 0
-      ? consultation.doctorReplies[consultation.doctorReplies.length - 1]
-      : null
   // Shown only while the consultation itself has not loaded yet; once it has,
   // the acknowledgement appears as the first notice in the thread.
   const chatbotReply = consultation?.chatbotReply || sessionChatbotReply
@@ -604,7 +600,10 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
   // patient meets them in: write another question, or finish here.
   const conversationFooter = resolvedLookup ? (
     <div className="space-y-4">
-      {latestReply && consultation?.status !== 'closed' ? (
+      {/* Open from intake, not from the first reply. Someone who remembers a
+          detail while waiting should not have to wait to say it - the backend
+          has always accepted this, only the screen withheld it. */}
+      {consultation && consultation.status !== 'closed' ? (
         <StatusFollowUpComposer
           lookup={resolvedLookup}
           uiLanguage={uiLanguage}
