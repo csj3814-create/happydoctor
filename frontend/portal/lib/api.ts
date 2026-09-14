@@ -194,12 +194,27 @@ export async function getConsultation(id: string): Promise<Consultation> {
   return res.json();
 }
 
-export async function postReply(consultationId: string, message: string): Promise<void> {
+// Which channels actually carried the reply to the patient. An empty list is
+// not an error: the reply is saved, but nobody has been told about it.
+export type PatientNotifyChannel = 'kakao' | 'sms' | 'email';
+
+export interface DoctorReplyResult {
+  replyId?: string | null;
+  notifiedChannels: PatientNotifyChannel[];
+}
+
+export async function postReply(consultationId: string, message: string): Promise<DoctorReplyResult> {
   const headers = await authHeader();
   const res = await fetch(`${BASE}/api/portal/consultations/${consultationId}/reply`, {
     method: 'POST', headers, body: JSON.stringify({ message }),
   });
   if (!res.ok) throw new Error(await parseError(res));
+
+  const body = await res.json().catch(() => ({}));
+  return {
+    replyId: body?.replyId ?? null,
+    notifiedChannels: Array.isArray(body?.notifiedChannels) ? body.notifiedChannels : [],
+  };
 }
 
 export interface DoctorStats {

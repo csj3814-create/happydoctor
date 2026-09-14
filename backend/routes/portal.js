@@ -633,6 +633,8 @@ router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
     ].filter(Boolean);
 
     if (notifiedChannels.length === 0) {
+      // The reply is saved either way, but nobody has told the patient. Only
+      // the portal can say so, and until now it answered ok and said nothing.
       console.warn(`[Portal] No patient reply notification channel available for ${consultation.userId}.`);
     } else {
       console.log(`[Portal] Patient reply notified via ${notifiedChannels.join('+')} for ${consultation.userId}.`);

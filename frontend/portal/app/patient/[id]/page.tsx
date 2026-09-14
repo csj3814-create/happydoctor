@@ -15,6 +15,7 @@ import {
   getConsultations,
   postReply,
 } from '@/lib/api'
+import type { PatientNotifyChannel } from '@/lib/api'
 import { AiDoctorSummaryPending, AiDoctorSummarySection } from './AiDoctorSummarySection'
 
 // The summary is written a few seconds after intake. Past this age an absent
@@ -224,6 +225,16 @@ function SummaryCard({
   )
 }
 
+const NOTIFY_CHANNEL_LABELS: Record<PatientNotifyChannel, string> = {
+  kakao: '카카오톡',
+  sms: '문자',
+  email: '이메일',
+}
+
+function formatNotifyChannels(channels: PatientNotifyChannel[]): string {
+  return channels.map((channel) => NOTIFY_CHANNEL_LABELS[channel] || channel).join(' · ')
+}
+
 function getDoctorFacingPatientData(consultation: Consultation): PatientData {
   return consultation.translatedPatientDataKo || consultation.patientData
 }
@@ -251,6 +262,7 @@ export default function PatientPage({ params }: PatientPageProps) {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitSuccess, setSubmitSuccess] = useState(false)
+  const [notifiedChannels, setNotifiedChannels] = useState<PatientNotifyChannel[] | null>(null)
   const [patientId, setPatientId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -427,9 +439,10 @@ export default function PatientPage({ params }: PatientPageProps) {
     setSubmitError(null)
     setSubmitSuccess(false)
     try {
-      await postReply(patientId, replyText.trim())
+      const result = await postReply(patientId, replyText.trim())
       setReplyText('')
       setDraftNotice(null)
+      setNotifiedChannels(result.notifiedChannels)
       setSubmitSuccess(true)
       const updated = await getConsultation(patientId)
       setConsultation(updated)
@@ -815,10 +828,18 @@ export default function PatientPage({ params }: PatientPageProps) {
                   </p>
                 ) : null}
 
-                {submitSuccess ? (
-                  <p className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
-                    답변이 전송되었습니다.
-                  </p>
+                {submitSuccess && notifiedChannels ? (
+                  notifiedChannels.length > 0 ? (
+                    <p className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
+                      답변이 전송되었습니다. 환자에게 {formatNotifyChannels(notifiedChannels)}로 알렸습니다.
+                    </p>
+                  ) : (
+                    <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-900">
+                      답변은 저장했지만 <strong>환자에게 알릴 연락 수단이 없습니다.</strong> 환자가 상태
+                      확인 링크를 직접 열어야 답변을 볼 수 있습니다. 연락이 필요하면 위 알림 동의
+                      연락처를 확인해 주세요.
+                    </p>
+                  )
                 ) : null}
 
                 <button

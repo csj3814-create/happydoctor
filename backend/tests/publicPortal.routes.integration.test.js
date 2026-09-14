@@ -15,6 +15,7 @@ const UI_COPY_SERVICE_PATH = path.resolve(__dirname, '../services/uiCopyService.
 const CONFIG_PATH = path.resolve(__dirname, '../config.js');
 const PUBLIC_ROUTE_PATH = path.resolve(__dirname, '../routes/public.js');
 const PORTAL_ROUTE_PATH = path.resolve(__dirname, '../routes/portal.js');
+const SUMMARY_SCHEDULER_PATH = path.resolve(__dirname, '../services/doctorSummaryScheduler.js');
 
 function createModuleRecord(modulePath, exports) {
   return {
@@ -30,6 +31,10 @@ function loadRouteWithMocks(routePath, mocks) {
   const originalMocks = new Map();
 
   delete require.cache[routePath];
+  // The summary scheduler captures dbService and doctorSummaryService when it
+  // is first required. Left cached, it would hand every later test the mocks
+  // belonging to the first one, so it is re-required alongside the route.
+  delete require.cache[SUMMARY_SCHEDULER_PATH];
 
   Object.entries(mocks).forEach(([modulePath, exports]) => {
     originalMocks.set(modulePath, require.cache[modulePath]);
@@ -2027,6 +2032,77 @@ test('the portal chart drops the fixed intake acknowledgement but keeps a transl
     // Consultations from before automated triage was removed keep their reply.
     const legacy = await getJson(`${server.baseUrl}/consultations/consult-legacy`, { headers });
     assert.match(legacy.body.chatbotReply, /보듬이가 예전에 직접 작성한 답변입니다/);
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});
+
+test('a reply that reached no channel says so instead of reporting success', { concurrency: false }, async () => {
+  const routeModule = loadRouteWithMocks(PORTAL_ROUTE_PATH, {
+    [DB_SERVICE_PATH]: {
+      getActiveConsultations: async () => ({ consultations: [], total: 0 }),
+      getConsultationSummary: async () => ({ pending: 0, replied: 0, closed: 0, followUp: 0 }),
+      // No Kakao room, and the patient consented to no contact at all.
+      getConsultationById: async (consultationId) => ({
+        id: consultationId,
+        userId: 'public_user_silent',
+        aiAction: 'ESCALATE',
+        status: 'ACTIVE',
+        uiLanguage: 'ko',
+        patientReplyLanguage: 'ko',
+        patientNotificationContact: null,
+      }),
+      getConsultationTrackingById: async () => ({ trackingCode: 'ABC234', trackingToken: 'token-1' }),
+      saveDoctorReply: async () => 'reply-silent',
+      awardHDT: async () => {},
+      getDoctorStats: async () => null,
+      getAdmin: () => ({
+        auth() {
+          return {
+            verifyIdToken: async () => ({ uid: 'doctor-uid', email: 'doctor@example.com', name: '김의사' }),
+          };
+        },
+      }),
+      getDoctorAccessRecordByEmail: async () => null,
+      ensureApprovedDoctorAccess: async (doctor) => ({ status: 'approved', email: doctor.email }),
+      upsertDoctorAccessRequest: async () => null,
+      approveDoctorAccessRequest: async () => null,
+      listPendingDoctorAccessRequests: async () => [],
+      HDT_REPLY: 50,
+    },
+    [NOTIFY_SERVICE_PATH]: {
+      enqueuePatientChannelPush: async () => false,
+      enqueuePatientSmsNotification: async () => false,
+      clearDoctorNotifications: async () => {},
+      clearPatientChannelPushes: async () => {},
+      clearPatientSmsNotifications: async () => {},
+      clearOperatorUnansweredAlerts: async () => 0,
+    },
+    [FOLLOW_UP_SERVICE_PATH]: { cancelFollowUp: async () => {} },
+    [CONFIG_PATH]: {
+      appSiteUrl: 'https://app.happydoctor.kr',
+      getAllowedDoctorEmails: () => ['doctor@example.com'],
+      getPortalAdminEmails: () => [],
+    },
+  });
+
+  const server = await startServer(routeModule.router, '/api/portal');
+
+  try {
+    const response = await postJson(
+      `${server.baseUrl}/consultations/consult-silent/reply`,
+      { message: '안내드립니다.' },
+      { headers: { Authorization: 'Bearer portal-token' } },
+    );
+
+    // The reply is saved, so this is not an error. But the portal has to be
+    // able to tell the clinician that nobody was told, which it can only do if
+    // the empty channel list survives the response.
+    assert.equal(response.status, 200);
+    assert.equal(response.body.ok, true);
+    assert.equal(response.body.replyId, 'reply-silent');
+    assert.deepEqual(response.body.notifiedChannels, []);
   } finally {
     await server.close();
     routeModule.restore();
