@@ -15,7 +15,11 @@ import {
   getConsultations,
   postReply,
 } from '@/lib/api'
-import { AiDoctorSummarySection } from './AiDoctorSummarySection'
+import { AiDoctorSummaryPending, AiDoctorSummarySection } from './AiDoctorSummarySection'
+
+// The summary is written a few seconds after intake. Past this age an absent
+// summary means it was never generated, not that it is still coming.
+const SUMMARY_WAIT_MS = 3 * 60 * 1000
 
 function formatDate(iso: string): string {
   const parsed = new Date(iso)
@@ -377,6 +381,28 @@ export default function PatientPage({ params }: PatientPageProps) {
     && sourceLanguage.toLowerCase() !== 'ko',
   )
   const doctorFacingPatientData = consultation ? getDoctorFacingPatientData(consultation) : null
+  const consultationAgeMs = consultation ? Date.now() - timestampMs(consultation.createdAt) : 0
+  const awaitingSummary = Boolean(
+    consultation
+    && !consultation.aiDoctorSummary
+    && timestampMs(consultation.createdAt)
+    && consultationAgeMs < SUMMARY_WAIT_MS,
+  )
+
+  // Nothing pushes the summary to an open chart, so poll briefly while it is
+  // still expected. Stops as soon as it arrives, and never runs for an older
+  // consultation that simply has none.
+  useEffect(() => {
+    if (!patientId || !awaitingSummary) return undefined
+
+    const timer = window.setTimeout(() => {
+      getConsultation(patientId)
+        .then((updated) => setConsultation(updated))
+        .catch(() => {})
+    }, 5000)
+
+    return () => window.clearTimeout(timer)
+  }, [patientId, awaitingSummary, consultation])
 
   // Puts the draft in the reply form. It still needs a clinician to read it and
   // press send, so anything already typed is never discarded without asking.
@@ -600,6 +626,16 @@ export default function PatientPage({ params }: PatientPageProps) {
               </section>
             ) : null}
 
+            {consultation.aiDoctorSummary ? (
+              <AiDoctorSummarySection
+                summary={consultation.aiDoctorSummary}
+                onUseDraft={handleUseDraft}
+                canUseDraft={!derivedState.closed && !fallbackNotice && !submitting}
+              />
+            ) : awaitingSummary ? (
+              <AiDoctorSummaryPending />
+            ) : null}
+
             {consultation.doctorChart ? (
               <section className="rounded-2xl border border-zinc-200 bg-white px-5 py-5 shadow-sm">
                 <h2 className="mb-3 text-sm font-bold text-zinc-800">SOAP 차트</h2>
@@ -725,14 +761,6 @@ export default function PatientPage({ params }: PatientPageProps) {
                 </ul>
               )}
             </section>
-
-            {consultation.aiDoctorSummary ? (
-              <AiDoctorSummarySection
-                summary={consultation.aiDoctorSummary}
-                onUseDraft={handleUseDraft}
-                canUseDraft={!derivedState.closed && !fallbackNotice && !submitting}
-              />
-            ) : null}
 
             <section className="rounded-2xl border border-zinc-200 bg-white px-5 py-5 shadow-sm">
               <div className="mb-4 flex flex-col gap-1">

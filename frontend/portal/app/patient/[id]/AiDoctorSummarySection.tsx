@@ -148,3 +148,17 @@ export function AiDoctorSummarySection({
     </section>
   )
 }
+
+// The summary lands a few seconds after intake, but the doctor alert goes out
+// immediately. A clinician who follows that alert at once would otherwise see
+// nothing at all and have no way to know a draft is on its way.
+export function AiDoctorSummaryPending() {
+  return (
+    <section className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-5 shadow-sm">
+      <h2 className="text-sm font-bold text-zinc-800">보듬이 정리 (의료진 전용)</h2>
+      <p className="mt-2 text-sm text-amber-800">
+        보듬이가 문진을 정리하는 중입니다. 잠시 후 이 자리에 SOAP 정리와 답변 초안이 표시됩니다.
+      </p>
+    </section>
+  )
+}
