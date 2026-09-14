@@ -26,6 +26,9 @@ import ConversationThread from './ConversationThread'
 // The summary is written a few seconds after intake. Past this age an absent
 // summary means it was never generated, not that it is still coming.
 const SUMMARY_WAIT_MS = 3 * 60 * 1000
+// Nothing pushes a patient's follow-up to an open chart. A minute is often
+// enough to notice one arriving without making the page chatter.
+const THREAD_REFRESH_INTERVAL_MS = 60 * 1000
 
 function formatDate(iso: string): string {
   const parsed = new Date(iso)
@@ -219,6 +222,7 @@ export default function PatientPage({ params }: PatientPageProps) {
   const [draftNotice, setDraftNotice] = useState<string | null>(null)
   const replyFieldRef = useRef<HTMLTextAreaElement | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [refreshingThread, setRefreshingThread] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [notifiedChannels, setNotifiedChannels] = useState<PatientNotifyChannel[] | null>(null)
@@ -360,6 +364,21 @@ export default function PatientPage({ params }: PatientPageProps) {
     && consultationAgeMs < SUMMARY_WAIT_MS,
   )
 
+  // Keep the thread current while the chart is open. Skipped while a reply is
+  // being sent, so a refresh cannot land on top of the submission.
+  useEffect(() => {
+    if (!patientId) return undefined
+
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      getConsultation(patientId)
+        .then((updated) => setConsultation(updated))
+        .catch(() => {})
+    }, THREAD_REFRESH_INTERVAL_MS)
+
+    return () => window.clearInterval(timer)
+  }, [patientId])
+
   // Nothing pushes the summary to an open chart, so poll briefly while it is
   // still expected. Stops as soon as it arrives, and never runs for an older
   // consultation that simply has none.
@@ -374,6 +393,20 @@ export default function PatientPage({ params }: PatientPageProps) {
 
     return () => window.clearTimeout(timer)
   }, [patientId, awaitingSummary, consultation])
+
+  async function refreshConsultation() {
+    if (!patientId) return
+
+    setRefreshingThread(true)
+    try {
+      const updated = await getConsultation(patientId)
+      setConsultation(updated)
+    } catch {
+      // A failed refresh leaves the chart as it was; the next tick tries again.
+    } finally {
+      setRefreshingThread(false)
+    }
+  }
 
   // Puts the draft in the reply form. It still needs a clinician to read it and
   // press send, so anything already typed is never discarded without asking.
@@ -720,13 +753,26 @@ export default function PatientPage({ params }: PatientPageProps) {
                         )
                       ) : null}
 
-                      <button
-                        type="submit"
-                        disabled={submitting || !replyText.trim() || derivedState.closed || Boolean(fallbackNotice)}
-                        className="self-end rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {submitting ? '전송 중...' : '환자에게 전송'}
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        {/* Before sending, a clinician may want to be sure no
+                            newer question arrived while they were writing. */}
+                        <button
+                          type="button"
+                          onClick={refreshConsultation}
+                          disabled={refreshingThread || submitting}
+                          className="rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {refreshingThread ? '확인 중...' : '대화 내역 확인'}
+                        </button>
+
+                        <button
+                          type="submit"
+                          disabled={submitting || !replyText.trim() || derivedState.closed || Boolean(fallbackNotice)}
+                          className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {submitting ? '전송 중...' : '환자에게 전송'}
+                        </button>
+                      </div>
                     </form>
                 </>
               )}
