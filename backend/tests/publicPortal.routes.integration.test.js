@@ -2108,3 +2108,95 @@ test('a reply that reached no channel says so instead of reporting success', { c
     routeModule.restore();
   }
 });
+
+test('a failed translation still delivers the reply, in Korean, and says so', { concurrency: false }, async () => {
+  const saved = [];
+  const pushed = [];
+
+  const routeModule = loadRouteWithMocks(PORTAL_ROUTE_PATH, {
+    [DB_SERVICE_PATH]: {
+      getActiveConsultations: async () => ({ consultations: [], total: 0 }),
+      getConsultationSummary: async () => ({ pending: 0, replied: 0, closed: 0, followUp: 0 }),
+      getConsultationById: async (consultationId) => ({
+        id: consultationId,
+        userId: 'public_user_vi',
+        aiAction: 'ESCALATE',
+        status: 'ACTIVE',
+        uiLanguage: 'ko',
+        // A patient who reads Vietnamese, not Korean.
+        patientReplyLanguage: 'vi',
+        patientNotificationContact: null,
+      }),
+      getConsultationTrackingById: async () => ({ trackingCode: 'ABC234', trackingToken: 'token-1' }),
+      saveDoctorReply: async (consultationId, userId, message, doctorName, doctorEmail, options) => {
+        saved.push({ message, options });
+        return 'reply-untranslated';
+      },
+      awardHDT: async () => {},
+      getDoctorStats: async () => null,
+      getAdmin: () => ({
+        auth() {
+          return { verifyIdToken: async () => ({ uid: 'u', email: 'doctor@example.com', name: '김의사' }) };
+        },
+      }),
+      getDoctorAccessRecordByEmail: async () => null,
+      ensureApprovedDoctorAccess: async (doctor) => ({ status: 'approved', email: doctor.email }),
+      upsertDoctorAccessRequest: async () => null,
+      approveDoctorAccessRequest: async () => null,
+      listPendingDoctorAccessRequests: async () => [],
+      HDT_REPLY: 50,
+    },
+    [TRANSLATION_SERVICE_PATH]: createTranslationServiceMock({
+      translateText: async () => {
+        throw new Error('translation api down');
+      },
+    }),
+    [NOTIFY_SERVICE_PATH]: {
+      enqueuePatientChannelPush: async (userId, message) => {
+        pushed.push(message);
+        return true;
+      },
+      enqueuePatientSmsNotification: async () => false,
+      clearDoctorNotifications: async () => {},
+      clearPatientChannelPushes: async () => {},
+      clearPatientSmsNotifications: async () => {},
+      clearOperatorUnansweredAlerts: async () => 0,
+    },
+    [FOLLOW_UP_SERVICE_PATH]: { cancelFollowUp: async () => {} },
+    [CONFIG_PATH]: {
+      appSiteUrl: 'https://app.happydoctor.kr',
+      getAllowedDoctorEmails: () => ['doctor@example.com'],
+      getPortalAdminEmails: () => [],
+    },
+  });
+
+  const server = await startServer(routeModule.router, '/api/portal');
+
+  try {
+    const response = await postJson(
+      `${server.baseUrl}/consultations/consult-vi/reply`,
+      { message: '충분히 쉬시는 것이 좋겠습니다.' },
+      { headers: { Authorization: 'Bearer portal-token' } },
+    );
+
+    // Refusing to send would have thrown the clinician's answer away and left
+    // the patient with nothing at all.
+    assert.equal(response.status, 200);
+    assert.equal(response.body.replyId, 'reply-untranslated');
+    assert.equal(response.body.translationFailed, true);
+
+    // The doctor's own words are stored untouched; only delivery carries the notice.
+    assert.equal(saved[0].message, '충분히 쉬시는 것이 좋겠습니다.');
+    assert.equal(saved[0].options.translationFailed, true);
+    assert.equal(saved[0].options.patientDeliveredLanguage, 'ko');
+    assert.match(saved[0].options.patientDeliveredMessage, /자동 번역 실패/);
+    assert.match(saved[0].options.patientDeliveredMessage, /Translation unavailable/);
+    assert.match(saved[0].options.patientDeliveredMessage, /충분히 쉬시는 것이 좋겠습니다/);
+
+    // And the patient is actually sent something.
+    assert.equal(pushed.length, 1);
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});

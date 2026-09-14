@@ -33,6 +33,14 @@ const { appSiteUrl, getAllowedDoctorEmails, getPortalAdminEmails } = require('..
 const followUpService = require('../services/followUpService');
 const { INITIAL_PATIENT_REPLY, FOLLOW_UP_PATIENT_REPLY } = require('../services/llmService');
 
+// Shown to the patient when automatic translation was unavailable. Korean and
+// English only, and fixed: the service that would translate it is the one that
+// just failed.
+const UNTRANSLATED_REPLY_NOTICE = [
+  '[자동 번역 실패] 번역이 되지 않아 한국어 원문을 그대로 보냅니다.',
+  '[Translation unavailable] The reply below is in Korean.',
+].join('\n');
+
 const router = express.Router();
 const ALLOWED_LIST_STATUS = new Set(['all', 'active', 'followup', 'replied', 'closed']);
 const MAX_SEARCH_LENGTH = 120;
@@ -535,16 +543,23 @@ router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
     const patientReplyLanguage = consultation.patientReplyLanguage || consultation.sourceLanguage || 'ko';
 
     let patientDeliveredMessage = message;
+    let patientDeliveredLanguage = patientReplyLanguage;
+    let translationFailed = false;
     if (!isKoreanLanguage(patientReplyLanguage)) {
       try {
         patientDeliveredMessage = await translateText(message, patientReplyLanguage, {
           sourceLanguage: 'ko',
         });
       } catch (error) {
+        // Refusing to send used to throw the clinician's answer away and leave
+        // the patient with nothing. Korean they can run through a translator
+        // themselves beats silence, so the answer goes out untranslated and
+        // both sides are told why. The notice cannot be localised: the copy
+        // service translates at runtime through the same service that is down.
         console.error('[Portal Reply Translation Error]', error);
-        return res.status(503).json({
-          error: '자동 번역 준비가 아직 끝나지 않아 답변을 보낼 수 없습니다. 잠시 후 다시 시도해 주세요.',
-        });
+        translationFailed = true;
+        patientDeliveredLanguage = 'ko';
+        patientDeliveredMessage = [UNTRANSLATED_REPLY_NOTICE, message].join('\n\n');
       }
     }
 
@@ -556,7 +571,8 @@ router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
       req.doctor.email,
       {
         patientDeliveredMessage,
-        patientDeliveredLanguage: patientReplyLanguage,
+        patientDeliveredLanguage,
+        translationFailed,
       },
     );
 
@@ -646,7 +662,7 @@ router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
     await awardHDT(req.doctor.email, req.doctor.name, HDT_REPLY, 'reply');
     console.log(`[Portal] ${req.doctor.email} replied to ${consultation.userId} (${replyId})`);
 
-    return res.json({ ok: true, replyId, notifiedChannels });
+    return res.json({ ok: true, replyId, notifiedChannels, translationFailed });
   } catch (error) {
     if (error?.statusCode) {
       return res.status(error.statusCode).json({ error: error.message });

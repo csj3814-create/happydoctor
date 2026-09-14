@@ -840,6 +840,9 @@ async function saveDoctorReply(consultationId, userId, message, doctorName, doct
       message,
       patientDeliveredMessage: options.patientDeliveredMessage || message,
       patientDeliveredLanguage: options.patientDeliveredLanguage || 'ko',
+      // Records that the patient received Korean because translation failed,
+      // not because Korean was their language.
+      translationFailed: Boolean(options.translationFailed),
       doctorName: doctorName || '담당 의사',
       doctorEmail: doctorEmail || '',
       seen: false,
