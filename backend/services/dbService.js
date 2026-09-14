@@ -9,6 +9,7 @@ const {
   getFirebaseStorageBucket,
 } = require('../config');
 const { isKoreanLanguage, translateText } = require('./translationService');
+const { CLOSED_STATUSES, isConsultationClosed } = require('./consultationStatus');
 const { buildDoctorReviewNotice } = require('./llmService');
 
 const PUBLIC_STATS_PATH = ['system', 'public_stats'];
@@ -527,7 +528,7 @@ function mapDoctorReplyForPatient(reply) {
 }
 
 async function buildPublicConsultationStatus(consultation, replies) {
-  const isClosed = consultation.status === 'COMPLETED' || Boolean(consultation.closedAt);
+  const isClosed = isConsultationClosed(consultation);
   const hasDoctorReply = replies.length > 0 || Boolean(consultation.doctorRepliedAt);
   const requiresDoctorReview = consultation.aiAction === 'ESCALATE';
 
@@ -605,7 +606,7 @@ async function rebuildPublicStats() {
   const docs = snapshot.docs.map((doc) => doc.data());
   const publicStats = {
     consultationCount: docs.length,
-    completedCount: docs.filter((doc) => doc.status === 'COMPLETED').length,
+    completedCount: docs.filter((doc) => isConsultationClosed(doc)).length,
     rebuiltAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   };
@@ -728,7 +729,7 @@ async function savePatientNotificationContactByUserId(userId, contact) {
 
     const doc = snapshot.docs[0];
     const data = doc.data() || {};
-    if (isConsultationClosed(data) || data.status === 'CLOSED') return null;
+    if (isConsultationClosed(data)) return null;
 
     await doc.ref.set({
       patientNotificationContact: {
@@ -844,7 +845,7 @@ async function closeConsultation(userId, reason) {
     const doc = snapshot.docs[0];
     const docRef = doc.ref;
     const data = doc.data();
-    const wasCompleted = data.status === 'COMPLETED';
+    const wasCompleted = isConsultationClosed(data);
 
     await docRef.update({
       status: 'COMPLETED',
@@ -1030,9 +1031,7 @@ function hasPendingConsultationFollowUp(doc) {
   return latestFollowUp > getDoctorReplyTimestamp(doc);
 }
 
-function isConsultationClosed(doc) {
-  return doc?.status === 'COMPLETED' || Boolean(doc?.closedAt);
-}
+
 
 function hasConsultationDoctorReply(doc) {
   return Boolean(doc?.doctorRepliedAt);
@@ -1091,10 +1090,13 @@ async function getEscalatedConsultationDocs() {
 }
 
 async function getEscalatedConsultationDocsForPortalStatus(status = 'all') {
+  // Both spellings of "finished". Querying only 'COMPLETED' left every
+  // consultation closed under the older status out of the portal entirely -
+  // not in the closed tab, not anywhere.
   if (status === 'closed') {
     const completedSnap = await db.collection('consultations')
       .where('aiAction', '==', 'ESCALATE')
-      .where('status', '==', 'COMPLETED')
+      .where('status', 'in', CLOSED_STATUSES)
       .get();
 
     return completedSnap.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
@@ -1116,7 +1118,7 @@ async function getEscalatedConsultationDocsForPortalStatus(status = 'all') {
       .get(),
     db.collection('consultations')
       .where('aiAction', '==', 'ESCALATE')
-      .where('status', '==', 'COMPLETED')
+      .where('status', 'in', CLOSED_STATUSES)
       .get(),
   ]);
 
@@ -1256,8 +1258,7 @@ async function getLatestConsultationTracking(userId, options = {}) {
     const doc = snapshot.docs[0];
     const data = doc.data() || {};
 
-    // 'CLOSED' is a legacy value that isConsultationClosed() does not cover.
-    if (requireOpen && (isConsultationClosed(data) || data.status === 'CLOSED')) {
+    if (requireOpen && isConsultationClosed(data)) {
       return null;
     }
 
@@ -1344,7 +1345,7 @@ async function getConsultationDocById(consultationId) {
 }
 
 function ensureConsultationCanAcceptUpdates(consultationData = {}) {
-  if (consultationData.status === 'COMPLETED' || consultationData.closedAt) {
+  if (isConsultationClosed(consultationData)) {
     throw new Error('CONSULTATION_CLOSED');
   }
 }
@@ -1579,7 +1580,7 @@ async function closePublicConsultationByLookup(trackingLookup, reason) {
 
     const consultationData = consultationDoc.data() || {};
     const wasCompleted =
-      consultationData.status === 'COMPLETED' || Boolean(consultationData.closedAt);
+      isConsultationClosed(consultationData);
 
     if (!wasCompleted) {
       await consultationDoc.ref.update({
@@ -1700,7 +1701,7 @@ async function processDataDeletionRequest(requestRef, consultationDoc) {
     await updatePublicStats({
       consultationCount: -1,
       completedCount:
-        consultationData.status === 'COMPLETED' || consultationData.closedAt ? -1 : 0,
+        isConsultationClosed(consultationData) ? -1 : 0,
     });
   } catch (error) {
     // Anonymous aggregate counters must never block a verified privacy deletion.
@@ -2126,6 +2127,7 @@ module.exports = {
   logFollowUp,
   buildPublicConsultationStatus,
   saveAiDoctorSummary,
+  isConsultationClosed,
   saveAiFollowUpDraft,
   savePatientNotificationContactByUserId,
   closeConsultation,

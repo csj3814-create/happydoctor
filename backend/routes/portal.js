@@ -18,6 +18,7 @@ const {
   HDT_REPLY,
   getAdmin,
 } = require('../services/dbService');
+const { isConsultationClosed } = require('../services/consultationStatus');
 const notifyService = require('../services/notifyService');
 const {
   enqueuePatientChannelPush,
@@ -135,7 +136,7 @@ function assertConsultationCanReceiveDoctorReply(consultation) {
     throw createRequestValidationError('환자 연결 정보가 없어 답변을 전송할 수 없습니다.');
   }
 
-  if (consultation.status === 'COMPLETED' || consultation.closedAt) {
+  if (isConsultationClosed(consultation)) {
     throw createRequestValidationError('종료된 상담에는 새 답변을 보낼 수 없습니다.');
   }
 
