@@ -93,14 +93,48 @@ async function logConsultationAndGetStatusLink(userId, patientData, analysisResu
     }
 }
 
+// A status link says "here is the thing you are waiting on". Only a
+// consultation that is still open, and recent enough that the patient could
+// plausibly be waiting on it, qualifies. Offering the newest one regardless
+// handed a patient a link to a months-old, already-answered case right after
+// they described a new symptom.
+const OPEN_STATUS_LINK_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+
 async function getLatestStatusLinkForUser(userId) {
     try {
-        const latest = await dbService.getLatestConsultationTracking(userId);
+        const latest = await dbService.getLatestConsultationTracking(userId, {
+            requireOpen: true,
+            maxAgeMs: OPEN_STATUS_LINK_MAX_AGE_MS,
+        });
         return buildStatusLinkText(latest);
     } catch (error) {
         console.error('[Status Link Lookup Error]', error);
         return '';
     }
+}
+
+// Commands and button labels are not symptoms; quoting those back would be
+// noise. Anything else is what the patient came to say, and the greeting
+// should show it was heard before asking them to start.
+const FALLBACK_QUOTE_MAX_LENGTH = 40;
+const NON_SYMPTOM_UTTERANCES = [
+    '상담시작', '상담종료', '처음으로', '시작', '종료', '취소', '안녕', '안녕하세요',
+    '차트확인', '알림방등록',
+];
+
+function buildHeardLine(utterance) {
+    const trimmed = String(utterance || '').trim().replace(/\s+/g, ' ');
+    if (!trimmed) return '';
+
+    const normalized = trimmed.replace(/\s+/g, '');
+    if (NON_SYMPTOM_UTTERANCES.includes(normalized)) return '';
+    if (normalized.length < 2) return '';
+
+    const quoted = trimmed.length > FALLBACK_QUOTE_MAX_LENGTH
+        ? `${trimmed.slice(0, FALLBACK_QUOTE_MAX_LENGTH)}...`
+        : trimmed;
+
+    return `"${quoted}"라고 말씀해 주셨네요.`;
 }
 
 async function getStatusLinkForConsultation(consultationId) {
@@ -658,12 +692,23 @@ router.post('/check-doctor-reply', async (req, res) => {
         }
 
         // 대기 중인 답변 없음 → 일반 환영 메시지
+        // This greeting used to say "먼저 말씀해 주세요" to someone who had just
+        // done exactly that, and then said nothing about what happens next. A
+        // symptom typed here is not filed anywhere: only the 상담 시작 flow
+        // records one, so the greeting has to send the patient into it.
         const statusLinkText = await getLatestStatusLinkForUser(userId);
+        const heardLine = buildHeardLine(getKakaoUtterance(payload));
+        const greeting = [
+            '안녕하세요. 해피닥터 보듬입니다.',
+            heardLine,
+            '아래 [상담 시작]을 눌러 상담을 시작해 주세요.',
+            '몇 가지 여쭤본 뒤 자원봉사 의료진에게 전달해 드립니다.',
+            // Only worth saying to someone who actually typed a symptom here.
+            heardLine ? '말씀하신 증상은 상담 시작 후 다시 한 번 적어 주세요.' : '',
+        ].filter(Boolean).join('\n');
+
         return res.status(200).json({
-            ...createKakaoTextResponse(
-                `안녕하세요. 해피닥터 보듬입니다.\n의료가 멀게 느껴질 때 먼저 말씀해 주세요.${statusLinkText}`,
-                [START_CONSULTATION_QUICK_REPLY],
-            ),
+            ...createKakaoTextResponse(`${greeting}${statusLinkText}`, [START_CONSULTATION_QUICK_REPLY]),
         });
     } catch (error) {
         console.error('[CheckDoctorReply Error]', error);

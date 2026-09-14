@@ -1157,8 +1157,16 @@ async function getConsultationById(consultationId) {
   }
 }
 
-async function getLatestConsultationTracking(userId) {
+// `requireOpen` and `maxAgeMs` exist because a status link is an invitation to
+// check on something in progress. Offering the newest consultation regardless
+// handed a patient a link to a months-old, already-answered case right after
+// they described a new symptom, which reads as if the new one were being
+// handled. Disqualifying happens before identifiers are minted, so a stale
+// consultation is not given a fresh lookup code on the way past.
+async function getLatestConsultationTracking(userId, options = {}) {
   if (!db || !userId) return null;
+
+  const { requireOpen = false, maxAgeMs = null } = options;
 
   try {
     const snapshot = await db.collection('consultations')
@@ -1171,6 +1179,17 @@ async function getLatestConsultationTracking(userId) {
 
     const doc = snapshot.docs[0];
     const data = doc.data() || {};
+
+    // 'CLOSED' is a legacy value that isConsultationClosed() does not cover.
+    if (requireOpen && (isConsultationClosed(data) || data.status === 'CLOSED')) {
+      return null;
+    }
+
+    if (maxAgeMs) {
+      const createdAtMs = getTimestampMs(data.createdAt);
+      if (!createdAtMs || Date.now() - createdAtMs > maxAgeMs) return null;
+    }
+
     const identifiers = await ensurePublicTrackingIdentifiers(doc.ref, data);
 
     return {
