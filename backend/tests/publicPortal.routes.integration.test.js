@@ -1949,3 +1949,86 @@ test('rejecting someone who is not pending answers 404 rather than inventing a r
     routeModule.restore();
   }
 });
+
+test('the portal chart drops the fixed intake acknowledgement but keeps a translated one', { concurrency: false }, async () => {
+  const { INITIAL_PATIENT_REPLY } = require('../services/llmService');
+
+  const consultations = {
+    'consult-standard': {
+      chatbotReply: INITIAL_PATIENT_REPLY,
+      patientDeliveredChatbotReply: INITIAL_PATIENT_REPLY,
+    },
+    'consult-translated': {
+      chatbotReply: INITIAL_PATIENT_REPLY,
+      patientDeliveredChatbotReply: 'Your consultation has been received.',
+    },
+    'consult-legacy': {
+      chatbotReply: '보듬이가 예전에 직접 작성한 답변입니다.',
+      patientDeliveredChatbotReply: '보듬이가 예전에 직접 작성한 답변입니다.',
+    },
+  };
+
+  const routeModule = loadRouteWithMocks(PORTAL_ROUTE_PATH, {
+    [DB_SERVICE_PATH]: {
+      getActiveConsultations: async () => ({ consultations: [], total: 0 }),
+      getConsultationSummary: async () => ({ pending: 0, replied: 0, closed: 0, followUp: 0 }),
+      getConsultationById: async (consultationId) => ({
+        id: consultationId,
+        userId: 'public_user_1',
+        aiAction: 'ESCALATE',
+        status: 'ACTIVE',
+        ...consultations[consultationId],
+      }),
+      getConsultationTrackingById: async () => null,
+      saveDoctorReply: async () => 'reply-id',
+      awardHDT: async () => {},
+      getDoctorStats: async () => null,
+      getAdmin: () => ({
+        auth() {
+          return {
+            verifyIdToken: async () => ({ uid: 'doctor-uid', email: 'doctor@example.com', name: '김의사' }),
+          };
+        },
+      }),
+      getDoctorAccessRecordByEmail: async () => null,
+      ensureApprovedDoctorAccess: async (doctor) => ({ status: 'approved', email: doctor.email }),
+      upsertDoctorAccessRequest: async () => null,
+      approveDoctorAccessRequest: async () => null,
+      listPendingDoctorAccessRequests: async () => [],
+      HDT_REPLY: 50,
+    },
+    [NOTIFY_SERVICE_PATH]: {
+      enqueuePatientChannelPush: async () => true,
+      clearDoctorNotifications: async () => {},
+    },
+    [FOLLOW_UP_SERVICE_PATH]: { cancelFollowUp: async () => {} },
+    [CONFIG_PATH]: {
+      appSiteUrl: 'https://app.happydoctor.kr',
+      getAllowedDoctorEmails: () => ['doctor@example.com'],
+      getPortalAdminEmails: () => [],
+    },
+  });
+
+  const server = await startServer(routeModule.router, '/api/portal');
+  const headers = { Authorization: 'Bearer portal-token' };
+
+  try {
+    // Same text for every patient, so it says nothing on a chart.
+    const standard = await getJson(`${server.baseUrl}/consultations/consult-standard`, { headers });
+    assert.equal(standard.status, 200);
+    assert.equal(standard.body.chatbotReply, '');
+    assert.equal(standard.body.patientDeliveredChatbotReply, null);
+
+    // What a non-Korean patient actually read is specific to that consultation.
+    const translated = await getJson(`${server.baseUrl}/consultations/consult-translated`, { headers });
+    assert.equal(translated.body.chatbotReply, INITIAL_PATIENT_REPLY);
+    assert.equal(translated.body.patientDeliveredChatbotReply, 'Your consultation has been received.');
+
+    // Consultations from before automated triage was removed keep their reply.
+    const legacy = await getJson(`${server.baseUrl}/consultations/consult-legacy`, { headers });
+    assert.match(legacy.body.chatbotReply, /보듬이가 예전에 직접 작성한 답변입니다/);
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});

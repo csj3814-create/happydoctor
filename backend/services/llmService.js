@@ -50,4 +50,6 @@ module.exports = {
     analyzeAndRouteTriage,
     analyzeFollowUp,
     buildDoctorReviewNotice,
+    INITIAL_PATIENT_REPLY,
+    FOLLOW_UP_PATIENT_REPLY,
 };

@@ -31,6 +31,7 @@ const { isKoreanLanguage, translateText } = require('../services/translationServ
 const emailService = require('../services/emailService');
 const { appSiteUrl, getAllowedDoctorEmails, getPortalAdminEmails } = require('../config');
 const followUpService = require('../services/followUpService');
+const { INITIAL_PATIENT_REPLY, FOLLOW_UP_PATIENT_REPLY } = require('../services/llmService');
 
 const router = express.Router();
 const ALLOWED_LIST_STATUS = new Set(['all', 'active', 'followup', 'replied', 'closed']);
@@ -294,6 +295,20 @@ function getOptedInPatientNotificationEmail(consultation) {
   return String(contact.normalizedEmail || contact.email || '').trim();
 }
 
+// Every patient receives the same intake acknowledgement, so repeating it on
+// the chart tells a reviewing clinician nothing. It is still stored, because
+// the patient's own status page shows it; this only keeps it off the portal.
+// A translated copy survives: that one shows what a non-Korean patient read.
+function withoutStandardIntakeReply(consultation) {
+  const reply = String(consultation?.chatbotReply || '').trim();
+  if (reply !== INITIAL_PATIENT_REPLY && reply !== FOLLOW_UP_PATIENT_REPLY) return consultation;
+
+  const delivered = String(consultation.patientDeliveredChatbotReply || '').trim();
+  if (delivered && delivered !== reply) return consultation;
+
+  return { ...consultation, chatbotReply: '', patientDeliveredChatbotReply: null };
+}
+
 async function resolveDoctorAccessContext(decoded) {
   const doctor = {
     uid: decoded.uid,
@@ -501,7 +516,7 @@ router.get('/consultations/:id', requireDoctorAuth, async (req, res) => {
     const consultationId = parseConsultationId(req.params.id);
     const consultation = assertPortalVisibleConsultation(await getConsultationById(consultationId));
 
-    return res.json(serializeTimestamps(consultation));
+    return res.json(serializeTimestamps(withoutStandardIntakeReply(consultation)));
   } catch (error) {
     if (error?.statusCode) {
       return res.status(error.statusCode).json({ error: error.message });

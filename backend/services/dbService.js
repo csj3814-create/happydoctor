@@ -9,6 +9,7 @@ const {
   getFirebaseStorageBucket,
 } = require('../config');
 const { isKoreanLanguage, translateText } = require('./translationService');
+const { buildDoctorReviewNotice } = require('./llmService');
 
 const PUBLIC_STATS_PATH = ['system', 'public_stats'];
 const FOLLOW_UP_SESSIONS = 'follow_up_sessions';
@@ -621,6 +622,18 @@ async function getPublicStats() {
   };
 }
 
+// Since commit d78e4e9 removed automated triage, soapChartForDoctor is a fixed
+// notice telling the reader to open the portal - which the portal then showed
+// inside the portal, under a "SOAP 차트" heading, for every consultation.
+// Storing it as a chart makes a constant look like a finding. Consultations
+// from before that change hold real triage notes and keep them.
+function chartWorthKeeping(chart) {
+  const text = typeof chart === 'string' ? chart.trim() : '';
+  if (!text) return null;
+  if (text === buildDoctorReviewNotice('initial') || text === buildDoctorReviewNotice('follow_up')) return null;
+  return text;
+}
+
 async function logConsultation(userId, patientData, analysisResult, options = {}) {
   if (!db) return null;
 
@@ -641,7 +654,7 @@ async function logConsultation(userId, patientData, analysisResult, options = {}
       aiAction: analysisResult.action,
       chatbotReply: analysisResult.replyToPatient,
       patientDeliveredChatbotReply: options.patientDeliveredChatbotReply || analysisResult.replyToPatient,
-      doctorChart: analysisResult.soapChartForDoctor || 'None',
+      doctorChart: chartWorthKeeping(analysisResult.soapChartForDoctor),
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       status: 'ACTIVE',
       followUpLogs: [],
@@ -731,7 +744,9 @@ async function logFollowUp(userId, fuAnalysis) {
       followUpLogs: admin.firestore.FieldValue.arrayUnion({
         action: fuAnalysis.action,
         timestamp: admin.firestore.Timestamp.now(),
-        alertMessage: fuAnalysis.fuChartForDoctor || 'None',
+        // Same constant notice as the initial chart: a follow-up entry keeps
+        // its action and timestamp, but not a message that says nothing.
+        alertMessage: chartWorthKeeping(fuAnalysis.fuChartForDoctor) || '',
       }),
     });
 
