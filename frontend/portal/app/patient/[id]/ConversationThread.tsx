@@ -199,7 +199,11 @@ export default function ConversationThread({
                   {item.delivered && item.delivered !== item.text ? (
                     <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
                       <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
-                        환자에게 전달된 번역본 ({languageLabel(item.deliveredLanguage)})
+                        {/* A delivered copy in Korean is not a translation: it
+                            is what went out when translation was unavailable. */}
+                        {item.deliveredLanguage === 'ko'
+                          ? '환자에게 전달된 내용 (번역 실패)'
+                          : `환자에게 전달된 번역본 (${languageLabel(item.deliveredLanguage)})`}
                       </p>
                       <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-zinc-700">
                         {item.delivered}

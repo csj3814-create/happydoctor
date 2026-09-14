@@ -215,6 +215,8 @@ export type PatientNotifyChannel = 'kakao' | 'sms' | 'email';
 export interface DoctorReplyResult {
   replyId?: string | null;
   notifiedChannels: PatientNotifyChannel[];
+  // The patient received the Korean original because translation was down.
+  translationFailed: boolean;
 }
 
 export async function postReply(consultationId: string, message: string): Promise<DoctorReplyResult> {
@@ -228,6 +230,7 @@ export async function postReply(consultationId: string, message: string): Promis
   return {
     replyId: body?.replyId ?? null,
     notifiedChannels: Array.isArray(body?.notifiedChannels) ? body.notifiedChannels : [],
+    translationFailed: Boolean(body?.translationFailed),
   };
 }
 

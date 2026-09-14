@@ -226,6 +226,7 @@ export default function PatientPage({ params }: PatientPageProps) {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [notifiedChannels, setNotifiedChannels] = useState<PatientNotifyChannel[] | null>(null)
+  const [translationFailed, setTranslationFailed] = useState(false)
   const [patientId, setPatientId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -435,6 +436,7 @@ export default function PatientPage({ params }: PatientPageProps) {
       setReplyText('')
       setDraftNotice(null)
       setNotifiedChannels(result.notifiedChannels)
+      setTranslationFailed(result.translationFailed)
       setSubmitSuccess(true)
       const updated = await getConsultation(patientId)
       setConsultation(updated)
@@ -736,6 +738,13 @@ export default function PatientPage({ params }: PatientPageProps) {
                       {submitError ? (
                         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
                           {submitError}
+                        </p>
+                      ) : null}
+
+                      {submitSuccess && translationFailed ? (
+                        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-900">
+                          자동 번역이 되지 않아 <strong>한국어 원문을 그대로 보냈습니다.</strong> 환자가
+                          읽지 못할 수 있으니, 번역이 복구된 뒤 다시 한 번 보내 주시면 좋겠습니다.
                         </p>
                       ) : null}
 
