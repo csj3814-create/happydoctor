@@ -147,12 +147,18 @@ export function localizeAndProtectStatusUrl(
   }
 }
 
+// The backend sleeps when idle and can take most of a minute to wake, during
+// which a plain fetch simply hangs and the page shows "loading" forever with
+// no way out. Bound the wait so the screen can say something instead.
+export const STATUS_REQUEST_TIMEOUT_MS = 45 * 1000
+
 export async function fetchConsultationStatus(
   token: string,
 ): Promise<PublicConsultationStatus | null> {
   const response = await fetch('/api/public/consultations/status', {
     headers: { 'X-Consultation-Lookup': token },
     cache: 'no-store',
+    signal: AbortSignal.timeout(STATUS_REQUEST_TIMEOUT_MS),
   })
 
   if (response.status === 404) {

@@ -30,6 +30,9 @@ import {
 const LIVE_STATUS_POLL_INTERVAL_MS = 15 * 1000
 const STATUS_LOADING_NOTICE_MIN_INTERVAL_MS = 60 * 1000
 const STATUS_LOADING_NOTICE_VISIBLE_MS = 4 * 1000
+// Long enough that an ordinary request never trips it, short enough that a
+// patient staring at a blank card learns the wait is expected.
+const STATUS_SLOW_LOADING_AFTER_MS = 6 * 1000
 
 const copyByLanguage = {
   ko: {
@@ -50,6 +53,7 @@ const copyByLanguage = {
     loadError: '지금은 상태를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.',
     loading: '상담 상태를 불러오고 있습니다...',
     lookupRefreshed: '최신 상태를 확인했습니다.',
+    slowLoading: '서버를 깨우는 중입니다. 최대 1분 정도 걸릴 수 있습니다.',
     liveUpdate: '새 의료진 답변이 도착했습니다. 아래 최신 답변을 확인해 주세요.',
     firstReplyEyebrow: 'Submission received',
     firstReplyTitle: '상담 접수 안내',
@@ -117,6 +121,7 @@ const copyByLanguage = {
     loadError: 'We could not load the consultation status right now. Please try again shortly.',
     loading: 'Loading your consultation status...',
     lookupRefreshed: 'Status is up to date.',
+    slowLoading: 'Waking the server up. This can take up to a minute.',
     liveUpdate: 'A new doctor reply has arrived. Please check the latest reply below.',
     firstReplyEyebrow: 'Submission received',
     firstReplyTitle: 'Consultation submission notice',
@@ -242,6 +247,8 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
   const [loading, setLoading] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [lookupNotice, setLookupNotice] = useState<string | null>(null)
+  const [slowLoading, setSlowLoading] = useState(false)
+  const slowLoadingTimeoutRef = useRef<number | null>(null)
   const manualLookupRef = useRef(false)
   const lookupNoticeTimeoutRef = useRef<number | null>(null)
   const [restoredRecentSession, setRestoredRecentSession] = useState(false)
@@ -370,6 +377,9 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
       if (lookupNoticeTimeoutRef.current) {
         window.clearTimeout(lookupNoticeTimeoutRef.current)
       }
+      if (slowLoadingTimeoutRef.current) {
+        window.clearTimeout(slowLoadingTimeoutRef.current)
+      }
     }
   }, [])
 
@@ -439,6 +449,13 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
       const manual = manualLookupRef.current
       manualLookupRef.current = false
       const hasVisibleConsultation = Boolean(latestConsultationRef.current)
+
+      if (!hasVisibleConsultation || manual) {
+        slowLoadingTimeoutRef.current = window.setTimeout(
+          () => setSlowLoading(true),
+          STATUS_SLOW_LOADING_AFTER_MS,
+        )
+      }
       if (manual) {
         setLoading(true)
       } else if (hasVisibleConsultation) {
@@ -485,6 +502,11 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
           setFetchError(copy.loadError)
         }
       } finally {
+        if (slowLoadingTimeoutRef.current) {
+          window.clearTimeout(slowLoadingTimeoutRef.current)
+          slowLoadingTimeoutRef.current = null
+        }
+        if (!cancelled) setSlowLoading(false)
         if (!cancelled && (manual || !hasVisibleConsultation)) {
           setLoading(false)
         }
@@ -908,7 +930,8 @@ export default function StatusPageClient({ initialUiLanguage }: StatusPageClient
 
         {(loading || showBackgroundLoadingNotice) ? (
           <section className="mt-6 rounded-[2rem] border border-[var(--line)] bg-white p-6 text-sm leading-7 text-[var(--muted)] shadow-[0_18px_50px_rgba(8,34,55,0.06)]">
-            {copy.loading}
+            <p>{copy.loading}</p>
+            {slowLoading ? <p className="mt-2 text-[var(--blue)]">{copy.slowLoading}</p> : null}
           </section>
         ) : null}
       </div>
