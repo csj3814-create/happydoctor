@@ -333,7 +333,10 @@ class EmailService {
 
     const lines = items.map((item, index) => {
       const waited = Number.isFinite(item.waitingDays) ? `${item.waitingDays}일 대기` : '대기일 미상';
-      return `${index + 1}. ${item.receivedAt || '접수시각 미상'} · ${waited} · ${item.channel || '경로 미상'}`;
+      // A follow-up question is a patient who has already been answered once
+      // and is waiting again, so the row says which wait this is.
+      const kind = item.kind === 'follow_up' ? '추가 질문' : '첫 답변';
+      return `${index + 1}. [${kind}] ${item.receivedAt || '접수시각 미상'} · ${waited} · ${item.channel || '경로 미상'}`;
     });
 
     const omitted = total - items.length;

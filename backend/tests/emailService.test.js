@@ -125,15 +125,18 @@ test('unanswered digest lists waiting consultations without health information',
     total: 12,
     generatedAt: '2026-09-01 09:00 KST',
     items: [
-      { receivedAt: '2026-08-22 23:25 KST', waitingDays: 10, channel: 'kakao' },
-      { receivedAt: '2026-08-31 19:11 KST', waitingDays: 1, channel: 'web' },
+      { kind: 'first_reply', receivedAt: '2026-08-22 23:25 KST', waitingDays: 10, channel: 'kakao' },
+      { kind: 'follow_up', receivedAt: '2026-08-31 19:11 KST', waitingDays: 1, channel: 'web' },
     ],
   });
 
   assert.equal(sent, true);
   const [mail] = sentMails;
   assert.match(mail.subject, /미답변 상담 12건/);
-  assert.match(mail.text, /1\. 2026-08-22 23:25 KST · 10일 대기 · kakao/);
+  assert.match(mail.text, /1\. \[첫 답변\] 2026-08-22 23:25 KST · 10일 대기 · kakao/);
+  // A patient who was answered once and is waiting again reads differently
+  // from one who has never been answered.
+  assert.match(mail.text, /2\. \[추가 질문\] 2026-08-31 19:11 KST · 1일 대기 · web/);
   assert.match(mail.text, /\.\.\. 외 10건/);
   assert.match(mail.text, /건강정보와 상담 내용은 이 메일에 담기지 않습니다\./);
 });

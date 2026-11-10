@@ -28,6 +28,26 @@ function getWaitingDays(createdAt, now) {
   return Math.max(0, Math.floor((now.getTime() - parsed.getTime()) / DAY_MS));
 }
 
+function toMillis(value) {
+  if (!value) return 0;
+  if (value?.toMillis) return value.toMillis();
+  if (value?._seconds) return value._seconds * 1000;
+  const parsed = new Date(value).getTime();
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+// When a patient asks something new on a consultation that was already
+// answered, the wait that matters starts at the question, not at intake.
+function getLatestPatientQuestionAt(consultation) {
+  const logs = Array.isArray(consultation?.followUpLogs) ? consultation.followUpLogs : [];
+  const asked = logs
+    .filter((log) => log?.action === 'PATIENT_FOLLOW_UP_QUESTION')
+    .map((log) => toMillis(log.timestamp))
+    .reduce((max, current) => Math.max(max, current), 0);
+
+  return asked ? new Date(asked) : null;
+}
+
 class UnansweredDigestService {
   constructor() {
     const config = getUnansweredDigestConfig();
@@ -86,19 +106,47 @@ class UnansweredDigestService {
     });
   }
 
+  // Two kinds of patient are waiting, and this digest used to see only the
+  // first: a consultation nobody has answered, and a consultation already
+  // answered where the patient has asked something new. The second is how one
+  // patient came to write "왜 아무도 내 질문에 답해주지 않는 거죠?" 19 hours
+  // after asking, then closed the consultation themselves - every alert for it
+  // had been delivered, and the one daily net that could have caught it was
+  // only ever looking at the pending tab.
   async collectUnanswered(now) {
-    const result = await dbService.getActiveConsultations({
-      status: 'pending',
-      limit: this.maxItems,
-    });
+    const [pending, followUp] = await Promise.all([
+      dbService.getActiveConsultations({ status: 'pending', limit: this.maxItems }),
+      dbService.getActiveConsultations({ status: 'followup', limit: this.maxItems }),
+    ]);
 
-    const items = (result.consultations || []).map((consultation) => ({
-      receivedAt: formatKst(consultation.createdAt),
-      waitingDays: getWaitingDays(consultation.createdAt, now),
-      channel: consultation.entryChannel || null,
-    }));
+    const rows = [
+      ...(pending.consultations || []).map((consultation) => ({
+        kind: 'first_reply',
+        waitingSince: consultation.createdAt,
+        channel: consultation.entryChannel || null,
+      })),
+      ...(followUp.consultations || []).map((consultation) => ({
+        kind: 'follow_up',
+        waitingSince: getLatestPatientQuestionAt(consultation) || consultation.createdAt,
+        channel: consultation.entryChannel || null,
+      })),
+    ];
 
-    return { items, total: result.total || items.length };
+    // Longest wait first: that is the order someone reads a list like this in.
+    const items = rows
+      .sort((a, b) => toMillis(a.waitingSince) - toMillis(b.waitingSince))
+      .slice(0, this.maxItems)
+      .map((row) => ({
+        kind: row.kind,
+        receivedAt: formatKst(row.waitingSince),
+        waitingDays: getWaitingDays(row.waitingSince, now),
+        channel: row.channel,
+      }));
+
+    const total = (pending.total ?? (pending.consultations || []).length)
+      + (followUp.total ?? (followUp.consultations || []).length);
+
+    return { items, total };
   }
 
   async runOnce(now = new Date()) {

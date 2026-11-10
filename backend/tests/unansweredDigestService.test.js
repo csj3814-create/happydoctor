@@ -68,6 +68,15 @@ function createFakeDb(initialState = null) {
   };
 }
 
+// The digest reads two tabs: consultations nobody has answered, and ones where
+// an answered patient has asked something new.
+function createConsultationsStub({
+  pending = { total: 0, consultations: [] },
+  followup = { total: 0, consultations: [] },
+} = {}) {
+  return async (options = {}) => (options.status === 'followup' ? followup : pending);
+}
+
 function createEmailServiceSpy(sent) {
   return {
     isConfigured: () => true,
@@ -85,7 +94,7 @@ test('the digest only fires during the configured KST hour', { concurrency: fals
     config: DEFAULT_CONFIG,
     dbService: {
       ...fakeDb,
-      getActiveConsultations: async () => ({ total: 3, consultations: [] }),
+      getActiveConsultations: createConsultationsStub({ pending: { total: 3, consultations: [] } }),
     },
     emailService: createEmailServiceSpy(sent),
   });
@@ -107,7 +116,7 @@ test('a restart inside the digest hour does not send a second mail', { concurren
     config: DEFAULT_CONFIG,
     dbService: {
       ...fakeDb,
-      getActiveConsultations: async () => ({ total: 2, consultations: [] }),
+      getActiveConsultations: createConsultationsStub({ pending: { total: 2, consultations: [] } }),
     },
     emailService: createEmailServiceSpy(sent),
   });
@@ -129,7 +138,7 @@ test('an empty pending queue claims the day but sends nothing', { concurrency: f
     config: DEFAULT_CONFIG,
     dbService: {
       ...fakeDb,
-      getActiveConsultations: async () => ({ total: 0, consultations: [] }),
+      getActiveConsultations: createConsultationsStub(),
     },
     emailService: createEmailServiceSpy(sent),
   });
@@ -144,7 +153,7 @@ test('the digest stays inert when SMTP is unavailable or the job is disabled', {
 
   const withoutSmtp = loadDigestServiceWithMocks({
     config: DEFAULT_CONFIG,
-    dbService: { ...fakeDb, getActiveConsultations: async () => ({ total: 5, consultations: [] }) },
+    dbService: { ...fakeDb, getActiveConsultations: createConsultationsStub({ pending: { total: 5, consultations: [] } }) },
     emailService: { isConfigured: () => false, sendUnansweredDigestEmail: async () => true },
   });
   assert.equal(withoutSmtp.isOperational(), false);
@@ -152,7 +161,7 @@ test('the digest stays inert when SMTP is unavailable or the job is disabled', {
 
   const disabled = loadDigestServiceWithMocks({
     config: { ...DEFAULT_CONFIG, enabled: false },
-    dbService: { ...fakeDb, getActiveConsultations: async () => ({ total: 5, consultations: [] }) },
+    dbService: { ...fakeDb, getActiveConsultations: createConsultationsStub({ pending: { total: 5, consultations: [] } }) },
     emailService: createEmailServiceSpy(sent),
   });
   assert.equal(disabled.isOperational(), false);
@@ -167,14 +176,16 @@ test('digest rows carry only timing and channel, never symptom text', { concurre
     config: DEFAULT_CONFIG,
     dbService: {
       ...fakeDb,
-      getActiveConsultations: async () => ({
-        total: 1,
-        consultations: [{
-          id: 'consult-1',
-          createdAt: '2026-08-22T14:25:55.092Z',
-          entryChannel: 'kakao',
-          chiefComplaint: '항문 주변에 작은 살이 튀어나온 것처럼 보입니다',
-        }],
+      getActiveConsultations: createConsultationsStub({
+        pending: {
+          total: 1,
+          consultations: [{
+            id: 'consult-1',
+            createdAt: '2026-08-22T14:25:55.092Z',
+            entryChannel: 'kakao',
+            chiefComplaint: '항문 주변에 작은 살이 튀어나온 것처럼 보입니다',
+          }],
+        },
       }),
     },
     emailService: createEmailServiceSpy(sent),
@@ -182,6 +193,7 @@ test('digest rows carry only timing and channel, never symptom text', { concurre
 
   assert.equal(await digest.runOnce(new Date('2026-09-02T00:05:00Z')), true);
   assert.deepEqual(sent[0].items, [{
+    kind: 'first_reply',
     receivedAt: '2026-08-22 23:25 KST',
     waitingDays: 10,
     channel: 'kakao',
@@ -191,10 +203,85 @@ test('digest rows carry only timing and channel, never symptom text', { concurre
 test('KST bucketing rolls the date key over at Korean midnight', { concurrency: false }, async () => {
   const digest = loadDigestServiceWithMocks({
     config: DEFAULT_CONFIG,
-    dbService: { ...createFakeDb(), getActiveConsultations: async () => ({ total: 0, consultations: [] }) },
+    dbService: { ...createFakeDb(), getActiveConsultations: createConsultationsStub() },
     emailService: { isConfigured: () => true, sendUnansweredDigestEmail: async () => true },
   });
 
   assert.deepEqual(digest.toKstParts(new Date('2026-09-01T14:59:00Z')), { dateKey: '2026-09-01', hour: 23 });
   assert.deepEqual(digest.toKstParts(new Date('2026-09-01T15:00:00Z')), { dateKey: '2026-09-02', hour: 0 });
+});
+
+test('a patient waiting on a follow-up question is in the digest too', { concurrency: false }, async () => {
+  // One patient asked again on an answered consultation, waited 19 hours,
+  // wrote "왜 아무도 내 질문에 답해주지 않는 거죠?" and closed the consultation
+  // themselves. Every alert had been delivered; this digest was looking only at
+  // the pending tab, so the next morning it reported nothing was waiting.
+  const sent = [];
+  const fakeDb = createFakeDb();
+  const digest = loadDigestServiceWithMocks({
+    config: DEFAULT_CONFIG,
+    dbService: {
+      ...fakeDb,
+      getActiveConsultations: createConsultationsStub({
+        pending: {
+          total: 1,
+          consultations: [{ id: 'fresh', createdAt: '2026-09-01T23:00:00.000Z', entryChannel: 'web' }],
+        },
+        followup: {
+          total: 1,
+          consultations: [{
+            id: 'asked-again',
+            createdAt: '2026-08-20T01:00:00.000Z',
+            entryChannel: 'kakao',
+            followUpLogs: [
+              { action: 'COMPLETE', timestamp: '2026-08-20T02:00:00.000Z' },
+              { action: 'PATIENT_FOLLOW_UP_QUESTION', timestamp: '2026-08-28T00:00:00.000Z' },
+              { action: 'PATIENT_FOLLOW_UP_QUESTION', timestamp: '2026-08-31T05:00:00.000Z' },
+            ],
+          }],
+        },
+      }),
+    },
+    emailService: createEmailServiceSpy(sent),
+  });
+
+  assert.equal(await digest.runOnce(new Date('2026-09-02T00:05:00Z')), true);
+  assert.equal(sent[0].total, 2);
+  assert.deepEqual(sent[0].items, [
+    // Longest wait first, and dated from the newest question rather than from
+    // an intake that was answered days ago.
+    { kind: 'follow_up', receivedAt: '2026-08-31 14:00 KST', waitingDays: 1, channel: 'kakao' },
+    { kind: 'first_reply', receivedAt: '2026-09-02 08:00 KST', waitingDays: 0, channel: 'web' },
+  ]);
+});
+
+test('a follow-up tab entry with no patient question falls back to intake time', { concurrency: false }, async () => {
+  // An auto-close note is newer than the last reply, which is enough to park a
+  // consultation in the follow-up tab. Nothing was asked, so there is no
+  // question to date the wait from.
+  const sent = [];
+  const fakeDb = createFakeDb();
+  const digest = loadDigestServiceWithMocks({
+    config: DEFAULT_CONFIG,
+    dbService: {
+      ...fakeDb,
+      getActiveConsultations: createConsultationsStub({
+        followup: {
+          total: 1,
+          consultations: [{
+            id: 'no-question',
+            createdAt: '2026-08-30T01:00:00.000Z',
+            entryChannel: 'web',
+            followUpLogs: [{ action: 'FOLLOW_UP', timestamp: '2026-08-31T01:00:00.000Z' }],
+          }],
+        },
+      }),
+    },
+    emailService: createEmailServiceSpy(sent),
+  });
+
+  assert.equal(await digest.runOnce(new Date('2026-09-02T00:05:00Z')), true);
+  assert.deepEqual(sent[0].items, [
+    { kind: 'follow_up', receivedAt: '2026-08-30 10:00 KST', waitingDays: 2, channel: 'web' },
+  ]);
 });
