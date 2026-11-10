@@ -30,6 +30,31 @@ const SUMMARY_WAIT_MS = 3 * 60 * 1000
 // enough to notice one arriving without making the page chatter.
 const THREAD_REFRESH_INTERVAL_MS = 60 * 1000
 
+// A reply half written is work a volunteer did on their own time. A stray back
+// gesture, a closed tab or a phone call used to take all of it, so it is kept
+// per consultation in this browser until it has actually been sent.
+const DRAFT_STORAGE_PREFIX = 'happydoctor:portal:reply-draft:'
+
+function readStoredDraft(patientId: string): string {
+  try {
+    return window.localStorage.getItem(`${DRAFT_STORAGE_PREFIX}${patientId}`) || ''
+  } catch {
+    // Private windows and blocked site data both throw on access. A missing
+    // backup is not a reason to break the reply form.
+    return ''
+  }
+}
+
+function writeStoredDraft(patientId: string, text: string) {
+  try {
+    const key = `${DRAFT_STORAGE_PREFIX}${patientId}`
+    if (text.trim()) window.localStorage.setItem(key, text)
+    else window.localStorage.removeItem(key)
+  } catch {
+    // Same here: the reply itself still works without the backup.
+  }
+}
+
 function formatDate(iso: string): string {
   const parsed = new Date(iso)
   if (Number.isNaN(parsed.getTime())) return '-'
@@ -221,6 +246,7 @@ export default function PatientPage({ params }: PatientPageProps) {
   const [replyText, setReplyText] = useState('')
   const [draftNotice, setDraftNotice] = useState<string | null>(null)
   const replyFieldRef = useRef<HTMLTextAreaElement | null>(null)
+  const draftRestoredForRef = useRef<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [refreshingThread, setRefreshingThread] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -233,6 +259,32 @@ export default function PatientPage({ params }: PatientPageProps) {
   useEffect(() => {
     params.then((resolved) => setPatientId(resolved.id))
   }, [params])
+
+  // Brings back whatever was being written for this consultation. Every later
+  // change is stored by updateReplyText, so nothing here can overwrite it.
+  useEffect(() => {
+    if (!patientId || draftRestoredForRef.current === patientId) return
+    draftRestoredForRef.current = patientId
+
+    const stored = readStoredDraft(patientId)
+    if (!stored) return
+    setReplyText(stored)
+    setDraftNotice('작성 중이던 답변을 다시 불러왔습니다. 전송하기 전까지 이 브라우저에 저장됩니다.')
+  }, [patientId])
+
+  // The draft is already safe in storage; this is the last chance to stay on
+  // the page and simply finish it.
+  useEffect(() => {
+    if (!replyText.trim() || submitting) return undefined
+
+    const confirmLeave = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+
+    window.addEventListener('beforeunload', confirmLeave)
+    return () => window.removeEventListener('beforeunload', confirmLeave)
+  }, [replyText, submitting])
 
   useEffect(() => {
     if (!auth) {
@@ -410,6 +462,13 @@ export default function PatientPage({ params }: PatientPageProps) {
     }
   }
 
+  // Every change to the reply goes through here, so what is on screen and what
+  // is kept for the next visit cannot drift apart.
+  function updateReplyText(next: string) {
+    setReplyText(next)
+    if (patientId) writeStoredDraft(patientId, next)
+  }
+
   // Puts the draft in the reply form. It still needs a clinician to read it and
   // press send, so anything already typed is never discarded without asking.
   function handleUseDraft(draft: string) {
@@ -419,7 +478,7 @@ export default function PatientPage({ params }: PatientPageProps) {
       if (!replace) return
     }
 
-    setReplyText(draft)
+    updateReplyText(draft)
     setSubmitSuccess(false)
     setDraftNotice('보듬이 초안을 답변란에 넣었습니다. 내용을 확인하고 고쳐서 보내 주세요.')
     replyFieldRef.current?.focus()
@@ -434,7 +493,9 @@ export default function PatientPage({ params }: PatientPageProps) {
     setSubmitSuccess(false)
     try {
       const result = await postReply(patientId, replyText.trim())
-      setReplyText('')
+      // Sent: the stored copy goes with it, so reopening the chart does not
+      // offer a draft of a reply the patient already has.
+      updateReplyText('')
       setDraftNotice(null)
       setNotifiedChannels(result.notifiedChannels)
       setTranslationFailed(result.translationFailed)
@@ -707,7 +768,11 @@ export default function PatientPage({ params }: PatientPageProps) {
                       )}
                       {derivedState.closed ? (
                         <p className="text-xs text-zinc-500">종료된 상담은 추가 회신을 보낼 수 없습니다.</p>
-                      ) : null}
+                      ) : (
+                        <p className="text-xs text-zinc-500">
+                          작성 중인 내용은 자동 저장됩니다. 페이지를 벗어났다 돌아와도 그대로 남아 있습니다.
+                        </p>
+                      )}
                       {!derivedState.closed && fallbackNotice ? (
                         <p className="text-xs text-zinc-500">
                           상세 데이터 동기화가 완료되면 답변 전송을 다시 사용할 수 있습니다.
@@ -718,7 +783,7 @@ export default function PatientPage({ params }: PatientPageProps) {
                       <textarea
                         ref={replyFieldRef}
                         value={replyText}
-                        onChange={(event) => setReplyText(event.target.value)}
+                        onChange={(event) => updateReplyText(event.target.value)}
                         placeholder={
                           derivedState.closed
                             ? '종료된 상담입니다.'
@@ -726,9 +791,12 @@ export default function PatientPage({ params }: PatientPageProps) {
                               ? '상세 데이터 동기화 후 답변 전송을 사용할 수 있습니다.'
                               : '환자에게 전달할 답변을 한국어로 입력하세요...'
                         }
-                        rows={5}
+                        rows={12}
                         disabled={submitting || derivedState.closed || Boolean(fallbackNotice)}
-                        className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-800 placeholder:text-zinc-400 transition focus:border-blue-400 focus:bg-white focus:outline-none disabled:opacity-50"
+                        // Writing a reply is the work this page exists for, so
+                        // the field gets the room: twelve lines to start, and a
+                        // drag handle for a clinician who wants more.
+                        className="min-h-[16rem] w-full resize-y rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm leading-relaxed text-zinc-800 placeholder:text-zinc-400 transition focus:border-blue-400 focus:bg-white focus:outline-none disabled:opacity-50"
                       />
 
                       {draftNotice && replyText.trim() ? (
