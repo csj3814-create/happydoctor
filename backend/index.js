@@ -6,6 +6,7 @@ const { createApp } = require('./app');
 const followUpService = require('./services/followUpService');
 const patientSmsService = require('./services/patientSmsService');
 const unansweredDigestService = require('./services/unansweredDigestService');
+const consultationAutoCloseService = require('./services/consultationAutoCloseService');
 const botHeartbeatService = require('./services/botHeartbeatService');
 const {
   isKeepAliveDisabled,
@@ -47,6 +48,11 @@ async function startServer() {
       await unansweredDigestService.initialize();
     } catch (error) {
       console.error('[Unanswered Digest Init Error]', error);
+    }
+    try {
+      await consultationAutoCloseService.initialize();
+    } catch (error) {
+      console.error('[Auto Close Init Error]', error);
     }
     try {
       await botHeartbeatService.initialize();

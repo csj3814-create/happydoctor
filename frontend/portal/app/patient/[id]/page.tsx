@@ -14,6 +14,7 @@ import {
   getConsultation,
   getConsultations,
   postReply,
+  closeConsultation,
 } from '@/lib/api'
 import type { PatientNotifyChannel } from '@/lib/api'
 import {
@@ -255,6 +256,8 @@ export default function PatientPage({ params }: PatientPageProps) {
   const [translationFailed, setTranslationFailed] = useState(false)
   const [awaitingKakaoPickup, setAwaitingKakaoPickup] = useState(false)
   const [patientId, setPatientId] = useState<string | null>(null)
+  const [closing, setClosing] = useState(false)
+  const [closeError, setCloseError] = useState<string | null>(null)
 
   useEffect(() => {
     params.then((resolved) => setPatientId(resolved.id))
@@ -482,6 +485,26 @@ export default function PatientPage({ params }: PatientPageProps) {
     setSubmitSuccess(false)
     setDraftNotice('보듬이 초안을 답변란에 넣었습니다. 내용을 확인하고 고쳐서 보내 주세요.')
     replyFieldRef.current?.focus()
+  }
+
+  // Ends the consultation from this side. It cannot be undone, and the patient
+  // loses the box they would ask another question in, so it asks first.
+  async function handleClose() {
+    if (!patientId || derivedState.closed || closing) return
+    if (replyText.trim() && !window.confirm('작성 중인 답변이 남아 있습니다. 보내지 않고 상담을 종료할까요?')) return
+    if (!window.confirm('이 상담을 종료할까요? 환자는 더 이상 추가 질문을 보낼 수 없고, 되돌릴 수 없습니다.')) return
+
+    setClosing(true)
+    setCloseError(null)
+    try {
+      await closeConsultation(patientId)
+      const updated = await getConsultation(patientId)
+      setConsultation(updated)
+    } catch (error) {
+      setCloseError(error instanceof Error ? error.message : '상담을 종료하지 못했습니다.')
+    } finally {
+      setClosing(false)
+    }
   }
 
   async function handleSubmit(event: React.FormEvent) {
@@ -860,6 +883,30 @@ export default function PatientPage({ params }: PatientPageProps) {
                         </button>
                       </div>
                     </form>
+
+                    {/* Under the message box, the order the patient meets these
+                        in on their own screen: write something, or finish. */}
+                    {!derivedState.closed ? (
+                      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-100 pt-4">
+                        <p className="text-xs text-zinc-500">
+                          환자가 더 묻지 않고 마무리된 상담이면 여기서 종료할 수 있습니다.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={handleClose}
+                          disabled={closing || Boolean(fallbackNotice)}
+                          className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {closing ? '종료 중...' : '상담 종료'}
+                        </button>
+                      </div>
+                    ) : null}
+
+                    {closeError ? (
+                      <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+                        {closeError}
+                      </p>
+                    ) : null}
                 </>
               )}
             />

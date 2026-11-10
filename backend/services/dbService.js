@@ -863,6 +863,77 @@ async function closeConsultation(userId, reason) {
   }
 }
 
+// Consultations whose last doctor reply is older than the cutoff, oldest
+// first. The portal's own list sorts newest first and takes a page from the
+// top, so the consultations an auto-close job wants are precisely the ones it
+// would never see.
+//
+// This reads the open consultations - the same query the portal's inbox tabs
+// run, so it needs no index that is not already in use - rather than ordering
+// the whole collection by reply time. Ordering by reply time would have been
+// cheaper per call and wrong over time: closed consultations would accumulate
+// at the head of that order until they filled every page, and the job would
+// quietly stop finding anything. The open set, by contrast, is the set this
+// job keeps small.
+//
+// A consultation with no reply at all is never returned. Nobody should be
+// closing one of those: no one has answered it yet.
+async function listRepliedConsultationsBefore(cutoffMs, limit = 100) {
+  if (!db || !Number.isFinite(cutoffMs)) return [];
+
+  const docs = await getEscalatedConsultationDocsForPortalStatus('replied');
+  const cap = Math.max(1, Math.min(500, Number(limit) || 100));
+
+  return docs
+    .filter((doc) => !isConsultationClosed(doc))
+    .filter((doc) => {
+      const repliedAt = getDoctorReplyTimestamp(doc);
+      return repliedAt > 0 && repliedAt <= cutoffMs;
+    })
+    .sort((a, b) => getDoctorReplyTimestamp(a) - getDoctorReplyTimestamp(b))
+    .slice(0, cap);
+}
+
+// Closes one consultation by its own id. The patient-facing paths above find a
+// consultation by who the patient is; a clinician in the portal and the
+// auto-close job are both already holding the consultation itself.
+//
+// Unlike the patient's own close this does not mark the doctor's replies read:
+// nobody has read them. A system log goes on the record so the conversation
+// shows why it stopped rather than simply ending.
+async function closeConsultationById(consultationId, reason, options = {}) {
+  if (!db || !consultationId) return null;
+
+  const docRef = db.collection('consultations').doc(consultationId);
+  const snapshot = await docRef.get();
+  if (!snapshot.exists) return null;
+
+  const data = snapshot.data() || {};
+  if (isConsultationClosed(data)) {
+    return { consultationId, userId: data.userId || null, alreadyClosed: true };
+  }
+
+  const logEntry = {
+    action: options.action || 'DOCTOR_CLOSE',
+    timestamp: admin.firestore.Timestamp.now(),
+    alertMessage: reason || '상담이 종료되었습니다.',
+  };
+  if (options.closedBy) logEntry.closedBy = options.closedBy;
+
+  await docRef.set({
+    status: 'COMPLETED',
+    closedAt: admin.firestore.FieldValue.serverTimestamp(),
+    closeReason: reason || '상담이 종료되었습니다.',
+    followUpLogs: admin.firestore.FieldValue.arrayUnion(logEntry),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+
+  await updatePublicStats({ completedCount: 1 });
+
+  console.log(`[DB] Consultation ${consultationId} closed (${logEntry.action}): ${reason || '-'}`);
+  return { consultationId, userId: data.userId || null, alreadyClosed: false };
+}
+
 async function saveDoctorReply(consultationId, userId, message, doctorName, doctorEmail, options = {}) {
   if (!db) return null;
 
@@ -2131,6 +2202,8 @@ module.exports = {
   saveAiFollowUpDraft,
   savePatientNotificationContactByUserId,
   closeConsultation,
+  closeConsultationById,
+  listRepliedConsultationsBefore,
   saveDoctorReply,
   getPendingDoctorReply,
   markReplyAsSeen,

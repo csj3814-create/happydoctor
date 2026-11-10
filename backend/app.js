@@ -22,6 +22,7 @@ const {
   getSolapiSmsConfig,
   getSolapiSmsConfigIssue,
   getUnansweredDigestConfig,
+  getConsultationAutoCloseConfig,
 } = require('./config');
 
 function createStatsResponse(publicStats) {
@@ -42,6 +43,7 @@ function createNotificationChannelSummary() {
   const smtpIssue = getSmtpConfigIssue();
   const solapiIssue = getSolapiSmsConfigIssue();
   const digestConfig = getUnansweredDigestConfig();
+  const autoCloseConfig = getConsultationAutoCloseConfig();
   const recipientCount = getAlertEmailRecipients().length;
 
   return {
@@ -61,6 +63,11 @@ function createNotificationChannelSummary() {
       enabled: digestConfig.enabled,
       hourKst: digestConfig.hourKst,
       ready: digestConfig.enabled && emailService.isConfigured() && recipientCount > 0,
+    },
+    // A job that closes consultations should be visible without reading logs.
+    consultationAutoClose: {
+      enabled: autoCloseConfig.enabled,
+      afterDays: autoCloseConfig.afterDays,
     },
   };
 }

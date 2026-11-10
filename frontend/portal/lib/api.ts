@@ -238,6 +238,19 @@ export async function postReply(consultationId: string, message: string): Promis
   };
 }
 
+// Ends a consultation from the clinician's side. A patient who is satisfied
+// often just stops replying, and only the patient could close until now.
+export async function closeConsultation(consultationId: string): Promise<{ alreadyClosed: boolean }> {
+  const headers = await authHeader();
+  const res = await fetch(`${BASE}/api/portal/consultations/${consultationId}/close`, {
+    method: 'POST', headers,
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+
+  const body = await res.json().catch(() => ({}));
+  return { alreadyClosed: Boolean(body?.alreadyClosed) };
+}
+
 export interface DoctorStats {
   email: string; name: string; hdt: number; totalReplies: number;
 }

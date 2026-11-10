@@ -317,6 +317,23 @@ function getUnansweredDigestConfig() {
   };
 }
 
+// Ends consultations that have quietly finished. A patient who is satisfied
+// usually just stops replying, which leaves the consultation open forever.
+function getConsultationAutoCloseConfig() {
+  return {
+    enabled: getBooleanEnv('CONSULTATION_AUTO_CLOSE_ENABLED', true),
+    // Days since the last doctor reply with nothing from the patient since.
+    // Long enough that someone who reads the answer at the weekend and comes
+    // back with one more question still finds the consultation open.
+    afterDays: getNumberEnv('CONSULTATION_AUTO_CLOSE_AFTER_DAYS', 7, { min: 1, integer: true }),
+    checkIntervalMs: getNumberEnv('CONSULTATION_AUTO_CLOSE_CHECK_INTERVAL_MS', 60 * 60 * 1000, {
+      min: 60 * 1000,
+      integer: true,
+    }),
+    maxPerRun: getNumberEnv('CONSULTATION_AUTO_CLOSE_MAX_PER_RUN', 25, { min: 1, integer: true }),
+  };
+}
+
 function getBotHeartbeatConfig() {
   return {
     enabled: getBooleanEnv('BOT_HEARTBEAT_ALERT_ENABLED', true),
@@ -354,6 +371,7 @@ function validateStartupConfig() {
   getPatientSmsRuntimeConfig();
   getFirebaseServiceAccount();
   getUnansweredDigestConfig();
+  getConsultationAutoCloseConfig();
   getBotHeartbeatConfig();
   getDoctorSummaryConfig();
 
@@ -394,6 +412,7 @@ module.exports = {
   getResendConfig,
   getResendConfigIssue,
   getUnansweredDigestConfig,
+  getConsultationAutoCloseConfig,
   getBotHeartbeatConfig,
   isKeepAliveDisabled,
   validateStartupConfig,

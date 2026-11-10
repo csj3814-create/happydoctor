@@ -2200,3 +2200,164 @@ test('a failed translation still delivers the reply, in Korean, and says so', { 
     routeModule.restore();
   }
 });
+
+// Until this route existed only the patient could end a consultation, so the
+// ones who were helped and simply stopped writing stayed in the portal as if a
+// clinician still owed them an answer.
+function createPortalCloseMocks({ consultation, calls }) {
+  return {
+    [DB_SERVICE_PATH]: {
+      getActiveConsultations: async () => ({ consultations: [], total: 0 }),
+      getConsultationSummary: async () => ({ pending: 0, replied: 0, closed: 0, followUp: 0 }),
+      getConsultationById: async (id) => {
+        calls.push({ type: 'getConsultationById', id });
+        return consultation;
+      },
+      closeConsultationById: async (id, reason, options) => {
+        calls.push({ type: 'closeConsultationById', id, reason, options });
+        return {
+          consultationId: id,
+          userId: consultation?.userId || null,
+          alreadyClosed: Boolean(consultation && (consultation.status === 'COMPLETED' || consultation.closedAt)),
+        };
+      },
+      saveDoctorReply: async () => 'reply-1',
+      getConsultationTrackingById: async () => null,
+      awardHDT: async () => {},
+      getDoctorStats: async () => null,
+      getAdmin: () => ({
+        auth() {
+          return {
+            verifyIdToken: async () => ({ uid: 'doctor-uid', email: 'doctor@example.com', name: '김의사' }),
+          };
+        },
+      }),
+      getDoctorAccessRecordByEmail: async () => null,
+      upsertDoctorAccessRequest: async () => null,
+      ensureApprovedDoctorAccess: async (doctor) => ({ status: 'approved', email: doctor.email }),
+      approveDoctorAccessRequest: async () => null,
+      listPendingDoctorAccessRequests: async () => [],
+      HDT_REPLY: 50,
+    },
+    [NOTIFY_SERVICE_PATH]: {
+      enqueuePatientChannelPush: async () => true,
+      clearDoctorNotifications: async (userId) => {
+        calls.push({ type: 'clearDoctorNotifications', userId });
+      },
+      clearOperatorUnansweredAlerts: async (userId) => {
+        calls.push({ type: 'clearOperatorUnansweredAlerts', userId });
+        return 0;
+      },
+    },
+    [FOLLOW_UP_SERVICE_PATH]: {
+      cancelFollowUp: async (userId) => {
+        calls.push({ type: 'cancelFollowUp', userId });
+      },
+    },
+    [CONFIG_PATH]: {
+      appSiteUrl: 'https://app.happydoctor.kr',
+      getAllowedDoctorEmails: () => ['doctor@example.com'],
+      getPortalAdminEmails: () => [],
+    },
+  };
+}
+
+test('a clinician can close a consultation, and nothing is left owed on it', { concurrency: false }, async () => {
+  const calls = [];
+  const routeModule = loadRouteWithMocks(PORTAL_ROUTE_PATH, createPortalCloseMocks({
+    calls,
+    consultation: {
+      id: 'consult-open',
+      userId: 'public_user_9',
+      aiAction: 'ESCALATE',
+      status: 'ACTIVE',
+      createdAt: new Date('2026-11-01T00:00:00.000Z'),
+    },
+  }));
+
+  const server = await startServer(routeModule.router, '/api/portal');
+
+  try {
+    const response = await postJson(`${server.baseUrl}/consultations/consult-open/close`, {}, {
+      headers: { Authorization: 'Bearer portal-token' },
+    });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, { ok: true, alreadyClosed: false });
+
+    const close = calls.find((entry) => entry.type === 'closeConsultationById');
+    assert.equal(close.id, 'consult-open');
+    assert.equal(close.options.action, 'DOCTOR_CLOSE');
+    assert.equal(close.options.closedBy, '김의사');
+    // The patient reads this on their status page, so it is a fixed sentence
+    // rather than anything a clinician typed into the portal.
+    assert.equal(close.reason, '의료진이 상담을 종료했습니다.');
+
+    // A closed consultation owes nobody anything: no follow-up question for
+    // the patient, no unanswered alert for the clinicians.
+    assert.deepEqual(
+      calls.filter((entry) => entry.type !== 'getConsultationById' && entry.type !== 'closeConsultationById'),
+      [
+        { type: 'cancelFollowUp', userId: 'public_user_9' },
+        { type: 'clearDoctorNotifications', userId: 'public_user_9' },
+        { type: 'clearOperatorUnansweredAlerts', userId: 'public_user_9' },
+      ],
+    );
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});
+
+test('closing an already closed consultation changes nothing', { concurrency: false }, async () => {
+  const calls = [];
+  const routeModule = loadRouteWithMocks(PORTAL_ROUTE_PATH, createPortalCloseMocks({
+    calls,
+    consultation: {
+      id: 'consult-done',
+      userId: 'public_user_10',
+      aiAction: 'ESCALATE',
+      status: 'COMPLETED',
+      closedAt: new Date('2026-11-02T00:00:00.000Z'),
+      createdAt: new Date('2026-11-01T00:00:00.000Z'),
+    },
+  }));
+
+  const server = await startServer(routeModule.router, '/api/portal');
+
+  try {
+    const response = await postJson(`${server.baseUrl}/consultations/consult-done/close`, {}, {
+      headers: { Authorization: 'Bearer portal-token' },
+    });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, { ok: true, alreadyClosed: true });
+    // Cancelling schedules again would be harmless but dishonest bookkeeping.
+    assert.deepEqual(calls.filter((entry) => entry.type === 'cancelFollowUp'), []);
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});
+
+test('the close route refuses a consultation the portal cannot show', { concurrency: false }, async () => {
+  const calls = [];
+  const routeModule = loadRouteWithMocks(PORTAL_ROUTE_PATH, createPortalCloseMocks({
+    calls,
+    consultation: null,
+  }));
+
+  const server = await startServer(routeModule.router, '/api/portal');
+
+  try {
+    const response = await postJson(`${server.baseUrl}/consultations/missing-consult/close`, {}, {
+      headers: { Authorization: 'Bearer portal-token' },
+    });
+
+    assert.equal(response.status, 404);
+    assert.deepEqual(calls.filter((entry) => entry.type === 'closeConsultationById'), []);
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});

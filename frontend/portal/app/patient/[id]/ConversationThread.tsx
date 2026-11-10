@@ -47,6 +47,8 @@ function systemLabel(action?: string): string {
       return '추가 문진 진행'
     case 'AUTO_CLOSE':
       return '자동 종료'
+    case 'DOCTOR_CLOSE':
+      return '의료진이 상담 종료'
     case 'COMPLETE':
       return '상담 정리'
     default:

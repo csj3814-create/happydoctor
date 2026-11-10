@@ -6,6 +6,7 @@ const {
   getConsultationById,
   saveDoctorReply,
   getConsultationTrackingById,
+  closeConsultationById,
   awardHDT,
   getHDTLeaderboard,
   getDoctorStats,
@@ -47,6 +48,7 @@ const ALLOWED_LIST_STATUS = new Set(['all', 'active', 'followup', 'replied', 'cl
 const MAX_SEARCH_LENGTH = 120;
 const MAX_REPLY_LENGTH = 2000;
 const MAX_CONSULTATION_ID_LENGTH = 160;
+const DOCTOR_CLOSE_REASON = '의료진이 상담을 종료했습니다.';
 
 function createRequestValidationError(message) {
   const error = new Error(message);
@@ -679,6 +681,44 @@ router.post('/consultations/:id/reply', requireDoctorAuth, async (req, res) => {
     }
     console.error('[Portal Reply Error]', error);
     return res.status(500).json({ error: '답변 전송 실패' });
+  }
+});
+
+// A patient who is satisfied often simply stops answering, and until now only
+// the patient could end a consultation - so the ones who never came back sat
+// in the portal as if a clinician still owed them something.
+router.post('/consultations/:id/close', requireDoctorAuth, async (req, res) => {
+  try {
+    const consultationId = parseConsultationId(req.params.id);
+    const consultation = assertPortalVisibleConsultation(await getConsultationById(consultationId));
+
+    // The reason reaches the patient on their status page, so it is this fixed
+    // sentence rather than anything typed in the portal.
+    const result = await closeConsultationById(consultationId, DOCTOR_CLOSE_REASON, {
+      action: 'DOCTOR_CLOSE',
+      closedBy: req.doctor.name || null,
+    });
+
+    if (!result) {
+      throw createPortalNotFoundError();
+    }
+
+    if (!result.alreadyClosed && consultation.userId) {
+      // Nothing is owed on this consultation any more: no follow-up question
+      // for the patient, no unanswered alert for the clinicians.
+      await followUpService.cancelFollowUp(consultation.userId);
+      await clearDoctorNotifications(consultation.userId);
+      await clearOperatorUnansweredAlerts(consultation.userId);
+    }
+
+    console.log(`[Portal] ${req.doctor.email} closed ${consultationId}`);
+    return res.json({ ok: true, alreadyClosed: result.alreadyClosed });
+  } catch (error) {
+    if (error?.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
+    console.error('[Portal Close Error]', error);
+    return res.status(500).json({ error: '상담 종료에 실패했습니다.' });
   }
 });
 
