@@ -108,6 +108,39 @@ test('the chart sent to the model carries only what the patient supplied', { con
   // itself as the AI intern the way the first version of this prompt did.
   assert.match(instruction, /자기소개나 서명을 쓰지 마세요/);
   assert.match(instruction, /작성자를 밝히는 표현을 쓰지 마세요/);
+  // 24 of the last 25 drafts asked the patient a question back, at a median of
+  // 563 characters. A patient who has to write again mostly does not, so the
+  // draft answers in one message and splits cases instead of interrogating.
+  assert.match(instruction, /되묻지 마세요/);
+  assert.match(instruction, /경우를 나눠 답하세요/);
+  assert.match(instruction, /350자 이내/);
+  // Freed from asking questions, the model started recommending examinations,
+  // which is the test order the prohibition above already rules out.
+  assert.match(instruction, /검사 이름이나 "정밀 검사" 같은 표현을 쓰지 마세요/);
+});
+
+test('the follow-up draft also answers in one message rather than asking again', { concurrency: false }, async () => {
+  const { service, calls } = loadServiceWithMocks({
+    generate: async () => ({ text: JSON.stringify({ replyDraft: '의료진이 확인한 바로는 ...' }) }),
+  });
+
+  await service.generateFollowUp({
+    patientData: PATIENT_DATA,
+    question: '수술을 꼭 해야 하나요?',
+    priorReply: '말씀해 주신 내용을 확인했습니다.',
+  });
+
+  const call = calls.find((entry) => entry.type === 'generateContent');
+  assert.match(call.request.contents, /\[환자의 추가 질문\]\n수술을 꼭 해야 하나요\?/);
+
+  const instruction = call.request.config.systemInstruction;
+  assert.match(instruction, /되묻지 마세요/);
+  assert.match(instruction, /경우를 나눠 답하세요/);
+  assert.match(instruction, /250자 이내/);
+  // The prohibitions do not relax because the conversation continued.
+  assert.match(instruction, /진단명을 확정하지 마세요/);
+  assert.match(instruction, /약물명, 용량, 복용법을 쓰지 마세요/);
+  assert.match(instruction, /환자에게 자동으로 전달되지 않습니다/);
 });
 
 test('a generated summary carries a SOAP note and a reply draft for approval', { concurrency: false }, async () => {
