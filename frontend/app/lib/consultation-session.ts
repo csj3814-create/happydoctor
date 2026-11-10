@@ -139,3 +139,46 @@ export function getWebConsultationDraft(): WebConsultationDraft | null {
 export function clearWebConsultationDraft() {
   removeItem(DRAFT_SESSION_KEY)
 }
+
+// A question half typed into the status page used to vanish if the patient
+// left the page, locked the phone, or let the tab be reclaimed - and a patient
+// who has to type it again mostly does not. It is kept until it is sent.
+//
+// The lookup token is the key to the whole consultation, so it is not written
+// into storage a second time; a short digest of it is enough to keep two
+// consultations apart on one device.
+const FOLLOW_UP_DRAFT_KEY_PREFIX = 'happydoctor-follow-up-draft-'
+
+function digestLookup(lookup: string): string {
+  let hash = 5381
+  for (let index = 0; index < lookup.length; index += 1) {
+    hash = ((hash << 5) + hash + lookup.charCodeAt(index)) | 0
+  }
+  return (hash >>> 0).toString(36)
+}
+
+function followUpDraftKey(lookup: string): string {
+  return `${FOLLOW_UP_DRAFT_KEY_PREFIX}${digestLookup(lookup)}`
+}
+
+export function getFollowUpDraft(lookup: string): string {
+  if (!isBrowser() || !lookup) return ''
+
+  try {
+    return window.localStorage.getItem(followUpDraftKey(lookup)) || ''
+  } catch {
+    // Private windows and blocked site data both throw on access.
+    return ''
+  }
+}
+
+export function saveFollowUpDraft(lookup: string, text: string) {
+  if (!isBrowser() || !lookup) return
+
+  try {
+    if (text.trim()) window.localStorage.setItem(followUpDraftKey(lookup), text)
+    else window.localStorage.removeItem(followUpDraftKey(lookup))
+  } catch {
+    // Losing the backup must not break asking the question.
+  }
+}

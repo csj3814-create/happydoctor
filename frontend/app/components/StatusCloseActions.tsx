@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
+import { getFollowUpDraft, saveFollowUpDraft } from '@/lib/consultation-session'
 import type { UiLanguage } from '@/lib/ui-language'
 
 type StatusCloseActionsProps = {
@@ -47,6 +48,7 @@ const copyByLanguage = {
     followUpSuccess:
       '추가 질문이 의료진에게 전달되었습니다. 답변이 준비되면 이 화면에서 바로 확인할 수 있습니다.',
     followUpError: '추가 질문을 보내지 못했습니다. 잠시 후 다시 시도해 주세요.',
+    followUpRestored: '쓰던 내용을 그대로 불러왔습니다. 보내기 전까지 이 기기에 남아 있습니다.',
   },
   en: {
     closedTitle: 'Consultation status',
@@ -76,6 +78,7 @@ const copyByLanguage = {
     followUpSuccess:
       'Your follow-up question was sent to the doctors. You can check this page again when a reply is ready.',
     followUpError: 'We could not send your follow-up question right now. Please try again shortly.',
+    followUpRestored: 'We brought back what you were writing. It stays on this device until you send it.',
   },
 } as const
 
@@ -169,10 +172,33 @@ export function StatusFollowUpComposer({
 }: StatusFollowUpComposerProps) {
   const router = useRouter()
   const copy = copyByLanguage[uiLanguage]
-  const [question, setQuestion] = useState('')
+  // An unsent question comes back with the page. This reads storage once as
+  // the component mounts rather than from an effect: the composer renders only
+  // after the consultation has been fetched in the browser, so there is no
+  // server-rendered markup for it to disagree with.
+  const [restoredDraft] = useState(() => getFollowUpDraft(lookup))
+  const [question, setQuestion] = useState(restoredDraft)
   const [sending, setSending] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(restoredDraft ? copy.followUpRestored : null)
   const [error, setError] = useState<string | null>(null)
+
+  // The text is already stored; this is the last chance to stay and send it.
+  useEffect(() => {
+    if (!question.trim() || sending) return undefined
+
+    const confirmLeave = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+
+    window.addEventListener('beforeunload', confirmLeave)
+    return () => window.removeEventListener('beforeunload', confirmLeave)
+  }, [question, sending])
+
+  function updateQuestion(next: string) {
+    setQuestion(next)
+    saveFollowUpDraft(lookup, next)
+  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -197,7 +223,9 @@ export function StatusFollowUpComposer({
         return
       }
 
-      setQuestion('')
+      // Sent: the stored copy goes with it, so reopening the page does not
+      // offer a question the doctors already have.
+      updateQuestion('')
       setMessage(copy.followUpSuccess)
       router.refresh()
       onUpdated?.()
@@ -215,7 +243,7 @@ export function StatusFollowUpComposer({
       <form onSubmit={handleSubmit} className="flex items-end gap-2">
         <textarea
           value={question}
-          onChange={(event) => setQuestion(event.target.value)}
+          onChange={(event) => updateQuestion(event.target.value)}
           placeholder={copy.placeholder}
           rows={2}
           disabled={sending}
