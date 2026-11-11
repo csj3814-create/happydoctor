@@ -323,9 +323,14 @@ function getConsultationAutoCloseConfig() {
   return {
     enabled: getBooleanEnv('CONSULTATION_AUTO_CLOSE_ENABLED', true),
     // Days since the last doctor reply with nothing from the patient since.
-    // Long enough that someone who reads the answer at the weekend and comes
-    // back with one more question still finds the consultation open.
-    afterDays: getNumberEnv('CONSULTATION_AUTO_CLOSE_AFTER_DAYS', 7, { min: 1, integer: true }),
+    // Three, from what patients actually did (measured 2026-11-11): of 35
+    // questions asked after a reply, 32 came within three days and none at all
+    // between day three and day seven - the three that came later arrived on
+    // day 18, past any window worth holding open. Replies that get read are
+    // read within three days 98% of the time. The first default here was
+    // seven, on the guess that someone might come back after a weekend; four
+    // extra days of open consultations bought no question that three missed.
+    afterDays: getNumberEnv('CONSULTATION_AUTO_CLOSE_AFTER_DAYS', 3, { min: 1, integer: true }),
     checkIntervalMs: getNumberEnv('CONSULTATION_AUTO_CLOSE_CHECK_INTERVAL_MS', 60 * 60 * 1000, {
       min: 60 * 1000,
       integer: true,
