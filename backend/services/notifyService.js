@@ -1255,6 +1255,36 @@ async function acknowledgePatientSmsNotification(notificationId, payload = {}) {
     return { status: 'delivered', exhausted: false };
   }
 
+  // A failure that is ours rather than the recipient's - SOLAPI refusing
+  // because the account has no balance - says nothing about whether this
+  // message can be delivered. It used to spend the retry budget anyway: every
+  // reply between 24 October and 14 November failed this way, five times each,
+  // and was given up on. Holding it instead means a top-up sends it.
+  if (Number.isFinite(payload.holdMinutes) && payload.holdMinutes > 0) {
+    // The claim counted this try; it was not a real attempt at the recipient.
+    // We hold the lease and read the document just now, so nothing else can
+    // have moved the count in between.
+    const refundedAttempts = Math.max(0, (Number(snapshot.data()?.attemptCount) || 0) - 1);
+    await docRef.update({
+      status: 'pending',
+      leaseId: null,
+      leaseExpiresAt: null,
+      attemptCount: refundedAttempts,
+      lastFailedAt: getAdmin().firestore.FieldValue.serverTimestamp(),
+      lastFailureReason: truncateSmsFailureReason(payload.error),
+      heldAt: getAdmin().firestore.FieldValue.serverTimestamp(),
+      availableAt: new Date(Date.now() + payload.holdMinutes * 60 * 1000),
+    });
+
+    return {
+      status: 'pending',
+      exhausted: false,
+      held: true,
+      attemptCount: refundedAttempts,
+      userId: snapshot.data()?.userId || null,
+    };
+  }
+
   // claimPatientSmsNotification() already incremented attemptCount for this try.
   const attemptCount = Number(snapshot.data()?.attemptCount) || 0;
   // `exhaust` short-circuits the retry budget for failures that repetition
@@ -1285,6 +1315,33 @@ async function acknowledgePatientSmsNotification(notificationId, payload = {}) {
     attemptCount,
     userId: snapshot.data()?.userId || null,
   };
+}
+
+// What happened to the reply-arrived texts for one patient, newest first. A
+// reply is reported to the clinician by the portal at the moment it is queued,
+// which is before anything has been sent; this is what actually happened.
+async function getPatientSmsOutcomes(userId, type = 'doctor_reply') {
+  const collection = getCollection(PATIENT_SMS_NOTIFICATIONS);
+  if (!collection || !userId) return [];
+
+  const snapshot = await collection.where('userId', '==', userId).get();
+  const toMillis = (value) => {
+    if (!value) return 0;
+    if (value.toMillis) return value.toMillis();
+    const parsed = new Date(value).getTime();
+    return Number.isNaN(parsed) ? 0 : parsed;
+  };
+
+  return snapshot.docs
+    .map((doc) => doc.data() || {})
+    .filter((data) => !type || data.type === type)
+    .map((data) => ({
+      createdAtMs: toMillis(data.createdAt),
+      status: data.status || 'pending',
+      reason: data.lastFailureReason || null,
+      held: Boolean(data.heldAt) && data.status === 'pending',
+    }))
+    .sort((a, b) => b.createdAtMs - a.createdAtMs);
 }
 
 async function clearPatientSmsNotifications(userId, type = null) {
@@ -1544,6 +1601,7 @@ module.exports = {
   claimPatientSmsNotification,
   acknowledgePatientSmsNotification,
   clearPatientSmsNotifications,
+  getPatientSmsOutcomes,
   reclaimExpiredPatientSmsLeases,
   registerRoom,
   registerDoctorRoom,

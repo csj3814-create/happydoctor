@@ -20,6 +20,7 @@ const {
   getAdmin,
 } = require('../services/dbService');
 const { isConsultationClosed } = require('../services/consultationStatus');
+const { summarizeSmsForReplies } = require('../services/replyDelivery');
 const notifyService = require('../services/notifyService');
 const {
   enqueuePatientChannelPush,
@@ -121,6 +122,34 @@ function parseReplyMessage(value) {
   }
 
   return normalized;
+}
+
+// The reply route answers "sent by text" the moment a text is queued, before
+// anything has gone out. From 24 October to 14 November every one of those
+// texts then failed on an empty SOLAPI balance while the portal went on saying
+// the patient had been told. This puts what actually happened next to each
+// reply. A failed lookup leaves the replies as they were: the chart matters
+// more than the annotation.
+async function withReplySmsStatus(consultation) {
+  const replies = consultation?.doctorReplies || [];
+  if (replies.length === 0 || !consultation.userId || typeof notifyService.getPatientSmsOutcomes !== 'function') {
+    return consultation;
+  }
+
+  try {
+    const outcomes = await notifyService.getPatientSmsOutcomes(consultation.userId);
+    const byReply = summarizeSmsForReplies(replies, outcomes);
+    return {
+      ...consultation,
+      doctorReplies: replies.map((reply) => {
+        const sms = byReply.get(reply.id) || { status: 'none', reason: null };
+        return { ...reply, smsStatus: sms.status, smsFailureReason: sms.reason };
+      }),
+    };
+  } catch (error) {
+    console.error('[Portal Reply SMS Status Error]', error?.message || error);
+    return consultation;
+  }
 }
 
 function assertPortalVisibleConsultation(consultation) {
@@ -527,7 +556,9 @@ router.get('/consultations/:id', requireDoctorAuth, async (req, res) => {
     const consultationId = parseConsultationId(req.params.id);
     const consultation = assertPortalVisibleConsultation(await getConsultationById(consultationId));
 
-    return res.json(serializeTimestamps(withoutStandardIntakeReply(consultation)));
+    return res.json(serializeTimestamps(withoutStandardIntakeReply(
+      await withReplySmsStatus(consultation),
+    )));
   } catch (error) {
     if (error?.statusCode) {
       return res.status(error.statusCode).json({ error: error.message });

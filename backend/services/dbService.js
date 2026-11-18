@@ -1243,6 +1243,20 @@ async function getConsultationSummary() {
   }
 }
 
+// Replies alone, oldest first. getConsultationById() also signs every media
+// URL, which a background job checking delivery has no use for.
+async function getDoctorRepliesForConsultation(consultationId) {
+  if (!db || !consultationId) return [];
+
+  const snapshot = await db.collection('doctor_replies')
+    .where('consultationId', '==', consultationId)
+    .get();
+
+  return snapshot.docs
+    .map((reply) => ({ ...reply.data(), id: reply.id }))
+    .sort((a, b) => getTimestampMs(a.createdAt) - getTimestampMs(b.createdAt));
+}
+
 async function getConsultationById(consultationId) {
   if (!db) return null;
 
@@ -2210,6 +2224,7 @@ module.exports = {
   getActiveConsultations,
   getConsultationSummary,
   getConsultationById,
+  getDoctorRepliesForConsultation,
   getConsultationTrackingById,
   getLatestConsultationTracking,
   getPublicConsultationStatusByLookup,

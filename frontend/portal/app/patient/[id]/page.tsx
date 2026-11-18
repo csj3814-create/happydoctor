@@ -851,7 +851,8 @@ export default function PatientPage({ params }: PatientPageProps) {
                       {submitSuccess && notifiedChannels && !awaitingKakaoPickup ? (
                         notifiedChannels.length > 0 ? (
                           <p className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
-                            답변이 전송되었습니다. 환자에게 {formatNotifyChannels(notifiedChannels)}로 알렸습니다.
+                            답변이 저장되었습니다. 환자에게 {formatNotifyChannels(notifiedChannels)} 알림을 보내는 중입니다.
+                            {notifiedChannels.includes('sms') ? ' 문자 발송 결과는 대화 내역의 답변 옆에 표시됩니다.' : ''}
                           </p>
                         ) : (
                           <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-900">

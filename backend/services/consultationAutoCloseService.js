@@ -1,4 +1,5 @@
 const dbService = require('./dbService');
+const { findUndeliveredLatestReply } = require('./undeliveredReplyService');
 const { getConsultationAutoCloseConfig } = require('../config');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -95,6 +96,15 @@ class ConsultationAutoCloseService {
         if (!repliedAt || repliedAt > cutoffMs) continue;
         // The patient came back. They are waiting for an answer, not finished.
         if (getLatestPatientQuestionAt(consultation) > repliedAt) continue;
+
+        // The answer exists but the patient was never told: unread, and the
+        // text announcing it failed. A chest-pain consultation went exactly
+        // this way on 14 November - the text died on an empty SOLAPI balance
+        // and the job closed it three days later, after which nothing anywhere
+        // showed that the patient had never been told. Left open, it stays in
+        // the daily digest as [미전달] until a clinician decides.
+        // eslint-disable-next-line no-await-in-loop
+        if (await findUndeliveredLatestReply(consultation)) continue;
 
         // eslint-disable-next-line no-await-in-loop
         const result = await dbService.closeConsultationById(consultation.id, this.buildReason(), {

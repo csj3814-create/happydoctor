@@ -351,3 +351,109 @@ test('a SOLAPI rejection is recorded as its status code, not a wall of SDK type 
     context.restore();
   }
 });
+
+// From 24 October to 14 November SOLAPI refused every text for want of
+// balance. Each was retried five times in half an hour, given up on, and
+// reported as a patient who could not be reached.
+function createBalanceFailureSolapiMock() {
+  return {
+    SolapiMessageService: class SolapiMessageService {
+      async send() {
+        const error = new Error('one or more messages failed');
+        error.failedMessageList = [{ statusCode: 'NotEnoughBalance', statusMessage: '보유 잔액이 부족하여 발송에 실패하였습니다.' }];
+        throw error;
+      }
+    },
+  };
+}
+
+function loadForAccountFailure({ acked, accountMails, patientMails }) {
+  return loadPatientSmsServiceWithMocks({
+    [SOLAPI_PATH]: createBalanceFailureSolapiMock(),
+    [CONFIG_PATH]: RUNTIME_CONFIG,
+    [NOTIFY_SERVICE_PATH]: {
+      isSmsDeliverableNumber: () => true,
+      claimPatientSmsNotification: async () => null,
+      reclaimExpiredPatientSmsLeases: async () => 0,
+      acknowledgePatientSmsNotification: async (id, payload) => {
+        acked.push({ id, payload });
+        return { exhausted: false, attemptCount: 1 };
+      },
+    },
+    [EMAIL_SERVICE_PATH]: {
+      sendSmsAccountFailureEmail: async (payload) => { accountMails.push(payload); return true; },
+      sendPatientSmsFailureEmail: async (payload) => { patientMails.push(payload); return true; },
+    },
+  });
+}
+
+test('an empty SOLAPI balance holds the text instead of spending its retries', { concurrency: false }, async () => {
+  const acked = [];
+  const accountMails = [];
+  const patientMails = [];
+  const { service, restore } = loadForAccountFailure({ acked, accountMails, patientMails });
+
+  try {
+    const fresh = { notificationId: 'n1', userId: 'u1', phoneNumber: '01012345678', message: 'm', createdAt: new Date() };
+    assert.equal(await service.executeClaimedNotification(fresh), false);
+
+    // Held for later, with the attempt handed back: a top-up should send it.
+    assert.equal(acked.length, 1);
+    assert.equal(acked[0].payload.holdMinutes, 30);
+    assert.match(acked[0].payload.error, /NotEnoughBalance/);
+
+    // The operator hears it is the account, not the patient.
+    assert.equal(accountMails.length, 1);
+    assert.deepEqual(patientMails, []);
+  } finally {
+    restore();
+  }
+});
+
+test('the balance alert is sent once, not once per held text', { concurrency: false }, async () => {
+  const acked = [];
+  const accountMails = [];
+  const patientMails = [];
+  const { service, restore } = loadForAccountFailure({ acked, accountMails, patientMails });
+
+  try {
+    for (const id of ['a', 'b', 'c']) {
+      // eslint-disable-next-line no-await-in-loop
+      await service.executeClaimedNotification({ notificationId: id, userId: id, phoneNumber: '01012345678', message: 'm', createdAt: new Date() });
+    }
+    assert.equal(acked.length, 3);
+    assert.equal(accountMails.length, 1);
+  } finally {
+    restore();
+  }
+});
+
+test('a text held for over a day is given up on the ordinary way', { concurrency: false }, async () => {
+  // "Your answer has arrived" two days late is noise; by then the patient has
+  // looked already or stopped expecting it.
+  const acked = [];
+  const accountMails = [];
+  const patientMails = [];
+  const { service, restore } = loadForAccountFailure({ acked, accountMails, patientMails });
+
+  try {
+    const stale = {
+      notificationId: 'old', userId: 'u', phoneNumber: '01012345678', message: 'm',
+      createdAt: new Date(Date.now() - 25 * 60 * 60 * 1000),
+    };
+    await service.executeClaimedNotification(stale);
+
+    assert.equal(acked.length, 1);
+    assert.equal(acked[0].payload.holdMinutes, undefined);
+    assert.deepEqual(accountMails, []);
+  } finally {
+    restore();
+  }
+});
+
+test('a recipient failure is still retried, not held', { concurrency: false }, async () => {
+  const { isAccountFailure } = require('../services/patientSmsService');
+  assert.equal(isAccountFailure('NotEnoughBalance 보유 잔액이 부족하여 발송에 실패하였습니다.'), true);
+  assert.equal(isAccountFailure('solapi_rejected_recipient'), false);
+  assert.equal(isAccountFailure(''), false);
+});

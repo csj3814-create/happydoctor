@@ -19,6 +19,8 @@ type ThreadItem =
       seenAt?: string | null
       delivered?: string | null
       deliveredLanguage?: string | null
+      smsStatus?: string | null
+      smsFailureReason?: string | null
     }
   | { kind: 'system'; at: number; label: string; text?: string }
 
@@ -95,10 +97,33 @@ export function buildThread(consultation: Consultation): ThreadItem[] {
       seenAt: reply.seenAt,
       delivered: reply.patientDeliveredMessage,
       deliveredLanguage: reply.patientDeliveredLanguage,
+      smsStatus: reply.smsStatus,
+      smsFailureReason: reply.smsFailureReason,
     })
   })
 
   return items.sort((a, b) => a.at - b.at)
+}
+
+// The portal said "알렸습니다" the moment a text was queued. This says what
+// happened to it afterwards, which is the thing a clinician needs to know when
+// a reply sits unread.
+function smsChip(status?: string | null, reason?: string | null): { label: string; tone: string } | null {
+  const account = /NotEnoughBalance|잔액/.test(reason || '')
+  switch (status) {
+    case 'delivered':
+      return { label: '문자 발송됨', tone: 'bg-emerald-50 text-emerald-700' }
+    case 'pending':
+      return { label: '문자 발송 대기', tone: 'bg-zinc-100 text-zinc-600' }
+    case 'held':
+      return { label: '문자 보류 · 잔액 부족', tone: 'bg-amber-50 text-amber-800' }
+    case 'failed':
+      return { label: account ? '문자 실패 · 잔액 부족' : '문자 실패', tone: 'bg-red-50 text-red-700' }
+    case 'cancelled':
+      return { label: '문자 생략 · 환자가 먼저 읽음', tone: 'bg-zinc-100 text-zinc-500' }
+    default:
+      return null
+  }
 }
 
 function languageLabel(language?: string | null): string {
@@ -192,6 +217,12 @@ export default function ConversationThread({
                   >
                     {item.seen ? (item.seenAt ? `읽음 ${formatDateTime(timestampMs(item.seenAt))}` : '읽음') : '미확인'}
                   </span>
+                  {(() => {
+                    const chip = smsChip(item.smsStatus, item.smsFailureReason)
+                    return chip ? (
+                      <span className={`rounded-full px-2 py-0.5 font-medium ${chip.tone}`}>{chip.label}</span>
+                    ) : null
+                  })()}
                   <span>{formatDateTime(item.at)}</span>
                 </div>
                 <div className="max-w-[85%] rounded-2xl rounded-tr-sm border border-blue-100 bg-blue-50 px-4 py-3">

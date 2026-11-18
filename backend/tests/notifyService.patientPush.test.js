@@ -1089,6 +1089,67 @@ test('a failed SMS ack backs off instead of returning to the head of the queue',
   }
 });
 
+test('a text held for the account hands its attempt back and waits', { concurrency: false }, async () => {
+  // Five attempts in half an hour against an empty SOLAPI balance is how every
+  // reply text from 24 October to 14 November was lost. Held, a top-up sends it.
+  const context = loadNotifyService({
+    patient_sms_notifications: {
+      'sms-held': {
+        userId: 'patientA',
+        phoneNumber: '01012345678',
+        message: 'doctor reply',
+        type: 'doctor_reply',
+        status: 'leased',
+        leaseId: 'lease-1',
+        attemptCount: 4,
+        availableAt: new Date('2026-11-14T02:54:00.000Z'),
+        createdAt: new Date('2026-11-14T02:54:00.000Z'),
+      },
+    },
+  });
+
+  try {
+    const before = Date.now();
+    const outcome = await context.service.acknowledgePatientSmsNotification('sms-held', {
+      delivered: false,
+      error: 'NotEnoughBalance',
+      holdMinutes: 30,
+    });
+
+    assert.equal(outcome.held, true);
+    assert.equal(outcome.exhausted, false);
+
+    const doc = context.getDoc('patient_sms_notifications', 'sms-held');
+    assert.equal(doc.status, 'pending');
+    // Four claims, one of them this refused try: three real attempts remain spent.
+    assert.equal(doc.attemptCount, 3);
+    assert.equal(doc.leaseId, null);
+    assert.ok(doc.availableAt.getTime() >= before + 29 * 60 * 1000, 'held for about the requested time');
+    assert.ok(doc.heldAt, 'marked as held so the portal can say so');
+  } finally {
+    context.restore();
+  }
+});
+
+test('the SMS outcomes for a patient come back newest first, by type', { concurrency: false }, async () => {
+  const context = loadNotifyService({
+    patient_sms_notifications: {
+      older: { userId: 'p', type: 'doctor_reply', status: 'failed', lastFailureReason: 'x', createdAt: new Date('2026-11-14T02:00:00.000Z') },
+      newer: { userId: 'p', type: 'doctor_reply', status: 'delivered', createdAt: new Date('2026-11-15T02:00:00.000Z') },
+      other: { userId: 'p', type: 'follow_up', status: 'delivered', createdAt: new Date('2026-11-16T02:00:00.000Z') },
+      someoneElse: { userId: 'q', type: 'doctor_reply', status: 'failed', createdAt: new Date('2026-11-16T02:00:00.000Z') },
+    },
+  });
+
+  try {
+    const outcomes = await context.service.getPatientSmsOutcomes('p');
+    assert.deepEqual(outcomes.map((o) => o.status), ['delivered', 'failed']);
+    assert.equal(outcomes[1].reason, 'x');
+  } finally {
+    context.restore();
+  }
+});
+
 test('an SMS is dead-lettered once it exhausts its attempts', { concurrency: false }, async () => {
   const context = loadNotifyService({
     patient_sms_notifications: {

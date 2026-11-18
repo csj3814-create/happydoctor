@@ -27,6 +27,10 @@ export interface DoctorReply {
   createdAt: string; seen: boolean; seenAt?: string; doctorEmail?: string;
   patientDeliveredMessage?: string | null;
   patientDeliveredLanguage?: string | null;
+  // What happened to the "answer arrived" text, as opposed to whether one was
+  // queued. 'none' means no text was ever due for this reply.
+  smsStatus?: 'delivered' | 'pending' | 'held' | 'failed' | 'cancelled' | 'none' | null;
+  smsFailureReason?: string | null;
 }
 
 export interface FollowUpLog {

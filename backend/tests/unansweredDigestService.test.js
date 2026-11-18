@@ -5,10 +5,11 @@ const path = require('node:path');
 
 const CONFIG_PATH = path.join(__dirname, '..', 'config.js');
 const DB_SERVICE_PATH = path.join(__dirname, '..', 'services', 'dbService.js');
+const UNDELIVERED_PATH = path.join(__dirname, '..', 'services', 'undeliveredReplyService.js');
 const EMAIL_SERVICE_PATH = path.join(__dirname, '..', 'services', 'emailService.js');
 const DIGEST_SERVICE_PATH = path.join(__dirname, '..', 'services', 'unansweredDigestService.js');
 
-function loadDigestServiceWithMocks({ config, dbService, emailService }) {
+function loadDigestServiceWithMocks({ config, dbService, emailService, undelivered = async () => null }) {
   const originalLoad = Module._load;
 
   Module._load = function patchedLoad(request, parent, isMain) {
@@ -22,6 +23,7 @@ function loadDigestServiceWithMocks({ config, dbService, emailService }) {
 
     if (resolved === CONFIG_PATH) return { getUnansweredDigestConfig: () => config };
     if (resolved === DB_SERVICE_PATH) return dbService;
+    if (resolved === UNDELIVERED_PATH) return { findUndeliveredLatestReply: undelivered };
     if (resolved === EMAIL_SERVICE_PATH) return emailService;
 
     return originalLoad(request, parent, isMain);
@@ -73,8 +75,13 @@ function createFakeDb(initialState = null) {
 function createConsultationsStub({
   pending = { total: 0, consultations: [] },
   followup = { total: 0, consultations: [] },
+  replied = { total: 0, consultations: [] },
 } = {}) {
-  return async (options = {}) => (options.status === 'followup' ? followup : pending);
+  return async (options = {}) => {
+    if (options.status === 'followup') return followup;
+    if (options.status === 'replied') return replied;
+    return pending;
+  };
 }
 
 function createEmailServiceSpy(sent) {
@@ -283,5 +290,34 @@ test('a follow-up tab entry with no patient question falls back to intake time',
   assert.equal(await digest.runOnce(new Date('2026-09-02T00:05:00Z')), true);
   assert.deepEqual(sent[0].items, [
     { kind: 'follow_up', receivedAt: '2026-08-30 10:00 KST', waitingDays: 2, channel: 'web' },
+  ]);
+});
+
+test('an answer whose text failed is listed as undelivered', { concurrency: false }, async () => {
+  const sent = [];
+  const fakeDb = createFakeDb();
+  const digest = loadDigestServiceWithMocks({
+    config: DEFAULT_CONFIG,
+    dbService: {
+      ...fakeDb,
+      getActiveConsultations: createConsultationsStub({
+        replied: {
+          total: 2,
+          consultations: [
+            { id: 'text-failed', createdAt: '2026-08-29T01:00:00.000Z', doctorRepliedAt: '2026-08-29T02:00:00.000Z', entryChannel: 'kakao' },
+            { id: 'read-it', createdAt: '2026-08-29T01:00:00.000Z', doctorRepliedAt: '2026-08-29T02:00:00.000Z', entryChannel: 'web' },
+          ],
+        },
+      }),
+    },
+    emailService: createEmailServiceSpy(sent),
+    undelivered: async (consultation) => (consultation.id === 'text-failed' ? { reply: {}, sms: { status: 'failed' } } : null),
+  });
+
+  assert.equal(await digest.runOnce(new Date('2026-09-02T00:05:00Z')), true);
+  assert.equal(sent[0].total, 1);
+  // Dated from the reply the patient never heard about.
+  assert.deepEqual(sent[0].items, [
+    { kind: 'undelivered', receivedAt: '2026-08-29 11:00 KST', waitingDays: 3, channel: 'kakao' },
   ]);
 });

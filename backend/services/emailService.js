@@ -335,7 +335,10 @@ class EmailService {
       const waited = Number.isFinite(item.waitingDays) ? `${item.waitingDays}일 대기` : '대기일 미상';
       // A follow-up question is a patient who has already been answered once
       // and is waiting again, so the row says which wait this is.
-      const kind = item.kind === 'follow_up' ? '추가 질문' : '첫 답변';
+      const kind = item.kind === 'follow_up'
+        ? '추가 질문'
+        // Answered, but the patient was never told - the text failed.
+        : item.kind === 'undelivered' ? '미전달' : '첫 답변';
       return `${index + 1}. [${kind}] ${item.receivedAt || '접수시각 미상'} · ${waited} · ${item.channel || '경로 미상'}`;
     });
 
@@ -403,6 +406,38 @@ class EmailService {
   // Sent when a patient reply SMS is abandoned after repeated failures, so a
   // human knows one patient is unreachable. Carries no phone number and no
   // reply text - only the fact and the portal link.
+  // The account, not a patient: every reply text is stuck until someone tops
+  // it up. The per-patient failure mail used to be the only signal, and it
+  // told the reader to check the patient's phone number.
+  async sendSmsAccountFailureEmail({ reason } = {}) {
+    if (!this.isConfigured()) {
+      return false;
+    }
+
+    const recipients = getAlertEmailRecipients();
+    if (recipients.length === 0) {
+      return false;
+    }
+
+    const text = [
+      'SOLAPI 계정에서 문자를 보낼 수 없어 환자 답변 알림 문자가 모두 멈춰 있습니다.',
+      reason ? `SOLAPI 응답: ${String(reason).slice(0, 200)}` : '',
+      '',
+      '환자 연락처 문제가 아닙니다. SOLAPI 잔액을 충전해 주세요.',
+      '충전되면 최근 24시간 안에 대기한 문자는 자동으로 다시 발송됩니다.',
+      '이 메일은 문제가 계속되는 동안 최대 6시간에 한 번 발송됩니다.',
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    await this.sendMail({
+      to: recipients,
+      subject: '[해피닥터] 문자 발송 중단 - SOLAPI 잔액 충전 필요',
+      text,
+    });
+    return true;
+  }
+
   async sendPatientSmsFailureEmail({ userId, attemptCount, reason } = {}) {
     if (!this.isConfigured()) {
       return false;

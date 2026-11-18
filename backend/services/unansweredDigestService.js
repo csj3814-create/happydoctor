@@ -1,5 +1,6 @@
 const dbService = require('./dbService');
 const emailService = require('./emailService');
+const { findUndeliveredLatestReply } = require('./undeliveredReplyService');
 const { getUnansweredDigestConfig } = require('../config');
 
 const DIGEST_STATE_COLLECTION = 'system_jobs';
@@ -114,10 +115,21 @@ class UnansweredDigestService {
   // had been delivered, and the one daily net that could have caught it was
   // only ever looking at the pending tab.
   async collectUnanswered(now) {
-    const [pending, followUp] = await Promise.all([
+    const [pending, followUp, replied] = await Promise.all([
       dbService.getActiveConsultations({ status: 'pending', limit: this.maxItems }),
       dbService.getActiveConsultations({ status: 'followup', limit: this.maxItems }),
+      dbService.getActiveConsultations({ status: 'replied', limit: 100 }),
     ]);
+
+    // Answered, but the patient was never told: unread, and the text that
+    // should have announced it failed. The auto-close job leaves these open
+    // for exactly this list - a patient still waiting, only on the wrong side
+    // of a reply they cannot see.
+    const undelivered = [];
+    for (const consultation of replied.consultations || []) {
+      // eslint-disable-next-line no-await-in-loop
+      if (await findUndeliveredLatestReply(consultation)) undelivered.push(consultation);
+    }
 
     const rows = [
       ...(pending.consultations || []).map((consultation) => ({
@@ -128,6 +140,11 @@ class UnansweredDigestService {
       ...(followUp.consultations || []).map((consultation) => ({
         kind: 'follow_up',
         waitingSince: getLatestPatientQuestionAt(consultation) || consultation.createdAt,
+        channel: consultation.entryChannel || null,
+      })),
+      ...undelivered.map((consultation) => ({
+        kind: 'undelivered',
+        waitingSince: consultation.doctorRepliedAt || consultation.createdAt,
         channel: consultation.entryChannel || null,
       })),
     ];
@@ -144,7 +161,8 @@ class UnansweredDigestService {
       }));
 
     const total = (pending.total ?? (pending.consultations || []).length)
-      + (followUp.total ?? (followUp.consultations || []).length);
+      + (followUp.total ?? (followUp.consultations || []).length)
+      + undelivered.length;
 
     return { items, total };
   }

@@ -5,6 +5,7 @@ const path = require('node:path');
 
 const CONFIG_PATH = path.join(__dirname, '..', 'config.js');
 const DB_SERVICE_PATH = path.join(__dirname, '..', 'services', 'dbService.js');
+const UNDELIVERED_PATH = path.join(__dirname, '..', 'services', 'undeliveredReplyService.js');
 const SERVICE_PATH = path.join(__dirname, '..', 'services', 'consultationAutoCloseService.js');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -17,7 +18,8 @@ const DEFAULT_CONFIG = Object.freeze({
   maxPerRun: 25,
 });
 
-function loadServiceWithMocks({ config = DEFAULT_CONFIG, dbService }) {
+// Everything is delivered unless a test says otherwise.
+function loadServiceWithMocks({ config = DEFAULT_CONFIG, dbService, undelivered = async () => null }) {
   const originalLoad = Module._load;
 
   Module._load = function patchedLoad(request, parent, isMain) {
@@ -31,6 +33,7 @@ function loadServiceWithMocks({ config = DEFAULT_CONFIG, dbService }) {
 
     if (resolved === CONFIG_PATH) return { getConsultationAutoCloseConfig: () => config };
     if (resolved === DB_SERVICE_PATH) return dbService;
+    if (resolved === UNDELIVERED_PATH) return { findUndeliveredLatestReply: undelivered };
 
     return originalLoad(request, parent, isMain);
   };
@@ -185,4 +188,21 @@ test('the configured age appears in the reason the patient reads', { concurrency
 
   await service.runOnce(NOW);
   assert.match(fakeDb.calls.closed[0].reason, /마지막 답변 후 30일/);
+});
+
+test('an answer the patient was never told about stays open', { concurrency: false }, async () => {
+  // 14 November: a chest-pain consultation got its answer in 56 minutes, the
+  // text announcing it died on an empty SOLAPI balance, and this job closed it
+  // three days later. Nothing anywhere then showed the patient had not been told.
+  const fakeDb = createFakeDb([
+    repliedDaysAgo(9, { id: 'text-failed' }),
+    repliedDaysAgo(10, { id: 'told' }),
+  ]);
+  const service = loadServiceWithMocks({
+    dbService: fakeDb,
+    undelivered: async (consultation) => (consultation.id === 'text-failed' ? { reply: {}, sms: { status: 'failed' } } : null),
+  });
+
+  assert.equal(await service.runOnce(NOW), 1);
+  assert.deepEqual(fakeDb.calls.closed.map((entry) => entry.id), ['told']);
 });
