@@ -15,7 +15,7 @@ const {
 const clearOperatorUnansweredAlerts = notifyService.clearOperatorUnansweredAlerts || (async () => 0);
 const followUpService = require('../services/followUpService');
 const dbService = require('../services/dbService');
-const { scheduleDoctorSummary } = require('../services/doctorSummaryScheduler');
+const { scheduleDoctorSummary, scheduleFollowUpDraft } = require('../services/doctorSummaryScheduler');
 const {
     buildConsentedContact,
     parseContactFromUtterance,
@@ -131,17 +131,22 @@ const CONTACT_PROMPT = [
 // they described a new symptom.
 const OPEN_STATUS_LINK_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 
-async function getLatestStatusLinkForUser(userId) {
+// The patient's open, recent consultation, or null. Never throws: every
+// caller has a sensible thing to say without one.
+async function getOpenConsultationForUser(userId) {
     try {
-        const latest = await dbService.getLatestConsultationTracking(userId, {
+        return await dbService.getLatestConsultationTracking(userId, {
             requireOpen: true,
             maxAgeMs: OPEN_STATUS_LINK_MAX_AGE_MS,
         });
-        return buildStatusLinkText(latest);
     } catch (error) {
         console.error('[Status Link Lookup Error]', error);
-        return '';
+        return null;
     }
+}
+
+async function getLatestStatusLinkForUser(userId) {
+    return buildStatusLinkText(await getOpenConsultationForUser(userId));
 }
 
 // Commands and button labels are not symptoms; quoting those back would be
@@ -149,7 +154,7 @@ async function getLatestStatusLinkForUser(userId) {
 // should show it was heard before asking them to start.
 const FALLBACK_QUOTE_MAX_LENGTH = 40;
 const NON_SYMPTOM_UTTERANCES = [
-    '상담시작', '상담종료', '처음으로', '시작', '종료', '취소', '안녕', '안녕하세요',
+    '상담시작', '상담종료', '예진상담', '처음으로', '시작', '종료', '취소', '안녕', '안녕하세요',
     '차트확인', '알림방등록',
 ];
 
@@ -166,6 +171,66 @@ function buildHeardLine(utterance) {
         : trimmed;
 
     return `"${quoted}"라고 말씀해 주셨네요.`;
+}
+
+// Something the patient wrote that a clinician should read: not a button
+// label, not a one-character slip, not a thank-you.
+function isFollowUpQuestion(utterance) {
+    const trimmed = String(utterance || '').trim();
+    const normalized = trimmed.replace(/\s+/g, '');
+    if (normalized.length < 2) return false;
+    if (NON_SYMPTOM_UTTERANCES.includes(normalized)) return false;
+    return !isAcknowledgement(trimmed);
+}
+
+// "감사합니다" after an answer is not a question. Filing it would page the
+// clinicians three times for a thank-you.
+const ACKNOWLEDGEMENT_PATTERN = /^(네|넵|예|응|감사|고맙|고마워|알겠|확인했|ㅇㅋ|ok|okay|thank)/i;
+const ACKNOWLEDGEMENT_MAX_LENGTH = 15;
+
+function isAcknowledgement(utterance) {
+    const trimmed = String(utterance || '').trim();
+    if (!trimmed || trimmed.length > ACKNOWLEDGEMENT_MAX_LENGTH) return false;
+    if (/[?？]/.test(trimmed)) return false;
+    return ACKNOWLEDGEMENT_PATTERN.test(trimmed.replace(/\s+/g, ''));
+}
+
+// The same path a web patient's follow-up takes, through the same function.
+// Returns the reply to show, or null to fall back to the greeting - a
+// consultation closed a moment ago, say.
+async function recordKakaoFollowUp(userId, openConsultation, utterance) {
+    try {
+        const followUp = await dbService.appendPublicFollowUpQuestionByLookup(
+            openConsultation.trackingToken,
+            utterance,
+            { source: 'kakao_channel' },
+        );
+
+        await enqueueDoctorNotification(followUp.doctorNotificationMessage, followUp.userId || userId, {
+            type: 'patient_follow_up_question',
+            priority: 'high',
+            reminderDelaysMinutes: [0, 5, 15],
+        });
+        scheduleFollowUpDraft(followUp.consultationId, followUp.translatedQuestionKo || followUp.question);
+
+        // They are here and asking; the "your answer has arrived" reminders
+        // for an earlier reply would only interrupt.
+        try {
+            await clearPatientChannelPushes(userId, 'doctor_reply');
+            await clearPatientSmsNotifications(userId, 'doctor_reply');
+        } catch (clearError) {
+            console.warn(`[Kakao Follow-Up] Failed to clear reply reminders for ${userId}:`, clearError.message);
+        }
+
+        return [
+            '추가 질문을 의료진에게 전달했습니다.',
+            '답변이 준비되면 이 채널에 아무 말이나 보내 확인하실 수 있습니다.',
+            '다른 증상으로 새로 상담하시려면 [상담 시작]을 눌러 주세요.',
+        ].join('\n') + buildStatusLinkText(openConsultation);
+    } catch (error) {
+        console.error('[Kakao Follow-Up Error]', error?.message || error);
+        return null;
+    }
 }
 
 async function getStatusLinkForConsultation(consultationId) {
@@ -735,11 +800,17 @@ router.post('/check-doctor-reply', async (req, res) => {
                 await dbService.awardHDT(pending.doctorEmail, pending.doctorName, dbService.HDT_SEEN, 'seen');
             }
             const statusLinkText = await getStatusLinkForConsultation(pending.consultationId);
+            // They typed something before reading the answer. It may be
+            // answered already, so it is not filed - but it is not silently
+            // dropped either.
+            const typedQuestion = isFollowUpQuestion(getKakaoUtterance(payload));
             const replyText =
                 `의료진 답변이 도착했습니다.\n\n` +
                 `👨‍⚕️ ${pending.doctorName}\n\n` +
                 `${pending.message}${statusLinkText}\n\n` +
-                `도움이 충분했다면 이 채널에 상담종료라고 보내 상담을 마무리해 주세요.`;
+                (typedQuestion ? '방금 보내신 내용은 답변을 읽어 보신 뒤에도 궁금하시면 다시 적어 보내 주세요.\n' : '') +
+                `더 궁금한 점은 이 채널에 그대로 적어 보내 주세요. 같은 상담으로 의료진에게 전달됩니다.\n` +
+                `도움이 충분했다면 상담종료라고 보내 상담을 마무리해 주세요.`;
 
             return res.status(200).json({
                 version: "2.0",
@@ -753,13 +824,44 @@ router.post('/check-doctor-reply', async (req, res) => {
             });
         }
 
+        // A patient with an open consultation who types here is continuing
+        // it. Until now this fell through to the greeting below, which told
+        // them to press 상담 시작 - so every KakaoTalk follow-up became a new
+        // consultation, and on 23 November a clinician opening one saw no
+        // trace of the answer they had sent the same patient that morning.
+        // It now goes where a web patient's follow-up goes: onto the
+        // consultation, to the clinicians, with a draft.
+        const utterance = getKakaoUtterance(payload);
+        // Looked up once: the follow-up path and the greeting's status link
+        // both want the same open, recent consultation.
+        const openConsultation = await getOpenConsultationForUser(userId);
+
+        if (openConsultation?.trackingToken && isFollowUpQuestion(utterance)) {
+            const followUpReply = await recordKakaoFollowUp(userId, openConsultation, utterance);
+            if (followUpReply) {
+                return res.status(200).json({
+                    ...createKakaoTextResponse(followUpReply, [START_CONSULTATION_QUICK_REPLY, END_CONSULTATION_QUICK_REPLY]),
+                });
+            }
+        }
+
+        if (openConsultation && isAcknowledgement(utterance)) {
+            return res.status(200).json({
+                ...createKakaoTextResponse(
+                    '확인했습니다. 더 궁금한 점이 있으면 언제든 이 채널에 적어 보내 주세요.\n'
+                    + '도움이 충분했다면 상담종료라고 보내 상담을 마무리해 주세요.',
+                    [END_CONSULTATION_QUICK_REPLY],
+                ),
+            });
+        }
+
         // 대기 중인 답변 없음 → 일반 환영 메시지
         // This greeting used to say "먼저 말씀해 주세요" to someone who had just
         // done exactly that, and then said nothing about what happens next. A
-        // symptom typed here is not filed anywhere: only the 상담 시작 flow
-        // records one, so the greeting has to send the patient into it.
-        const statusLinkText = await getLatestStatusLinkForUser(userId);
-        const heardLine = buildHeardLine(getKakaoUtterance(payload));
+        // symptom typed here with no open consultation is not filed anywhere:
+        // only the 상담 시작 flow records one, so the greeting sends them there.
+        const statusLinkText = buildStatusLinkText(openConsultation);
+        const heardLine = buildHeardLine(utterance);
         const greeting = [
             '안녕하세요. 해피닥터 보듬입니다.',
             heardLine,

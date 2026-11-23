@@ -70,10 +70,20 @@ async function postUtterance(baseUrl, utterance) {
   return { status: response.status, text: body?.template?.outputs?.[0]?.simpleText?.text || '' };
 }
 
-function buildMocks({ trackingCalls, tracking = null }) {
+function buildMocks({ trackingCalls, tracking = null, followUps = [], alerts = [], drafts = [], pending = null }) {
   return {
     [DB_SERVICE_PATH]: {
-      getPendingDoctorReply: async () => null,
+      getPendingDoctorReply: async () => pending,
+      appendPublicFollowUpQuestionByLookup: async (lookup, question, options) => {
+        followUps.push({ lookup, question, options });
+        return {
+          consultationId: tracking?.consultationId || null,
+          userId: 'kakao-user-1',
+          question,
+          translatedQuestionKo: null,
+          doctorNotificationMessage: `추가 질문: ${question}`,
+        };
+      },
       getLatestConsultationTracking: async (userId, options) => {
         trackingCalls.push({ userId, options });
         return tracking;
@@ -85,14 +95,17 @@ function buildMocks({ trackingCalls, tracking = null }) {
       HDT_SEEN: 50,
     },
     [NOTIFY_SERVICE_PATH]: {
-      enqueueDoctorNotification: async () => true,
+      enqueueDoctorNotification: async (message, userId, options) => {
+        alerts.push({ message, userId, options });
+        return true;
+      },
       clearDoctorNotifications: async () => {},
       clearPatientChannelPushes: async () => {},
       clearPatientSmsNotifications: async () => {},
       clearOperatorUnansweredAlerts: async () => 0,
     },
     [FOLLOW_UP_SERVICE_PATH]: { scheduleFollowUpWithOptions: async () => {}, cancelFollowUp: async () => {} },
-    [SCHEDULER_PATH]: { scheduleDoctorSummary: () => {} },
+    [SCHEDULER_PATH]: { scheduleDoctorSummary: () => {}, scheduleFollowUpDraft: (id, q) => { drafts.push({ id, q }); } },
     [CONFIG_PATH]: {
       appSiteUrl: 'https://app.happydoctor.kr',
       ConfigurationError: class ConfigurationError extends Error {},
@@ -146,6 +159,7 @@ test('the greeting asks only for an open, recent consultation before offering a 
   try {
     const { text } = await postUtterance(server.baseUrl, '머리가 아파요');
 
+    // One lookup, shared by the follow-up path and the status link.
     assert.equal(trackingCalls.length, 1);
     assert.equal(trackingCalls[0].options.requireOpen, true);
     assert.ok(trackingCalls[0].options.maxAgeMs > 0);
@@ -168,7 +182,8 @@ test('an open consultation still gets its status link', { concurrency: false }, 
   const server = await startServer(routeModule.router);
 
   try {
-    const { text } = await postUtterance(server.baseUrl, '목이 아파요');
+    // A greeting is not a question, so this reaches the greeting and its link.
+    const { text } = await postUtterance(server.baseUrl, '안녕하세요');
 
     assert.match(text, /진행 상태 확인하기/);
     assert.match(text, /status#token=token-abc/);
@@ -255,6 +270,123 @@ test('a sentence that merely mentions a number is not taken as a contact', { con
     assert.deepEqual(saved, []);
     // Falls through to the ordinary greeting.
     assert.match(text, /상담 시작/);
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});
+
+// 23 November: a patient answered at 11:18 asked about the answer at 13:48 by
+// starting a new consultation, because typing a question here only got
+// "상담 시작을 눌러 주세요". The clinician opening the new one saw no trace of
+// the reply already sent.
+const OPEN_TRACKING = { consultationId: 'consult-open', trackingToken: 'token-abc', trackingCode: 'MRK7U8' };
+
+test('a question typed with an open consultation goes onto that consultation', { concurrency: false }, async () => {
+  const followUps = [];
+  const alerts = [];
+  const drafts = [];
+  const routeModule = loadKakaoRoute(buildMocks({ trackingCalls: [], tracking: OPEN_TRACKING, followUps, alerts, drafts }));
+  const server = await startServer(routeModule.router);
+
+  try {
+    const { text } = await postUtterance(server.baseUrl, '응급실에 가야 하는 상황인가요?');
+
+    // Filed the way a web patient's follow-up is, on the same consultation.
+    assert.deepEqual(followUps, [{
+      lookup: 'token-abc',
+      question: '응급실에 가야 하는 상황인가요?',
+      options: { source: 'kakao_channel' },
+    }]);
+    assert.equal(alerts.length, 1);
+    assert.equal(alerts[0].options.type, 'patient_follow_up_question');
+    assert.equal(alerts[0].options.priority, 'high');
+    assert.deepEqual(drafts, [{ id: 'consult-open', q: '응급실에 가야 하는 상황인가요?' }]);
+
+    assert.match(text, /추가 질문을 의료진에게 전달했습니다/);
+    // A different problem can still start fresh.
+    assert.match(text, /새로 상담하시려면 \[상담 시작\]/);
+    assert.doesNotMatch(text, /상담 시작 후 다시 한 번 적어 주세요/);
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});
+
+test('without an open consultation, a typed symptom is still sent to 상담 시작', { concurrency: false }, async () => {
+  const followUps = [];
+  const alerts = [];
+  const routeModule = loadKakaoRoute(buildMocks({ trackingCalls: [], tracking: null, followUps, alerts }));
+  const server = await startServer(routeModule.router);
+
+  try {
+    const { text } = await postUtterance(server.baseUrl, '어제부터 배가 아파요');
+
+    assert.deepEqual(followUps, []);
+    assert.deepEqual(alerts, []);
+    assert.match(text, /\[상담 시작\]을 눌러 상담을 시작해 주세요/);
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});
+
+test('a thank-you is acknowledged without paging anyone', { concurrency: false }, async () => {
+  const followUps = [];
+  const alerts = [];
+  const routeModule = loadKakaoRoute(buildMocks({ trackingCalls: [], tracking: OPEN_TRACKING, followUps, alerts }));
+  const server = await startServer(routeModule.router);
+
+  try {
+    for (const thanks of ['감사합니다', '네 알겠습니다', 'Thank you']) {
+      // eslint-disable-next-line no-await-in-loop
+      const { text } = await postUtterance(server.baseUrl, thanks);
+      assert.match(text, /확인했습니다/);
+    }
+    assert.deepEqual(followUps, []);
+    assert.deepEqual(alerts, []);
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});
+
+test('a question that starts politely is still a question', { concurrency: false }, async () => {
+  const followUps = [];
+  const routeModule = loadKakaoRoute(buildMocks({ trackingCalls: [], tracking: OPEN_TRACKING, followUps }));
+  const server = await startServer(routeModule.router);
+
+  try {
+    // Starts like a thank-you, but asks something.
+    await postUtterance(server.baseUrl, '네 그런데 약은 계속 먹어도 되나요?');
+    await postUtterance(server.baseUrl, '감사합니다 혹시 내일 가도 될까요');
+    assert.equal(followUps.length, 2);
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});
+
+test('a waiting reply is delivered first, and the typed text is not silently dropped', { concurrency: false }, async () => {
+  const followUps = [];
+  const routeModule = loadKakaoRoute(buildMocks({
+    trackingCalls: [],
+    tracking: OPEN_TRACKING,
+    followUps,
+    pending: { id: 'reply-1', consultationId: 'consult-open', doctorName: '김의사', message: '신경과 진료를 받아보세요.' },
+  }));
+  const server = await startServer(routeModule.router);
+
+  try {
+    const { text } = await postUtterance(server.baseUrl, '어느 병원으로 가야 하나요?');
+
+    assert.match(text, /의료진 답변이 도착했습니다/);
+    assert.match(text, /신경과 진료를 받아보세요/);
+    // The answer may already cover it, so it is not filed - but they are told.
+    assert.deepEqual(followUps, []);
+    assert.match(text, /답변을 읽어 보신 뒤에도 궁금하시면 다시 적어/);
+    // And the way to ask a follow-up is now spelled out.
+    assert.match(text, /더 궁금한 점은 이 채널에 그대로 적어 보내 주세요/);
   } finally {
     await server.close();
     routeModule.restore();
