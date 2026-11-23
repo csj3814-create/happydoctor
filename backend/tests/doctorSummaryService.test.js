@@ -117,6 +117,21 @@ test('the chart sent to the model carries only what the patient supplied', { con
   // Freed from asking questions, the model started recommending examinations,
   // which is the test order the prohibition above already rules out.
   assert.match(instruction, /검사 이름이나 "정밀 검사" 같은 표현을 쓰지 마세요/);
+  // Read against what the clinician actually sent (32 replies to 2026-11-23):
+  // they deleted this phrase from every draft that carried it, and the prompt
+  // was the thing telling the model to write it.
+  assert.match(instruction, /"의료진이 확인한 바로는"이라는 표현은 쓰지 마세요/);
+  assert.doesNotMatch(instruction, /같은 여지를 두세요/);
+  // Where and when is what the clinician adds by hand, every time.
+  assert.match(instruction, /진료과를 정해 주세요/);
+  // A draft may push urgency up, never talk it down. A first version let it
+  // say "응급까지는 아닙니다", and on a young patient short of breath it wrote
+  // that where the clinician had sent them to the emergency room.
+  assert.match(instruction, /시급도를 낮추는 말/);
+  assert.match(instruction, /애매하면 더 서두르는 쪽을 고르세요/);
+  assert.doesNotMatch(instruction, /"응급까지는 아닙니다"라고 말해도/);
+  // The prohibitions the style rules sit under do not move.
+  assert.match(instruction, /응급 여부를 단정하지 마세요/);
 });
 
 test('the follow-up draft also answers in one message rather than asking again', { concurrency: false }, async () => {
@@ -136,7 +151,10 @@ test('the follow-up draft also answers in one message rather than asking again',
   const instruction = call.request.config.systemInstruction;
   assert.match(instruction, /되묻지 마세요/);
   assert.match(instruction, /경우를 나눠 답하세요/);
-  assert.match(instruction, /250자 이내/);
+  // The clinician's own follow-up answers ran 34 to 124 characters.
+  assert.match(instruction, /150자 이내/);
+  assert.match(instruction, /처방한 의사만/);
+  assert.match(instruction, /시급도를 낮추는 말/);
   // The prohibitions do not relax because the conversation continued.
   assert.match(instruction, /진단명을 확정하지 마세요/);
   assert.match(instruction, /약물명, 용량, 복용법을 쓰지 마세요/);
