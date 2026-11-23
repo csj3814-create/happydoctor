@@ -8,8 +8,9 @@ import type { Consultation, FollowUpLog } from '@/lib/api'
 // The patient's questions and the doctor's replies were two separate lists on
 // this page, so reading the exchange meant jumping between them and matching
 // timestamps by eye. They are one conversation; this shows them as one.
+// `other` marks an item from one of the same patient's other consultations.
 type ThreadItem =
-  | { kind: 'patient'; at: number; label: string; text: string }
+  | { kind: 'patient'; at: number; label: string; text: string; other?: boolean }
   | {
       kind: 'doctor'
       at: number
@@ -21,8 +22,9 @@ type ThreadItem =
       deliveredLanguage?: string | null
       smsStatus?: string | null
       smsFailureReason?: string | null
+      other?: boolean
     }
-  | { kind: 'system'; at: number; label: string; text?: string }
+  | { kind: 'system'; at: number; label: string; text?: string; divider?: boolean }
 
 function timestampMs(value?: string | null): number {
   if (!value) return 0
@@ -102,6 +104,37 @@ export function buildThread(consultation: Consultation): ThreadItem[] {
     })
   })
 
+  // A KakaoTalk patient's follow-up arrives as a new consultation, so the
+  // answer they are asking about lives in another one. Folded in here, marked,
+  // so the clinician reads one conversation instead of finding a gap.
+  ;(consultation.relatedConsultations ?? []).forEach((related) => {
+    const openedAt = timestampMs(related.createdAt)
+    const closed = Boolean(related.closedAt) || related.status === 'COMPLETED' || related.status === 'CLOSED'
+    items.push({
+      kind: 'system',
+      at: openedAt,
+      label: `다른 상담 접수${closed ? ' · 종료됨' : ''}`,
+      divider: true,
+    })
+    if (related.chiefComplaint) {
+      items.push({ kind: 'patient', at: openedAt, label: '다른 상담', text: related.chiefComplaint, other: true })
+    }
+    ;(related.followUpLogs ?? []).forEach((log) => {
+      const text = (log.alertMessage || '').trim()
+      if (text) items.push({ kind: 'patient', at: timestampMs(log.timestamp), label: '다른 상담 · 추가 질문', text, other: true })
+    })
+    ;(related.doctorReplies ?? []).forEach((reply) => {
+      items.push({
+        kind: 'doctor',
+        at: timestampMs(reply.createdAt),
+        text: reply.message,
+        doctorName: reply.doctorName,
+        seen: reply.seen,
+        other: true,
+      })
+    })
+  })
+
   return items.sort((a, b) => a.at - b.at)
 }
 
@@ -168,7 +201,7 @@ export default function ConversationThread({
           <p className="mt-1 text-xs text-zinc-400">환자 질문과 의료진 답변을 시간 순서대로 보여줍니다.</p>
         </div>
         <span className="inline-flex items-center rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-500">
-          {items.length}건
+          {items.filter((item) => !(item.kind === 'system' && item.divider) && !('other' in item && item.other)).length}건
         </span>
       </div>
 
@@ -177,6 +210,18 @@ export default function ConversationThread({
       ) : (
         <ol ref={listRef} className="flex max-h-[60vh] flex-col gap-3 overflow-y-auto pr-1">
           {items.map((item, index) => {
+            if (item.kind === 'system' && item.divider) {
+              return (
+                <li key={`divider-${index}`} className="flex items-center gap-3 py-1">
+                  <span className="h-px flex-1 bg-zinc-200" />
+                  <span className="text-[11px] font-medium text-zinc-400">
+                    {item.label} · {formatDateTime(item.at)}
+                  </span>
+                  <span className="h-px flex-1 bg-zinc-200" />
+                </li>
+              )
+            }
+
             if (item.kind === 'system') {
               return (
                 <li key={`system-${index}`} className="flex justify-center">
@@ -191,7 +236,7 @@ export default function ConversationThread({
 
             if (item.kind === 'patient') {
               return (
-                <li key={`patient-${index}`} className="flex flex-col items-start">
+                <li key={`patient-${index}`} className={`flex flex-col items-start${item.other ? ' opacity-60' : ''}`}>
                   <div className="mb-1 flex items-center gap-2 text-[11px] text-zinc-400">
                     <span className="font-semibold text-zinc-500">환자</span>
                     <span>{item.label}</span>
@@ -207,8 +252,9 @@ export default function ConversationThread({
             }
 
             return (
-              <li key={`doctor-${index}`} className="flex flex-col items-end">
+              <li key={`doctor-${index}`} className={`flex flex-col items-end${item.other ? ' opacity-60' : ''}`}>
                 <div className="mb-1 flex items-center gap-2 text-[11px] text-zinc-400">
+                  {item.other ? <span className="rounded-full bg-zinc-100 px-2 py-0.5 font-medium text-zinc-500">다른 상담</span> : null}
                   <span className="font-semibold text-blue-700">{item.doctorName}</span>
                   <span
                     className={`rounded-full px-2 py-0.5 font-medium ${

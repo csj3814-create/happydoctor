@@ -90,6 +90,19 @@ export interface ConsultationMediaItem {
   url?: string | null;
 }
 
+// The same patient's other consultations near this one. A KakaoTalk patient
+// can only ask a follow-up by starting over, so the conversation is often
+// spread across several of these.
+export interface RelatedConsultation {
+  id: string;
+  createdAt: string | null;
+  status: string | null;
+  closedAt?: string | null;
+  chiefComplaint: string | null;
+  followUpLogs: FollowUpLog[];
+  doctorReplies: Array<Pick<DoctorReply, 'id' | 'message' | 'doctorName' | 'createdAt' | 'seen'>>;
+}
+
 export interface Consultation {
   id: string;
   userId: string;
@@ -115,6 +128,7 @@ export interface Consultation {
   patientNotificationContact?: PatientNotificationContact | null;
   aiDoctorSummary?: AiDoctorSummary | null;
   aiFollowUpDraft?: AiFollowUpDraft | null;
+  relatedConsultations?: RelatedConsultation[];
 }
 
 export type ConsultationStatus = 'all' | 'active' | 'followup' | 'replied' | 'closed';

@@ -2361,3 +2361,51 @@ test('the close route refuses a consultation the portal cannot show', { concurre
     routeModule.restore();
   }
 });
+
+// 23 November: a KakaoTalk patient answered at 11:18 asked about that answer
+// at 13:48 by starting a new consultation - the only way the channel offers.
+// Opening the new one, the clinician saw no sign of the reply already sent.
+test('the chart carries the same patient\'s other consultations, and survives without them', { concurrency: false }, async () => {
+  for (const failing of [false, true]) {
+    const calls = [];
+    const mocks = createPortalCloseMocks({
+      calls,
+      consultation: {
+        id: 'consult-new',
+        userId: 'kakao-user',
+        aiAction: 'ESCALATE',
+        status: 'ACTIVE',
+        createdAt: new Date('2026-11-23T04:46:00.000Z'),
+        doctorReplies: [],
+      },
+    });
+    mocks[DB_SERVICE_PATH].getRelatedConsultations = async (userId, excludeId) => {
+      calls.push({ type: 'getRelatedConsultations', userId, excludeId });
+      if (failing) throw new Error('firestore_unavailable');
+      return [{ id: 'consult-earlier', chiefComplaint: '두통', doctorReplies: [{ id: 'r1', message: '신경과 진료를 받아보세요.' }], followUpLogs: [] }];
+    };
+
+    const routeModule = loadRouteWithMocks(PORTAL_ROUTE_PATH, mocks);
+    const server = await startServer(routeModule.router, '/api/portal');
+    try {
+      const response = await getJson(`${server.baseUrl}/consultations/consult-new`, {
+        headers: { Authorization: 'Bearer portal-token' },
+      });
+
+      assert.equal(response.status, 200);
+      assert.equal(response.body.id, 'consult-new');
+      assert.deepEqual(calls.find((entry) => entry.type === 'getRelatedConsultations'), {
+        type: 'getRelatedConsultations', userId: 'kakao-user', excludeId: 'consult-new',
+      });
+      if (failing) {
+        // Context only: the chart still loads.
+        assert.equal(response.body.relatedConsultations, undefined);
+      } else {
+        assert.equal(response.body.relatedConsultations[0].doctorReplies[0].message, '신경과 진료를 받아보세요.');
+      }
+    } finally {
+      await server.close();
+      routeModule.restore();
+    }
+  }
+});

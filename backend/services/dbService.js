@@ -1257,6 +1257,46 @@ async function getDoctorRepliesForConsultation(consultationId) {
     .sort((a, b) => getTimestampMs(a.createdAt) - getTimestampMs(b.createdAt));
 }
 
+// The same patient's other consultations around this one, each with its
+// replies. A KakaoTalk patient with a follow-up has only a 상담 시작 button,
+// so a follow-up arrives as a new consultation - on 23 November a patient
+// answered at 11:18 asked about that answer at 13:48 in a fresh consultation,
+// and the clinician opening it saw no sign of the reply they had already
+// sent. Only portal-visible consultations, and only near this one in time.
+const RELATED_CONSULTATION_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+const RELATED_CONSULTATION_LIMIT = 5;
+
+async function getRelatedConsultations(userId, excludeId, aroundMs) {
+  if (!db || !userId) return [];
+
+  const snapshot = await db.collection('consultations').where('userId', '==', userId).get();
+  const centre = Number.isFinite(aroundMs) ? aroundMs : Date.now();
+
+  const related = snapshot.docs
+    .filter((doc) => doc.id !== excludeId)
+    .map((doc) => ({ ...doc.data(), id: doc.id }))
+    .filter((doc) => doc.aiAction === 'ESCALATE')
+    .filter((doc) => Math.abs(getTimestampMs(doc.createdAt) - centre) <= RELATED_CONSULTATION_WINDOW_MS)
+    .sort((a, b) => getTimestampMs(b.createdAt) - getTimestampMs(a.createdAt))
+    .slice(0, RELATED_CONSULTATION_LIMIT);
+
+  return Promise.all(related.map(async (doc) => ({
+    id: doc.id,
+    createdAt: doc.createdAt || null,
+    status: doc.status || null,
+    closedAt: doc.closedAt || null,
+    chiefComplaint: (doc.translatedPatientDataKo?.cc || doc.patientData?.cc || '').trim() || null,
+    followUpLogs: (doc.followUpLogs || []).filter((log) => log?.action === 'PATIENT_FOLLOW_UP_QUESTION'),
+    doctorReplies: (await getDoctorRepliesForConsultation(doc.id)).map((reply) => ({
+      id: reply.id,
+      message: reply.message,
+      doctorName: reply.doctorName,
+      createdAt: reply.createdAt,
+      seen: Boolean(reply.seen),
+    })),
+  })));
+}
+
 async function getConsultationById(consultationId) {
   if (!db) return null;
 
@@ -2225,6 +2265,7 @@ module.exports = {
   getConsultationSummary,
   getConsultationById,
   getDoctorRepliesForConsultation,
+  getRelatedConsultations,
   getConsultationTrackingById,
   getLatestConsultationTracking,
   getPublicConsultationStatusByLookup,

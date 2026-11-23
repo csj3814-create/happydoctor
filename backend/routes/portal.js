@@ -7,6 +7,7 @@ const {
   saveDoctorReply,
   getConsultationTrackingById,
   closeConsultationById,
+  getRelatedConsultations,
   awardHDT,
   getHDTLeaderboard,
   getDoctorStats,
@@ -148,6 +149,22 @@ async function withReplySmsStatus(consultation) {
     };
   } catch (error) {
     console.error('[Portal Reply SMS Status Error]', error?.message || error);
+    return consultation;
+  }
+}
+
+// Context only: a failed lookup must never cost the clinician the chart itself.
+async function withRelatedConsultations(consultation) {
+  if (!consultation?.userId || typeof getRelatedConsultations !== 'function') return consultation;
+
+  try {
+    const createdAt = consultation.createdAt?.toMillis
+      ? consultation.createdAt.toMillis()
+      : new Date(consultation.createdAt).getTime();
+    const relatedConsultations = await getRelatedConsultations(consultation.userId, consultation.id, createdAt);
+    return { ...consultation, relatedConsultations };
+  } catch (error) {
+    console.error('[Portal Related Consultations Error]', error?.message || error);
     return consultation;
   }
 }
@@ -557,7 +574,7 @@ router.get('/consultations/:id', requireDoctorAuth, async (req, res) => {
     const consultation = assertPortalVisibleConsultation(await getConsultationById(consultationId));
 
     return res.json(serializeTimestamps(withoutStandardIntakeReply(
-      await withReplySmsStatus(consultation),
+      await withRelatedConsultations(await withReplySmsStatus(consultation)),
     )));
   } catch (error) {
     if (error?.statusCode) {
