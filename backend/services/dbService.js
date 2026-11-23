@@ -1992,9 +1992,18 @@ async function appendPublicFollowUpQuestionByLookup(trackingLookup, question, op
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   }, { merge: true });
 
+  // What the record looked like before this question: lets a channel tell a
+  // patient continuing a burst of messages from one starting a new question.
+  const previousPatientQuestionAtMs = (consultationData.followUpLogs || [])
+    .filter((log) => log?.action === 'PATIENT_FOLLOW_UP_QUESTION')
+    .map((log) => getTimestampMs(log.timestamp))
+    .reduce((max, current) => Math.max(max, current), 0) || null;
+
   return {
     consultationId: consultationDoc.id,
     userId: consultationData.userId || null,
+    previousPatientQuestionAtMs,
+    doctorRepliedAtMs: getTimestampMs(consultationData.doctorRepliedAt) || null,
     question: normalizedQuestion,
     sourceLanguage,
     translatedQuestionKo,

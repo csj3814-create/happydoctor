@@ -392,3 +392,62 @@ test('a waiting reply is delivered first, and the typed text is not silently dro
     routeModule.restore();
   }
 });
+
+// The first live test: two questions twenty seconds apart, and the full
+// guidance - link, code and preview card - came back after each one.
+function buildBurstMocks({ previousPatientQuestionAtMs, doctorRepliedAtMs }) {
+  const mocks = buildMocks({ trackingCalls: [], tracking: OPEN_TRACKING });
+  mocks[DB_SERVICE_PATH].appendPublicFollowUpQuestionByLookup = async (lookup, question) => ({
+    consultationId: 'consult-open',
+    userId: 'kakao-user-1',
+    question,
+    translatedQuestionKo: null,
+    doctorNotificationMessage: question,
+    previousPatientQuestionAtMs,
+    doctorRepliedAtMs,
+  });
+  return mocks;
+}
+
+test('a question following another within the burst gets one short line', { concurrency: false }, async () => {
+  const routeModule = loadKakaoRoute(buildBurstMocks({
+    previousPatientQuestionAtMs: Date.now() - 20 * 1000,
+    doctorRepliedAtMs: null,
+  }));
+  const server = await startServer(routeModule.router);
+
+  try {
+    const { text } = await postUtterance(server.baseUrl, '언제까지 기다리나요?');
+    assert.equal(text, '이어서 보내주신 내용도 의료진에게 함께 전달했습니다.');
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});
+
+test('the full guidance returns once a reply has come or the burst is over', { concurrency: false }, async () => {
+  const cases = [
+    // Answered since the last question: this one starts a new wait.
+    { previousPatientQuestionAtMs: Date.now() - 10 * 60 * 1000, doctorRepliedAtMs: Date.now() - 5 * 60 * 1000 },
+    // Asked long ago.
+    { previousPatientQuestionAtMs: Date.now() - 2 * 60 * 60 * 1000, doctorRepliedAtMs: null },
+    // The first question on this consultation.
+    { previousPatientQuestionAtMs: null, doctorRepliedAtMs: null },
+  ];
+
+  for (const timing of cases) {
+    const routeModule = loadKakaoRoute(buildBurstMocks(timing));
+    // eslint-disable-next-line no-await-in-loop
+    const server = await startServer(routeModule.router);
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const { text } = await postUtterance(server.baseUrl, '약은 계속 먹어도 되나요?');
+      assert.match(text, /추가 질문을 의료진에게 전달했습니다/);
+      assert.match(text, /진행 상태 확인하기/);
+    } finally {
+      // eslint-disable-next-line no-await-in-loop
+      await server.close();
+      routeModule.restore();
+    }
+  }
+});

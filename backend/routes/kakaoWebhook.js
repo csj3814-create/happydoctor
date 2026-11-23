@@ -195,6 +195,16 @@ function isAcknowledgement(utterance) {
     return ACKNOWLEDGEMENT_PATTERN.test(trimmed.replace(/\s+/g, ''));
 }
 
+// Still waiting on the same answer: they asked something within the last half
+// hour and no reply has come since.
+const FOLLOW_UP_BURST_WINDOW_MS = 30 * 60 * 1000;
+
+function isContinuingFollowUp(followUp, now = Date.now()) {
+    const previous = followUp?.previousPatientQuestionAtMs;
+    if (!previous || now - previous > FOLLOW_UP_BURST_WINDOW_MS) return false;
+    return !followUp.doctorRepliedAtMs || followUp.doctorRepliedAtMs < previous;
+}
+
 // The same path a web patient's follow-up takes, through the same function.
 // Returns the reply to show, or null to fall back to the greeting - a
 // consultation closed a moment ago, say.
@@ -220,6 +230,14 @@ async function recordKakaoFollowUp(userId, openConsultation, utterance) {
             await clearPatientSmsNotifications(userId, 'doctor_reply');
         } catch (clearError) {
             console.warn(`[Kakao Follow-Up] Failed to clear reply reminders for ${userId}:`, clearError.message);
+        }
+
+        // Patients write in bursts - two questions twenty seconds apart in the
+        // first live test - and the full guidance with its link and preview
+        // card repeated after every one. Once is enough while they are still
+        // waiting on the same answer.
+        if (isContinuingFollowUp(followUp)) {
+            return '이어서 보내주신 내용도 의료진에게 함께 전달했습니다.';
         }
 
         return [
