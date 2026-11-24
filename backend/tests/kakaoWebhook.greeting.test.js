@@ -451,3 +451,65 @@ test('the full guidance returns once a reply has come or the burst is over', { c
     }
   }
 });
+
+async function postIntake(baseUrl, params) {
+  const response = await fetch(`${baseUrl}/triage-complete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      userRequest: { user: { id: 'kakao-user-1' }, utterance: '완료' },
+      action: { params, detailParams: {} },
+    }),
+  });
+  const body = await response.json();
+  return (body?.template?.outputs || []).map((output) => output?.simpleText?.text || '');
+}
+
+function buildIntakeMocks() {
+  const mocks = buildMocks({ trackingCalls: [] });
+  mocks[DB_SERVICE_PATH].logConsultation = async () => ({ consultationId: 'consult-new', trackingToken: 'token-new', trackingCode: 'NEW123' });
+  mocks[FOLLOW_UP_SERVICE_PATH] = {
+    consumePendingFollowUp: async () => null,
+    resetSession: async () => {},
+    scheduleFollowUpWithOptions: async () => {},
+    cancelFollowUp: async () => {},
+  };
+  return mocks;
+}
+
+const INTAKE_PARAMS = { chief_complaint: '두통', age: '30대', gender: '남성', onset: '어제', symptom_detail: '욱신거림', nrs: '5' };
+
+test('the contact request is its own bubble and says what not leaving one means', { concurrency: false }, async () => {
+  const routeModule = loadKakaoRoute(buildIntakeMocks());
+  const server = await startServer(routeModule.router);
+
+  try {
+    const outputs = await postIntake(server.baseUrl, INTAKE_PARAMS);
+
+    assert.equal(outputs.length, 2);
+    assert.match(outputs[0], /상담 내용이 접수되었습니다/);
+    assert.doesNotMatch(outputs[0], /알려드릴까요/);
+    // 3 of 16 KakaoTalk patients left a number when this trailed the link.
+    assert.match(outputs[1], /답변이 오면 문자로 알려드릴까요/);
+    assert.match(outputs[1], /먼저 메시지를 보낼 수 없어서/);
+    // The old prompt offered the status link as the alternative.
+    assert.doesNotMatch(outputs[1], /위 링크로 언제든/);
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});
+
+test('a patient who gave a number during intake is not asked for one again', { concurrency: false }, async () => {
+  const routeModule = loadKakaoRoute(buildIntakeMocks());
+  const server = await startServer(routeModule.router);
+
+  try {
+    const outputs = await postIntake(server.baseUrl, { ...INTAKE_PARAMS, reply_notification_phone: '010-1234-5678' });
+    assert.equal(outputs.length, 1);
+    assert.doesNotMatch(outputs[0], /알려드릴까요/);
+  } finally {
+    await server.close();
+    routeModule.restore();
+  }
+});

@@ -116,13 +116,25 @@ const SUPPORT_NOTICE = [
 // who does not come back never learns their answer arrived. Asking for a phone
 // or an email here gives the reply somewhere to go - and asking is what makes
 // a number typed afterwards consent rather than a guess on our part.
+// Its own speech bubble, last, where the reply box is. It used to trail the
+// acknowledgement, the status link and the link's preview card, and 3 of 16
+// KakaoTalk patients left a number. It also offered the link as the
+// alternative, which for a KakaoTalk patient was not the real situation: the
+// channel cannot speak first, so without a number nobody can tell them the
+// answer has arrived. 10 of 17 KakaoTalk replies were ever read.
 const CONTACT_PROMPT = [
-    '',
-    '',
-    '답변이 준비되면 문자나 이메일로 알려드릴까요?',
-    '휴대폰 번호 또는 이메일 주소만 보내주시면 그 주소로 알림을 보내드립니다.',
-    '원하지 않으시면 보내지 않으셔도 됩니다. 위 링크로 언제든 직접 확인하실 수 있습니다.',
+    '답변이 오면 문자로 알려드릴까요?',
+    '카카오톡 채널은 저희가 먼저 메시지를 보낼 수 없어서, 번호를 남기지 않으시면 답변이 도착해도 알려드릴 방법이 없습니다.',
+    '휴대폰 번호(또는 이메일 주소)를 이 채널에 보내 주세요.',
+    '남기지 않으셔도 이 채널에 아무 말이나 보내시면 답변을 확인하실 수 있습니다.',
 ].join('\n');
+
+// Asking for a number the patient has just given would read as not listening.
+function buildIntakeOutputs(acknowledgement, options = {}) {
+    const outputs = [{ simpleText: { text: acknowledgement } }];
+    if (!options.patientNotificationContact) outputs.push({ simpleText: { text: CONTACT_PROMPT } });
+    return outputs;
+}
 
 // A status link says "here is the thing you are waiting on". Only a
 // consultation that is still open, and recent enough that the patient could
@@ -491,11 +503,10 @@ async function processTriageSync(userId, patientData, options = {}) {
         });
         let finalResponseText = analysisResult.replyToPatient;
         finalResponseText += await logConsultationAndGetStatusLink(userId, patientData, analysisResult, options);
-        finalResponseText += CONTACT_PROMPT;
         return {
             version: "2.0",
             template: {
-                outputs: [{ simpleText: { text: finalResponseText } }],
+                outputs: buildIntakeOutputs(finalResponseText, options),
                 quickReplies: [
                     START_CONSULTATION_QUICK_REPLY,
                     END_CONSULTATION_QUICK_REPLY
@@ -534,16 +545,13 @@ async function processTriageAsync(callbackUrl, userId, patientData, options = {}
         let finalResponseText = analysisResult.replyToPatient;
 
         finalResponseText += await logConsultationAndGetStatusLink(userId, patientData, analysisResult, options);
-        finalResponseText += CONTACT_PROMPT;
 
         // 콜백 URL로 실제 분석 결과 전송
         if (callbackUrl) {
             const callbackBody = {
                 version: "2.0",
                 template: {
-                    outputs: [{
-                        simpleText: { text: finalResponseText }
-                    }],
+                    outputs: buildIntakeOutputs(finalResponseText, options),
                     quickReplies: [
                         START_CONSULTATION_QUICK_REPLY,
                         END_CONSULTATION_QUICK_REPLY

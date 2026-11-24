@@ -35,7 +35,14 @@ const { isKoreanLanguage, translateText } = require('../services/translationServ
 const emailService = require('../services/emailService');
 const { appSiteUrl, getAllowedDoctorEmails, getPortalAdminEmails } = require('../config');
 const followUpService = require('../services/followUpService');
-const { INITIAL_PATIENT_REPLY, FOLLOW_UP_PATIENT_REPLY } = require('../services/llmService');
+const llmService = require('../services/llmService');
+
+const { INITIAL_PATIENT_REPLY, FOLLOW_UP_PATIENT_REPLY } = llmService;
+// The night acknowledgement and the wording stored before the emergency line
+// changed are standard too; the plain equality below is kept as a fallback.
+const isStandardPatientReply = typeof llmService.isStandardPatientReply === 'function'
+  ? llmService.isStandardPatientReply
+  : (text) => text === INITIAL_PATIENT_REPLY || text === FOLLOW_UP_PATIENT_REPLY;
 
 // Shown to the patient when automatic translation was unavailable. Korean and
 // English only, and fixed: the service that would translate it is the one that
@@ -358,7 +365,7 @@ function getOptedInPatientNotificationEmail(consultation) {
 // A translated copy survives: that one shows what a non-Korean patient read.
 function withoutStandardIntakeReply(consultation) {
   const reply = String(consultation?.chatbotReply || '').trim();
-  if (reply !== INITIAL_PATIENT_REPLY && reply !== FOLLOW_UP_PATIENT_REPLY) return consultation;
+  if (!isStandardPatientReply(reply)) return consultation;
 
   const delivered = String(consultation.patientDeliveredChatbotReply || '').trim();
   if (delivered && delivered !== reply) return consultation;
