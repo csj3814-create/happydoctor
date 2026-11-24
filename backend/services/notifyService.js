@@ -1062,12 +1062,20 @@ function normalizeSmsPhoneNumber(phoneNumber) {
 // SOLAPI sends from a Korean origination number and cannot reach subscribers
 // abroad; those requests are rejected by the SDK before they ever leave. Many
 // patients here use foreign numbers, so this is a routine case, not an error.
+//
+// Only a Korean mobile number can take a text. "Starts with 0" used to count
+// as Korean, but a UK patient writes their mobile as 07512..., which went to
+// SOLAPI as if it were Korean and failed; a Korean landline cannot take a
+// text either. Accepted: 010/011/016-019 locally, or +82 with or without the
+// leading 0.
+const KOREAN_MOBILE_PATTERN = /^(?:\+82|0)?0?1[016789]\d{7,8}$/;
+
 function isSmsDeliverableNumber(phoneNumber) {
   const normalized = normalizeSmsPhoneNumber(phoneNumber);
   if (!normalized) return false;
-  if (normalized.startsWith('+82')) return true;
-  if (normalized.startsWith('+')) return false;
-  return normalized.startsWith('0');
+  if (normalized.startsWith('+') && !normalized.startsWith('+82')) return false;
+  if (!normalized.startsWith('+82') && !normalized.startsWith('01')) return false;
+  return KOREAN_MOBILE_PATTERN.test(normalized);
 }
 
 function truncateSmsFailureReason(reason) {

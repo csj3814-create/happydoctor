@@ -8,6 +8,7 @@ import {
   localizeAndProtectStatusUrl,
 } from '@/lib/status'
 import type { StartFormCopy } from '@/lib/start-copy'
+import { canReceiveReplyText, looksLikeCompleteNumber } from '@/lib/phone'
 import {
   ActiveConsultationSession,
   WebConsultationDraft,
@@ -94,6 +95,7 @@ const copyByLanguage = {
     emailLabel: '이메일 (선택)',
     emailPlaceholder: '예: name@example.com',
     contactChoiceHint: '휴대폰 번호와 이메일 중 하나만 입력해도 됩니다.',
+    overseasPhoneHint: '해외 번호로는 문자를 보낼 수 없어요. 답변이 도착하면 이메일로 알려드릴 수 있도록 이메일 주소도 적어 주세요.',
     emailInvalid: '이메일 주소를 다시 확인해 주세요.',
     policyNote: '응급 상황이라고 느껴지면 신고나 119 또는 가까운 응급실 이용이 우선입니다. 해피닥터는 응급실을 대신하는 서비스가 아니라 의료가 멀게 느껴지는 분들이 온라인으로 먼저 도움을 청할 수 있게 돕는 상담 서비스입니다.',
     submitLoading: '상담 내용을 안전하게 접수하고 있습니다...',
@@ -145,6 +147,7 @@ const copyByLanguage = {
     emailLabel: 'Email (optional)',
     emailPlaceholder: 'Example: name@example.com',
     contactChoiceHint: 'Either a phone number or an email address is enough.',
+    overseasPhoneHint: 'We can only send text alerts to Korean mobile numbers. Please add your email address so we can tell you when your reply arrives.',
     emailInvalid: 'Please check the email address.',
     policyNote: 'If this feels urgent, please use emergency services first. Happy Doctor does not replace emergency care. It is an online support service for people who need to ask for help before healthcare becomes harder to reach.',
     submitLoading: 'Submitting your consultation securely...',
@@ -638,6 +641,16 @@ export default function WebConsultationStartForm({
                       placeholder={copy.phonePlaceholder}
                       className="mt-3 w-full rounded-[1.1rem] border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--ink)] outline-none transition focus:border-[var(--blue)]"
                     />
+                    {/* A foreign number takes the consent and then never
+                        receives anything. Said here, while the email field
+                        is still right below. */}
+                    {looksLikeCompleteNumber(formState.replyNotificationPhone)
+                      && !canReceiveReplyText(formState.replyNotificationPhone)
+                      && copy.overseasPhoneHint ? (
+                        <p className="mt-2 rounded-[0.9rem] bg-amber-50 px-3 py-2 text-xs leading-6 text-amber-900">
+                          {copy.overseasPhoneHint}
+                        </p>
+                      ) : null}
                   </label>
                 ) : null}
                 {formState.replyNotificationConsent ? (

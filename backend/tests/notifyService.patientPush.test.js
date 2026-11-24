@@ -1226,6 +1226,17 @@ test('SMS deliverability follows the Korean origination number SOLAPI sends from
 
     assert.equal(isSmsDeliverableNumber(''), false);
     assert.equal(isSmsDeliverableNumber(null), false);
+
+    // "Starts with 0" is not "Korean": a UK mobile written locally - a real
+    // patient's, from Birmingham - and a Korean landline cannot take a text.
+    assert.equal(isSmsDeliverableNumber('07512345678'), false);
+    assert.equal(isSmsDeliverableNumber('02-123-4567'), false);
+    // The older Korean mobile prefixes and the +82 forms people actually type.
+    assert.equal(isSmsDeliverableNumber('011-234-5678'), true);
+    assert.equal(isSmsDeliverableNumber('+82 010-1234-5678'), true);
+    assert.equal(isSmsDeliverableNumber('+821012345678'), true);
+    // A Jordanian number typed without the plus.
+    assert.equal(isSmsDeliverableNumber('962791234567'), false);
   } finally {
     context.restore();
   }
