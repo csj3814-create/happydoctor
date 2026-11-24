@@ -1080,9 +1080,18 @@ function getClosedTimestamp(doc) {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
+// Records the system writes about a consultation, as opposed to the patient
+// saying something. A newer one than the last reply must not put a
+// consultation in the follow-up tab as if a patient were waiting. Excluded by
+// name rather than included, so that any action not listed here - including
+// one added later - still counts as the patient speaking: wrongly showing a
+// consultation as waiting costs a glance, wrongly hiding one costs a patient.
+const SYSTEM_ONLY_LOG_ACTIONS = new Set(['AUTO_CLOSE', 'DOCTOR_CLOSE', 'COMPLETE']);
+
 function getLatestFollowUpTimestamp(doc) {
   const logs = Array.isArray(doc?.followUpLogs) ? doc.followUpLogs : [];
   return logs
+    .filter((log) => !SYSTEM_ONLY_LOG_ACTIONS.has(log?.action))
     .map((log) => {
       if (log?.timestamp?.toMillis) return log.timestamp.toMillis();
 
@@ -2275,6 +2284,7 @@ module.exports = {
   getConsultationById,
   getDoctorRepliesForConsultation,
   getRelatedConsultations,
+  getPortalInboxStage,
   getConsultationTrackingById,
   getLatestConsultationTracking,
   getPublicConsultationStatusByLookup,
