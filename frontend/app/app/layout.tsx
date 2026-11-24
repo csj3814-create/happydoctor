@@ -1,21 +1,16 @@
 import type { Metadata, Viewport } from 'next'
-import { Noto_Sans_KR, Space_Grotesk } from 'next/font/google'
+// The same font files as before, installed from npm instead of downloaded
+// from Google at build time. That download failed a CI build on 2026-11-10
+// for a commit that did not touch this app, and passed on rerun. Families and
+// weights are unchanged; the names are set in globals.css.
+import '@fontsource/noto-sans-kr/400.css'
+import '@fontsource/noto-sans-kr/500.css'
+import '@fontsource/noto-sans-kr/700.css'
+import '@fontsource/space-grotesk/500.css'
+import '@fontsource/space-grotesk/700.css'
 
 import AppPrivacyFooter from '@/components/AppPrivacyFooter'
 import './globals.css'
-
-const notoSansKr = Noto_Sans_KR({
-  subsets: ['latin'],
-  weight: ['400', '500', '700'],
-  display: 'swap',
-})
-
-const spaceGrotesk = Space_Grotesk({
-  subsets: ['latin'],
-  weight: ['500', '700'],
-  display: 'swap',
-  variable: '--font-display',
-})
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://app.happydoctor.kr'),
@@ -69,7 +64,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ko" className={`${notoSansKr.className} ${spaceGrotesk.variable} h-full`}>
+    <html lang="ko" className="h-full">
       <body className="min-h-full bg-[var(--surface)] text-[var(--ink)] antialiased">
         {children}
         <AppPrivacyFooter />
