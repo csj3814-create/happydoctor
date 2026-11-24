@@ -56,6 +56,7 @@
 
 - [ ] 의료법 검토 (보듬이 승인제 구조 기준) — 변호사 검토, 제출 차단 1순위. 사용자가 변호사 지인에게 문의 예정
 - [ ] `자동 임상 의사결정 지원: 아니요` 답변을 규제 검토로 확정한다
+  - ⚠ `docs/google-play/health-app-declaration-ko.md`의 근거 문장("임상적 판단이나 권고를 생성하지 않는 사무 보조")이 2026-11-24 초안 변경(진료과·시기·놓치면 안 되는 질환 제안) 이후 정확하지 않다. 변호사 검토 결과를 보고 문구 또는 초안 범위 중 하나를 맞출 것. 검토 요청서: https://claude.ai/artifact/BQnwwiV9Ct4DVHvWFL4Spq
 - [x] Gemini API 키 요금 등급 확인 — 운영은 Tier 1 유료 키 (2026-11-24, 아래 운영 점검 항목 참고)
 - [ ] Play Console에 Data Safety 양식을 직접 입력한다 (`docs/google-play/data-safety-ko.md` 기준, 이메일 주소 항목 포함)
 - [ ] 의료진 자격 확인·승인·회수·비밀유지 문서를 확정한다
