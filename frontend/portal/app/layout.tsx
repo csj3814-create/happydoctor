@@ -1,19 +1,12 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+// Geist from npm rather than downloaded from Google at build time - that
+// download failed a CI build once. The family names are set in globals.css.
+import "@fontsource-variable/geist";
+import "@fontsource-variable/geist-mono";
 import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 
 const portalUrl = process.env.NEXT_PUBLIC_PORTAL_SITE_URL || "https://portal.happydoctor.kr";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   metadataBase: new URL(portalUrl),
@@ -50,7 +43,7 @@ export default function RootLayout({
   return (
     <html
       lang="ko"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className="h-full antialiased"
     >
       <body className="min-h-full flex flex-col font-sans">{children}<Analytics /></body>
     </html>
