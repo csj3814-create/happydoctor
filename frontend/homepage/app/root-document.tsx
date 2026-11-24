@@ -1,12 +1,11 @@
-import { Noto_Sans_KR } from 'next/font/google'
+// The same font files as before, from npm rather than downloaded from Google
+// at build time - that download failed a CI build once. Same weights as the
+// old next/font setup; globals.css names the family on body.
+import '@fontsource/noto-sans-kr/400.css'
+import '@fontsource/noto-sans-kr/500.css'
+import '@fontsource/noto-sans-kr/700.css'
 import { Analytics } from '@vercel/analytics/react'
 import './globals.css'
-
-const notoSansKR = Noto_Sans_KR({
-  subsets: ['latin'],
-  weight: ['400', '500', '700'],
-  display: 'swap',
-})
 
 // The Korean and English homepages each have their own root layout so that
 // each can declare its own language: the English page used to ship as
@@ -18,7 +17,7 @@ export default function RootDocument({
   children,
 }: Readonly<{ lang: 'ko' | 'en'; children: React.ReactNode }>) {
   return (
-    <html lang={lang} className={`${notoSansKR.className} h-full`}>
+    <html lang={lang} className="h-full">
       <body className="min-h-full flex flex-col antialiased">
         {children}
         <Analytics />
