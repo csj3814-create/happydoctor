@@ -38,20 +38,8 @@ export const metadata: Metadata = {
   title: 'Happy Doctor | Free Online Medical Support',
   description:
     'Happy Doctor connects underserved communities with volunteer medical professionals through free online consultation.',
-  alternates: {
-    canonical: '/en',
-    languages: {
-      'ko-KR': '/ko',
-      'en-US': '/en',
-    },
-  },
-  openGraph: {
-    locale: 'en_US',
-    url: '/en',
-    title: 'Happy Doctor | Free Online Medical Support',
-    description:
-      'Happy Doctor connects underserved communities with volunteer medical professionals through free online consultation.',
-  },
+  // Canonical, language alternates and share previews come from the layout.
+  // Setting them here replaced the layout's wholesale and dropped the image.
 }
 
 export default function EnglishHomepage() {
