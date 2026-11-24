@@ -406,6 +406,36 @@ class EmailService {
   // Sent when a patient reply SMS is abandoned after repeated failures, so a
   // human knows one patient is unreachable. Carries no phone number and no
   // reply text - only the fact and the portal link.
+  // Before the balance runs out, rather than after: once it is gone every
+  // reply text fails, and the patients waiting on them are not told.
+  async sendSmsLowBalanceEmail({ balance, point, threshold } = {}) {
+    if (!this.isConfigured()) {
+      return false;
+    }
+
+    const recipients = getAlertEmailRecipients();
+    if (recipients.length === 0) {
+      return false;
+    }
+
+    const available = (Number(balance) || 0) + (Number(point) || 0);
+    const text = [
+      `SOLAPI 문자 잔액이 ${available.toLocaleString('ko-KR')}원으로 기준(${Number(threshold).toLocaleString('ko-KR')}원) 아래입니다.`,
+      `잔액 ${Number(balance || 0).toLocaleString('ko-KR')} · 포인트 ${Number(point || 0).toLocaleString('ko-KR')}`,
+      '',
+      '잔액이 0이 되면 환자에게 가는 답변 도착 문자가 모두 실패합니다.',
+      '문자 1건 약 45원, 답변 1건당 최대 3건이 나갑니다.',
+      'SOLAPI에서 충전해 주세요. 잔액이 기준 아래인 동안 하루에 한 번 알려드립니다.',
+    ].join('\n');
+
+    await this.sendMail({
+      to: recipients,
+      subject: '[해피닥터] SOLAPI 문자 잔액 부족 - 충전 필요',
+      text,
+    });
+    return true;
+  }
+
   // The account, not a patient: every reply text is stuck until someone tops
   // it up. The per-patient failure mail used to be the only signal, and it
   // told the reader to check the patient's phone number.

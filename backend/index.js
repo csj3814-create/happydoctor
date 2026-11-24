@@ -7,6 +7,7 @@ const followUpService = require('./services/followUpService');
 const patientSmsService = require('./services/patientSmsService');
 const unansweredDigestService = require('./services/unansweredDigestService');
 const consultationAutoCloseService = require('./services/consultationAutoCloseService');
+const smsBalanceService = require('./services/smsBalanceService');
 const botHeartbeatService = require('./services/botHeartbeatService');
 const {
   isKeepAliveDisabled,
@@ -53,6 +54,11 @@ async function startServer() {
       await consultationAutoCloseService.initialize();
     } catch (error) {
       console.error('[Auto Close Init Error]', error);
+    }
+    try {
+      await smsBalanceService.initialize();
+    } catch (error) {
+      console.error('[SMS Balance Init Error]', error);
     }
     try {
       await botHeartbeatService.initialize();

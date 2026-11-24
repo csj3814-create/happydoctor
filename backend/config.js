@@ -317,6 +317,17 @@ function getUnansweredDigestConfig() {
   };
 }
 
+// One reply queues up to three texts at 45 each, so 3000 is roughly twenty
+// replies of warning before texts start failing.
+function getSmsBalanceAlertConfig() {
+  return {
+    enabled: getBooleanEnv('SMS_BALANCE_ALERT_ENABLED', true),
+    threshold: getNumberEnv('SMS_BALANCE_ALERT_THRESHOLD', 3000, { min: 0, integer: true }),
+    checkIntervalMs: getNumberEnv('SMS_BALANCE_CHECK_INTERVAL_MS', 6 * 60 * 60 * 1000, { min: 60 * 1000, integer: true }),
+    alertIntervalMs: getNumberEnv('SMS_BALANCE_ALERT_INTERVAL_MS', 24 * 60 * 60 * 1000, { min: 60 * 1000, integer: true }),
+  };
+}
+
 // Ends consultations that have quietly finished. A patient who is satisfied
 // usually just stops replying, which leaves the consultation open forever.
 function getConsultationAutoCloseConfig() {
@@ -377,6 +388,7 @@ function validateStartupConfig() {
   getFirebaseServiceAccount();
   getUnansweredDigestConfig();
   getConsultationAutoCloseConfig();
+  getSmsBalanceAlertConfig();
   getBotHeartbeatConfig();
   getDoctorSummaryConfig();
 
@@ -418,6 +430,7 @@ module.exports = {
   getResendConfigIssue,
   getUnansweredDigestConfig,
   getConsultationAutoCloseConfig,
+  getSmsBalanceAlertConfig,
   getBotHeartbeatConfig,
   isKeepAliveDisabled,
   validateStartupConfig,
